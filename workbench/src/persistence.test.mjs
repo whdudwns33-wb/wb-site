@@ -8,6 +8,7 @@ const html=readFileSync(new URL('./app.html',import.meta.url),'utf8');
 function section(start,end){const a=html.indexOf(start),b=html.indexOf(end,a);assert.ok(a>=0&&b>a);return html.slice(a,b);}
 const source=[section('function load(){','function stu(){'),
   section('// COURSE_PLAN_CORE_START','// COURSE_PLAN_CORE_END'),
+  section('// CARE_CORE_START','// CARE_CORE_END'),
   section('// JEONGSI_CORE_START','// JEONGSI_CORE_END'),section('// JEONGSI_STORE_START','// JEONGSI_STORE_END'),
   section('// REPORT_STORE_START','// REPORT_STORE_END'),section('const ADIGA_FIELDS=','function renderAdiga(){'),
   section('function exportJson(){','/* ═══════════ 렌더 루트'),section('function allIpRows(){','/* 대학·학과·전형 그룹')].join('\n');
@@ -39,6 +40,16 @@ test('real backup merge preserves both course-plan histories and repeated confli
  const rows=c.db.students[0].consult.coursePlans;assert.equal(rows.length,3);assert.equal(JSON.stringify(rows[0]),first);assert.equal(rows[1].importedFromId,'plan-one');
  c.doImport();assert.equal(c.db.students[0].consult.coursePlans.length,3);
  const before=c.stored;c.fail=true;incoming.consult.coursePlans.push({...old,id:'plan-three'});c.imported=JSON.stringify({students:[incoming]});c.doImport();assert.equal(c.stored,before);assert.equal(JSON.stringify(c.db),before);
+});
+
+test('care sessions survive export, restore and repeated real merges without losing existing records',()=>{
+ const c=fixture();c.csToday=()=> '2026-10-29';const p={...c.csBlank(),title:'합성 상담',date:'2026-10-28',status:'완료',summary:'상담 요약'};
+ c.csSaveSession(c.db.students[0],p);const original=JSON.parse(c.stored);c.exportJson();const backup=c.exported;
+ c.imported=backup;c.doRestore();assert.equal(c.db.students[0].consult.care.sessions[0].summary,'상담 요약');
+ const incoming=clone(original);incoming.students[0].consult.care.sessions[0].summary='다른 기기 요약';c.imported=JSON.stringify(incoming);c.doImport();c.doImport();
+ assert.equal(c.db.students[0].consult.care.sessions.length,2);assert.equal(c.csLatest(c.db.students[0])[0].summary,'상담 요약');
+ assert.deepEqual(clone(c.db.students[0].consult.susi),original.students[0].consult.susi);
+ const before=c.stored;incoming.students[0].consult.care.sessions={broken:true};c.imported=JSON.stringify(incoming);c.doRestore();assert.equal(c.stored,before);
 });
 test('failed real exam and support writes preserve records and history across a retry',()=>{
   const c=fixture();

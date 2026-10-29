@@ -584,7 +584,7 @@ function nextConsult(s){
     const dt=nthWeekday(now.getFullYear(),now.getMonth()+k,+c.week,+c.day);
     if(dt&&dt>=now)return fmtDate(dt);}
   return null;}
-function lastRecordDate(s){const rs=(s.records||[]).map(r=>r.date).filter(Boolean).sort();return rs[rs.length-1]||null;}
+function lastRecordDate(s){const sessions=s.consult?.care?csLatest(s).filter(r=>r.status==="완료"):[];const rs=[...(s.records||[]),...sessions].map(r=>r.date).filter(Boolean).sort();return rs[rs.length-1]||null;}
 function overdueDays(s){const d=lastRecordDate(s);if(!d)return null;return Math.floor((new Date(today())-new Date(d))/864e5);}
 function odChip(s){const od=overdueDays(s);
   if(od===null)return `<span class="chip danger">상담 기록 없음</span>`;
@@ -621,6 +621,7 @@ function renderSide(){
   <button class="navbtn ${view.page==='lab'?'on':''}" onclick="go('lab')">🧪 <span class="txt">노하우 랩</span></button>
   <button class="navbtn ${view.page==='ipsi'?'on':''}" onclick="go('ipsi')">🎯 <span class="txt">수시 상담·가능권 분석</span></button>
   <button class="navbtn ${view.page==='jeongsi'?'on':''}" aria-label="정시 상담" title="정시 상담" onclick="go('jeongsi')"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 20V11h4v9m2 0V4h4v16m2 0V8h4v12M3 20h18"/></svg><span class="txt">정시 상담</span></button>
+  <button class="navbtn ${view.page==='care'?'on':''}" aria-label="상담 현황" onclick="go('care')"><span class="txt">상담 현황</span></button>
   <button class="navbtn ${view.page==='report'?'on':''}" aria-label="통합 상담 보고서" title="통합 상담 보고서" onclick="go('report')"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M14 3H5v18h14V8zM14 3v5h5M8 12h8M8 16h8"/></svg><span class="txt">통합 상담 보고서</span></button>
   <button class="navbtn ${view.page==='mock'?'on':''}" onclick="go('mock')">🧾 <span class="txt">모의지원</span></button>
   <button class="navbtn ${view.page==='hssim'?'on':''}" onclick="go('hssim')">🏫 <span class="txt">고교 선택</span></button>
@@ -739,7 +740,7 @@ function renderHome(){
 /* ═══════════ 학생 화면 ═══════════ */
 function renderStu(){
   const s=stu();if(!s){go("home");return;}
-  const tabs=[["overview","프로파일"],["acad","학업 관리"],["course","진로·과목 설계"],["saenggibu","생기부"],["tasks","수행평가"],["inquiry","탐구보고서"],["records","상담 관리"],["adm","진학사 통"],["plan","월간 계획"]];
+  const tabs=[["overview","프로파일"],["acad","학업 관리"],["course","진로·과목 설계"],["saenggibu","생기부"],["tasks","수행평가"],["inquiry","탐구보고서"],["records","상담 관리"],["sessions","상담 세션"],["adm","진학사 통"],["plan","월간 계획"]];
   /* 고3(또는 지원 기록이 있는 학생)은 수시 지원 탭을 프로파일 바로 뒤에 둔다 */
   if(s.grade==="고3"||(s.apply||[]).length)tabs.splice(1,0,["apply","수시 지원"]);
   $("#main").innerHTML=`
@@ -772,7 +773,7 @@ function renderStu(){
     </div>`;})()}
   <div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${view.tab===k?'on':''}" onclick="view.tab='${k}';render()">${l}</button>`).join("")}</div>
   <div id="tabbody"></div>`;
-  ({overview:tabOverview,apply:tabApply,acad:tabAcad,course:tabCourse,saenggibu:tabSaenggibu,tasks:tabTasks,inquiry:tabInquiry,adm:tabAdm,records:tabRecords,plan:tabPlan})[view.tab]();
+  ({overview:tabOverview,apply:tabApply,acad:tabAcad,course:tabCourse,saenggibu:tabSaenggibu,tasks:tabTasks,inquiry:tabInquiry,adm:tabAdm,records:tabRecords,sessions:tabSessions,plan:tabPlan})[view.tab]();
 }
 
 /* ── 프로파일 탭 ── */
@@ -1460,6 +1461,114 @@ ${tasks.length?`<h2>수행평가 마감</h2><ul>${tasks.map(t=>`<li>${esc(t.subj
 <h2>플래너</h2><pre>${p?esc(p.content):"이번 달 플래너가 아직 없습니다."}</pre>
 <footer>WB 웩슬러브레인센터 컨설팅 · 읽기 전용 공유본 (${today()} 기준)</footer></body></html>`;
   saveFile(`${s.name}_플래너공유_${ym}.html`,html);}
+
+// CARE_CORE_START
+const CS_KINDS=["월 정규 상담","주간 미트 상담","플래너 관리","기타 상담"],CS_STATUS=["예정","완료","불참","취소"];
+const CS_TARGETS=[["monthlyRegular","월 정규 상담",10],["weeklyMeet","주 미트 상담",14],["weeklyPlanner","주 플래너 확인",7],["monthlyDesign","월 플래너 설계",10]];
+function csToday(){return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
+function csBlank(){return {sessionId:"",previousId:"",title:"",date:csToday(),time:"",kind:"월 정규 상담",mode:"대면",status:"예정",meetUrl:"",plannerCheck:"미확인",plannerDesign:"미진행",plannerRef:"",agenda:"",summary:"",summaryReviewed:false,transcript:"",decisions:"",followUp:"",followUpDate:"",source:"직접 입력",sourceId:"",sourceUrl:"",importedFiles:[]};}
+function csPolicyBlank(){return {effectiveFrom:csToday(),monthlyRegular:"",weeklyMeet:"",weeklyPlanner:"",monthlyDesign:"",meetUrl:"",note:""};}
+function csState(s){const c=s.consult?.care;if(c==null)return {policies:[],sessions:[]};if(!c||typeof c!=="object"||Array.isArray(c)||!Array.isArray(c.policies)||!Array.isArray(c.sessions))throw Error("상담 세션 기록 형식을 확인하세요. 기존 자료는 유지됩니다.");return c;}
+function csMeet(v){if(!v)return "";const safe=adigaUrl(v);if(!safe)return "";const u=new URL(safe);return u.protocol==="https:"&&u.hostname==="meet.google.com"&&!u.search&&!u.hash&&/^\/[a-z]{3}-[a-z]{4}-[a-z]{3}$/.test(u.pathname)?u.href:"";}
+function csLatest(s){const rows=csState(s).sessions,map=new Map();for(const r of rows){if(!r||typeof r!=="object"||!r.sessionId||!r.id)throw Error("상담 세션 식별자를 확인하세요.");map.set(r.sessionId,r);}return [...map.values()];}
+function csPolicy(s,date){return csState(s).policies.filter(p=>p.effectiveFrom<=date).sort((a,b)=>a.effectiveFrom.localeCompare(b.effectiveFrom)||a.createdAt.localeCompare(b.createdAt)).at(-1)||null;}
+function csPeriod(date){if(!adigaDate(date))throw Error("기준일을 확인하세요.");const d=new Date(date+'T00:00:00Z'),monday=new Date(d);monday.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);const sunday=new Date(monday);sunday.setUTCDate(monday.getUTCDate()+6);return {month:date.slice(0,7),start:monday.toISOString().slice(0,10),end:sunday.toISOString().slice(0,10)};}
+function csProgress(s,date){
+ const period=csPeriod(date),rows=csLatest(s),done=rows.filter(r=>r.status==="완료"),week=r=>r.date>=period.start&&r.date<=period.end,month=r=>r.date.slice(0,7)===period.month;
+ const counts={monthlyRegular:done.filter(r=>month(r)&&r.kind==="월 정규 상담").length,weeklyMeet:done.filter(r=>week(r)&&r.kind==="주간 미트 상담").length,weeklyPlanner:done.filter(r=>week(r)&&r.plannerCheck==="확인").length,monthlyDesign:done.filter(r=>month(r)&&r.plannerDesign==="설계 완료").length};
+ return {period,policy:csPolicy(s,date),counts,planned:rows.filter(r=>r.status==="예정"&&month(r)).length,overdue:rows.filter(r=>r.status==="예정"&&r.date<csToday()).length,missingNotes:done.filter(r=>month(r)&&(!r.summary.trim()||!r.followUp.trim())).length,rows};
+}
+function csValidatePolicy(p){
+ if(!p||typeof p!=="object"||Array.isArray(p)||!adigaDate(p.effectiveFrom))throw Error("관리 기준 적용일을 확인하세요.");
+ for(const [key,,max]of CS_TARGETS)if(typeof p[key]!=="string"||!/^\d{1,2}$/.test(p[key])||+p[key]>max)throw Error("상담·플래너 목표 횟수를 입력하세요. 진행하지 않는 항목은 0회입니다.");
+ if(typeof p.meetUrl!=="string"||p.meetUrl&&!csMeet(p.meetUrl))throw Error("Google Meet 주소를 확인하세요 (https://meet.google.com/abc-defg-hij).");
+ if(typeof p.note!=="string"||p.note.length>4000)throw Error("관리 기준 메모는 4,000자 이내입니다.");return p;
+}
+function csValidateSession(p){
+ if(!p||typeof p!=="object"||Array.isArray(p))throw Error("상담 세션 형식을 확인하세요.");
+ for(const key of Object.keys(csBlank()).filter(k=>!["importedFiles","summaryReviewed"].includes(k))){const max=key==="transcript"?150000:key==="summary"?30000:8000;if(typeof p[key]!=="string"||p[key].length>max||p[key].includes('\u0000'))throw Error("상담 입력 형식·길이를 확인하세요: "+key);}
+ if(typeof p.summaryReviewed!=="boolean")throw Error("요약 검토 상태를 확인하세요.");
+ if(!p.title.trim()||!adigaDate(p.date)||p.time&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(p.time))throw Error("상담 제목·날짜·시간을 확인하세요.");
+ if(!CS_KINDS.includes(p.kind)||!CS_STATUS.includes(p.status)||!["대면","Google Meet","전화","자료 검토","기타"].includes(p.mode)||!["미확인","확인","해당없음"].includes(p.plannerCheck)||!["미진행","설계 완료","해당없음"].includes(p.plannerDesign))throw Error("상담·플래너 상태를 확인하세요.");
+ if(p.kind==="주간 미트 상담"&&p.mode!=="Google Meet")throw Error("주간 미트 상담의 방식은 Google Meet로 선택하세요.");
+ if(p.meetUrl&&!csMeet(p.meetUrl)||p.sourceUrl&&!adigaUrl(p.sourceUrl))throw Error("미트·자료 원문 주소를 확인하세요.");
+ if(!["직접 입력","PLAUD","기타 전사"].includes(p.source))throw Error("전사·요약 출처를 확인하세요.");
+ if(p.followUpDate&&(!adigaDate(p.followUpDate)||p.followUpDate<p.date))throw Error("후속 확인일은 상담일 이후여야 합니다.");
+ if(p.status==="완료"&&p.date>csToday())throw Error("미래 상담은 완료로 저장할 수 없습니다.");
+ if(p.status==="완료"&&!p.summary.trim())throw Error("완료한 상담의 확인된 요약을 입력하세요.");
+ if(p.status==="완료"&&p.source==="PLAUD"&&!p.summaryReviewed)throw Error("PLAUD 요약을 검토한 뒤 완료로 저장하세요.");
+ if(p.status==="완료"&&(p.plannerCheck==="확인"||p.plannerDesign==="설계 완료")&&!p.plannerRef.trim())throw Error("확인·설계한 플래너와 변경 내용을 적어 주세요.");
+ if(!Array.isArray(p.importedFiles)||p.importedFiles.length>10||p.importedFiles.some(f=>!f||!["transcript","summary","bundle"].includes(f.kind)||typeof f.name!=="string"||f.name.length>200||!Number.isSafeInteger(f.size)||f.size<0||f.size>1048576||typeof f.importedAt!=="string"||!Number.isFinite(Date.parse(f.importedAt))))throw Error("가져온 파일 정보를 확인하세요.");
+ return p;
+}
+function csValidateState(s){const state=csState(s);if(state.sessions.length>2000||state.policies.length>200)throw Error("상담 이력 한도를 초과했습니다.");for(const rows of [state.policies,state.sessions]){const ids=new Set();for(const r of rows){if(!r||typeof r.id!=="string"||!r.id||r.id.length>128||ids.has(r.id)||typeof r.createdAt!=="string"||!Number.isFinite(Date.parse(r.createdAt)))throw Error("상담 이력 식별자·저장일을 확인하세요.");ids.add(r.id);}}for(const p of state.policies)csValidatePolicy(p);for(const r of state.sessions)csValidateSession(r);csLatest(s);return state;}
+function csSavePolicy(s,p){
+ csValidatePolicy(p);const next=jCopy(db),target=next.students.find(x=>String(x.id)===String(s.id));if(!target)throw Error("학생을 확인하세요.");const state=csState(target);if(state.policies.length>=200)throw Error("관리 기준 이력 한도를 초과했습니다.");
+ target.consult=target.consult||{};target.consult.care={...state,policies:[...state.policies,{...jCopy(p),id:uid(),createdAt:new Date().toISOString()}]};save(next);
+}
+function csSaveSession(s,p){
+ csValidateSession(p);const next=jCopy(db),target=next.students.find(x=>String(x.id)===String(s.id));if(!target)throw Error("학생을 확인하세요.");const state=csState(target),current=p.sessionId?csLatest(target).find(x=>x.sessionId===p.sessionId):null;
+ if(p.sessionId&&(!current||current.id!==p.previousId)||!p.sessionId&&p.previousId)throw Error("상담 기록이 바뀌었습니다. 최신 회차를 다시 열어 주세요.");
+ if(state.sessions.length>=2000)throw Error("상담 이력 한도를 초과했습니다.");
+ if(p.source==="PLAUD"&&p.sourceId.trim())for(const student of next.students)for(const r of csLatest(student))if(r.source==="PLAUD"&&r.sourceId.trim()===p.sourceId.trim()&&(String(student.id)!==String(target.id)||r.sessionId!==p.sessionId))throw Error("이미 다른 상담에 연결된 PLAUD 녹음입니다. 학생과 회차를 확인하세요.");
+ const saved={...jCopy(p),id:uid(),sessionId:p.sessionId||uid(),createdAt:new Date().toISOString()};
+ target.consult=target.consult||{};target.consult.care={...state,sessions:[...state.sessions,saved]};save(next);return saved;
+}
+function csReadText(text){if(typeof text!=="string"||text.length>150000||/[\u0000\uFFFD]/.test(text))throw Error("UTF-8 텍스트와 길이를 확인하세요 (전사문 최대 150,000자).");return text.replace(/^\uFEFF/,"");}
+function csImportBundle(studentId,text){
+ if(text.length>1048576)throw Error("자료 파일은 1MB 이내입니다.");const data=JSON.parse(text, (k,v)=>{if(["__proto__","prototype","constructor"].includes(k))throw Error("허용하지 않는 자료 필드입니다.");return v;});
+ if(data.schema!=="wb-care-session-v1"||String(data.studentId)!==String(studentId)||!data.session||typeof data.session!=="object"||Array.isArray(data.session))throw Error("상담 자료의 형식·학생 식별자가 다릅니다.");
+ const allowed=Object.keys(csBlank()).filter(k=>!["sessionId","previousId","importedFiles"].includes(k));if(Object.keys(data.session).some(k=>!allowed.includes(k)))throw Error("상담 자료에 지원하지 않는 필드가 있습니다.");
+ const p={...csBlank(),...data.session,status:"예정",summaryReviewed:false};csValidateSession(p);return p;
+}
+function csMergeCare(current,incoming){
+ if(current)csValidateState({consult:{care:current}});if(incoming)csValidateState({consult:{care:incoming}});if(!current)return incoming?jCopy(incoming):undefined;if(!incoming)return jCopy(current);
+ const merge=key=>{const rows=jCopy(current[key]),added=[];for(const r of incoming[key]){const all=[...rows,...added],content=x=>{const q={...x};delete q.id;delete q.importedFromId;return jSerial(q);};if(all.some(x=>(x.importedFromId||x.id)===(r.importedFromId||r.id)&&content(x)===content(r)))continue;const q=jCopy(r);if(all.some(x=>x.id===q.id)){q.importedFromId=q.id;q.id=uid();}added.push(q);}return [...added,...rows];};
+ const merged={...incoming,...current,policies:merge("policies"),sessions:merge("sessions")};csValidateState({consult:{care:merged}});return merged;
+}
+function csText(s,r){return `${s.name} · ${r.title}\n${r.date} ${r.time} / ${r.kind} / ${r.mode} / ${r.status}\n플래너 확인: ${r.plannerCheck} / 설계: ${r.plannerDesign}\n대상·변경: ${r.plannerRef||"미기록"}\n\n상담 전 아젠다\n${r.agenda||"미기록"}\n\n확인된 요약\n${r.summary||"미기록"}\n\n결정 사항\n${r.decisions||"미기록"}\n\n후속 조치\n${r.followUp||"미기록"}\n확인일: ${r.followUpDate||"미정"}\n\n출처: ${r.source} / 녹음 ID: ${r.sourceId||"미입력"} / ${r.sourceUrl||"원문 링크 없음"}\n가져온 파일: ${r.importedFiles.map(f=>f.name).join(", ")||"없음"}\n\n전사 원문\n${r.transcript||"첨부 없음"}`;}
+// CARE_CORE_END
+
+const csDrafts=new Map(),csPolicies=new Map();let csBoardDate=csToday();
+function csDraft(){const s=stu();if(!csDrafts.has(s.id))csDrafts.set(s.id,{...csBlank(),meetUrl:csPolicy(s,csToday())?.meetUrl||""});return csDrafts.get(s.id);}
+function csPolicyDraft(){const s=stu();if(!csPolicies.has(s.id))csPolicies.set(s.id,{...csPolicyBlank(),...(csPolicy(s,csToday())||{}),effectiveFrom:csToday()});return csPolicies.get(s.id);}
+function csSet(k,v){const p=csDraft();p[k]=v;if(["summary","transcript","source","sourceId"].includes(k)){p.summaryReviewed=false;if($("#cs_reviewed"))$("#cs_reviewed").checked=false;}if(k==="kind"&&v==="주간 미트 상담"){p.mode="Google Meet";if($("#cs_mode"))$("#cs_mode").value=p.mode;}}
+function csOpen(index){const s=db.students[index];if(!s)return;openStu(s.id);view.tab="sessions";render();}
+function csNew(){if(confirm("미저장 상담 초안을 새 회차로 바꿀까요? 저장된 상담 이력은 유지됩니다.")){csDrafts.delete(stu().id);tabSessions();}}
+function csEdit(index){const r=csLatest(stu())[index];if(r&&confirm("이 회차의 최신 기록을 편집할까요? 기존 버전은 유지됩니다.")){csDrafts.set(stu().id,{...jCopy(r),previousId:r.id});tabSessions();}}
+function csSave(){try{const r=csSaveSession(stu(),csDraft());csDrafts.set(stu().id,{...jCopy(r),previousId:r.id});render();toast("상담을 새 버전으로 저장했습니다.");}catch(e){toast(e.message);}}
+function csSaveTargets(){try{csSavePolicy(stu(),csPolicyDraft());render();toast("적용일부터의 관리 기준을 저장했습니다.");}catch(e){toast(e.message);}}
+function csCopy(index){try{const r=index==null?csDraft():csLatest(stu())[index];csValidateSession(r);copy(csText(stu(),r));}catch(e){toast(e.message);}}
+function csTemplate(){const session={...csBlank(),title:"상담 제목",source:"PLAUD"};delete session.sessionId;delete session.previousId;delete session.importedFiles;saveFile('상담자료_입력양식.json',JSON.stringify({schema:"wb-care-session-v1",studentId:stu().id,session},null,2));}
+async function csReadFile(file,kind){
+ if(!file)return;const s=stu(),p=csDraft();try{
+  if(file.size>1048576||!new RegExp(kind==="bundle"?'\\.json$':'\\.(txt|md|srt|vtt)$','i').test(file.name))throw Error("1MB 이내의 UTF-8 TXT·MD·SRT·VTT 또는 연동 JSON 파일을 선택하세요.");
+  const text=await file.text();if(stu()?.id!==s.id||csDrafts.get(s.id)!==p)throw Error("학생이나 상담 초안이 바뀌어 가져오기를 중단했습니다.");
+  if(p.importedFiles.length>=10)throw Error("회차당 파일 가져오기는 10개까지입니다.");
+  const next=kind==="bundle"?csImportBundle(s.id,text):jCopy(p);if(kind!=="bundle"){const value=csReadText(text);if(kind==="summary"&&value.length>30000)throw Error("요약은 30,000자 이내입니다.");if(p[kind]&&!confirm("현재 초안의 해당 내용을 파일 내용으로 바꿀까요? 저장한 과거 버전은 유지됩니다."))return;next[kind]=value;next.source="PLAUD";next.summaryReviewed=false;}
+  else if((p.title||p.transcript||p.summary)&&!confirm("현재 미저장 초안을 새 상담 자료로 바꿀까요? 저장된 이력은 유지됩니다."))return;
+  next.importedFiles.push({kind,name:file.name.slice(0,200),size:file.size,importedAt:new Date().toISOString()});csDrafts.set(s.id,next);tabSessions();toast("초안에 읽었습니다. 학생·날짜·내용을 확인한 뒤 저장하세요.");
+ }catch(e){toast("가져오기 실패: "+e.message);}
+}
+function csMetrics(s,date){const p=csProgress(s,date);return `<p class="aplnote">월 ${esc(p.period.month)} · 주 ${esc(p.period.start)}~${esc(p.period.end)} (월~일, 한국시간)</p><div class="grid cols2">${CS_TARGETS.map(([k,label])=>`<div class="card"><b>${label}</b><p>${p.counts[k]}회 완료 / 목표 ${p.policy?esc(p.policy[k])+"회":"미설정"}</p></div>`).join("")}</div><p>이번 달 예정 ${p.planned}회 · 날짜가 지난 예정 ${p.overdue}회 · 요약/후속 조치 미기록 ${p.missingNotes}회</p>`;}
+function renderCare(){
+ const rows=db.students.map((s,i)=>({s,i})).filter(({s})=>s.enrollmentStatus!=="withdrawn");
+ $("#main").innerHTML=`<div class="ph"><h1>상담 현황</h1><p>학생별 정규 상담·미트 상담·플래너 관리. 완료로 저장한 최신 회차만 집계합니다.</p></div><div class="card"><label for="cs_boardDate">집계 기준일</label><input id="cs_boardDate" type="date" value="${esc(csBoardDate)}" onchange="if(adigaDate(this.value)){csBoardDate=this.value;renderCare()}"><p class="aplnote">주간 목표는 기준일이 속한 월~일, 월간 목표는 해당 달 기준입니다. 과거 상담 관리 기록은 별도 보존하며 자동으로 완료 횟수에 넣지 않습니다.</p><div style="overflow:auto"><table><caption>학생별 관리 진행 현황</caption><thead><tr><th>학생</th>${CS_TARGETS.map(([,label])=>`<th>${label}<br>완료/목표</th>`).join("")}<th>지연·미정리</th></tr></thead><tbody>${rows.map(({s,i})=>{try{const p=csProgress(s,csBoardDate);return `<tr><td><button class="btn sm" onclick="csOpen(${i})">${esc(s.name)}</button><br>${esc(s.grade||"")}</td>${CS_TARGETS.map(([k])=>`<td>${p.counts[k]} / ${p.policy?esc(p.policy[k]):"미설정"}</td>`).join("")}<td>지난 예정 ${p.overdue}<br>미정리 ${p.missingNotes}</td></tr>`;}catch{return `<tr><td>${esc(s.name)}</td><td colspan="5">기록 형식 확인 필요 — 원본은 유지됩니다.</td></tr>`;}}).join("")||'<tr><td colspan="6">재원 학생이 없습니다.</td></tr>'}</tbody></table></div></div>`;
+}
+function tabSessions(){
+ const s=stu();try{
+ const p=csDraft(),policy=csPolicyDraft(),state=csState(s),rows=csLatest(s),field=(key,label,type="text",value=p[key])=>`<div class="frow"><label for="cs_${key}">${label}</label><input id="cs_${key}" type="${type}" value="${esc(value||"")}" oninput="csSet('${key}',this.value)"></div>`,area=(key,label,lines=3)=>`<div class="frow"><label for="cs_${key}">${label}</label><textarea id="cs_${key}" rows="${lines}" oninput="csSet('${key}',this.value)">${esc(p[key])}</textarea></div>`,select=(key,label,values)=>`<div class="frow"><label for="cs_${key}">${label}</label><select id="cs_${key}" onchange="csSet('${key}',this.value)">${values.map(v=>`<option ${v===p[key]?'selected':''}>${esc(v)}</option>`).join("")}</select></div>`;
+ $("#tabbody").innerHTML=`<div class="card"><h2>상담 세션</h2><p>학생별 진행 상황을 확인하고 회차마다 전사문·요약·결정·후속 조치를 정리합니다.</p>${csMetrics(s,csToday())}<button class="btn sm" onclick="go('care')">전체 학생 현황</button> <button class="btn sm" onclick="view.tab='records';render()">기존 상담 관리</button></div>
+ <details class="acc2"><summary>학생별 관리 횟수와 미트 주소</summary><p>목표 횟수는 학생마다 정합니다. 하지 않는 항목은 0회로 저장하세요. 이전 관리 기준은 보존됩니다.</p><div class="formgrid">${[["effectiveFrom","적용 시작일","date"],...CS_TARGETS.map(([k,label])=>[k,label+" 목표 횟수","number"]),["meetUrl","기본 Google Meet 주소","url"],["note","관리 기준 메모","text"]].map(([k,label,type])=>`<div class="frow"><label for="cs_policy_${k}">${label}</label><input id="cs_policy_${k}" type="${type}" ${type==="number"?`min="0" max="${CS_TARGETS.find(x=>x[0]===k)[2]}"`:""} value="${esc(policy[k]||"")}" oninput="csPolicyDraft()['${k}']=this.value"></div>`).join("")}</div><button class="btn" onclick="csSaveTargets()">관리 기준 저장</button><details><summary>기준 변경 이력 ${state.policies.length}개</summary>${state.policies.map(x=>`<p>${esc(x.effectiveFrom)}부터 · ${CS_TARGETS.map(([k,label])=>`${label} ${esc(x[k])}회`).join(" / ")}</p>`).join("")}</details></details>
+ <div class="card"><h2>${p.sessionId?"상담 회차 수정":"새 상담 회차"}</h2><p class="aplnote">편집 후 저장하면 새 버전을 추가합니다. 이전 버전과 전사 원문은 이력에 남습니다.</p><div class="formgrid">${field("title","상담 제목")}${field("date","상담일","date")}${field("time","시간","time")}${select("kind","회차 유형",CS_KINDS)}${select("mode","진행 방식",["대면","Google Meet","전화","자료 검토","기타"])}${select("status","회차 상태",CS_STATUS)}${field("meetUrl","이 회차 Google Meet 주소","url")}</div>${csMeet(p.meetUrl)?`<p><a href="${esc(csMeet(p.meetUrl))}" target="_blank" rel="noopener noreferrer">Google Meet 열기</a></p>`:""}
+ ${area("agenda","상담 전 확인할 내용")}
+ <h3>플래너 확인·설계</h3><div class="formgrid">${select("plannerCheck","플래너 확인",["미확인","확인","해당없음"])}${select("plannerDesign","플래너 설계",["미진행","설계 완료","해당없음"])}</div>${area("plannerRef","확인한 플래너·설계 변경 내용")}<p class="aplnote">한 회차에서 확인·설계를 마쳐도 상담 횟수는 한 번만 셉니다. 기존 월간 계획과 진로·과목 설계는 각각 유지됩니다.</p><button class="btn sm" onclick="view.tab='plan';render()">월간 계획 열기 (${(s.planners||[]).length})</button> <button class="btn sm" onclick="view.tab='course';render()">진로·과목 설계 열기</button>
+ <h3>PLAUD 전사·요약 자료</h3><p>PLAUD에서 내보낸 파일을 읽거나 내용을 붙여넣으세요. 전사문과 요약은 별도로 보관합니다. 학생·상담일을 확인하고 요약을 검토한 뒤 저장합니다.</p><div class="formgrid">${select("source","자료 출처",["직접 입력","PLAUD","기타 전사"])}${field("sourceId","PLAUD 녹음 ID (알고 있을 때)")}${field("sourceUrl","자료 원문 링크","url")}</div><div class="formgrid"><div><label for="cs_transcriptFile">전사 TXT·MD·SRT·VTT</label><input id="cs_transcriptFile" type="file" accept=".txt,.md,.srt,.vtt" onchange="csReadFile(this.files[0],'transcript')"></div><div><label for="cs_summaryFile">요약 TXT·MD</label><input id="cs_summaryFile" type="file" accept=".txt,.md" onchange="csReadFile(this.files[0],'summary')"></div></div><p class="aplnote">UTF-8, 파일당 1MB. 파일은 먼저 초안에 읽고 저장 버튼을 눌렀을 때 상담 자료에 반영됩니다. 녹음·회의 생성이나 자동 수집은 실행하지 않습니다.</p><details><summary>연동용 상담 자료 JSON 가져오기</summary><p>어사이드에서 별도로 정리한 자료를 이 학생의 입력 양식으로 가져올 수 있습니다. 학생 식별자가 다른 파일은 거절하며 완료 여부는 다시 확인합니다.</p><button class="btn sm" onclick="csTemplate()">이 학생의 입력 양식 받기</button><label for="cs_bundle">상담 자료 JSON</label><input id="cs_bundle" type="file" accept=".json" onchange="csReadFile(this.files[0],'bundle')"></details>
+ ${area("summary","상담 요약",5)}<label class="ck"><input id="cs_reviewed" type="checkbox" ${p.summaryReviewed?'checked':''} onchange="csSet('summaryReviewed',this.checked)"><span>PLAUD 요약을 원문과 대조하고 검토했습니다</span></label><details><summary>전사 원문 (${p.transcript.length.toLocaleString()}자)</summary>${area("transcript","전사 원문",10)}</details>${p.importedFiles.length?`<p class="aplnote">읽은 파일: ${p.importedFiles.map(f=>esc(f.name)).join(" · ")}</p>`:""}
+ ${area("decisions","합의·결정 사항")}${area("followUp","다음 과제·담당자·확인할 일")}${field("followUpDate","후속 확인일","date")}<div style="display:flex;gap:var(--sp-2);flex-wrap:wrap"><button class="btn pri" onclick="csSave()">상담 회차 저장</button><button class="btn" onclick="csCopy()">정리 내용 복사</button><button class="btn ghost" onclick="csNew()">새 회차</button></div></div>
+ <div class="card"><h2>회차별 최신 기록 ${rows.length}개</h2>${rows.map((r,i)=>`<details class="acc2"><summary>${esc(r.date)} ${esc(r.time)} · ${esc(r.title)} · ${esc(r.status)}</summary><p>${esc(r.kind)} / ${esc(r.mode)} · 플래너 ${esc(r.plannerCheck)} / ${esc(r.plannerDesign)}</p><pre style="white-space:pre-wrap">${esc(r.summary||"요약 미입력")}</pre><p>후속: ${esc(r.followUp||"미기록")} · ${esc(r.followUpDate||"날짜 미정")}</p><button class="btn sm" onclick="csEdit(${i})">이 회차 편집</button> <button class="btn sm" onclick="csCopy(${i})">정리 내용 복사</button><details><summary>저장 버전 ${state.sessions.filter(x=>x.sessionId===r.sessionId).length}개 (전사 포함)</summary>${state.sessions.filter(x=>x.sessionId===r.sessionId).map(x=>`<details><summary>${esc(x.createdAt||"")} · ${esc(x.status)}</summary><pre style="white-space:pre-wrap">${esc(csText(s,x))}</pre></details>`).join("")}</details></details>`).join("")||'<p>저장한 상담 회차가 없습니다. 기존 상담 기록은 상담 관리 탭에서 확인할 수 있습니다.</p>'}</div>`;
+ }catch(e){$("#tabbody").innerHTML=`<div class="card"><h2>상담 세션 확인 필요</h2><p>${esc(e.message)}</p></div>`;}
+}
 
 /* ── 상담 관리 탭 ── */
 function upConsult(k,v){const s=stu();s.consult=s.consult||{};s.consult[k]=v;save();render();}
@@ -5136,6 +5245,7 @@ function checkBackup(data){
     object(s.consult?.jeongsi,"정시 기록");
     array(s.consult?.coursePlans,"진로·과목 설계");
     for(const p of s.consult?.coursePlans||[])cpValidate(p,true);
+    if(s.consult?.care!=null)csValidateState(s);
     for(const k of ["exams","plans","history"])array(s.consult?.jeongsi?.[k],"정시 "+k);
     if(s.consult?.reports!=null){
       rptMergeReports([],s.consult.reports);
@@ -5179,6 +5289,7 @@ function mergeSusiStudent(existing,incoming){
   if(current.jeongsi||added.jeongsi)consult.jeongsi=jMergeState(current.jeongsi||{},added.jeongsi||{});
   if(current.reports!=null||added.reports!=null)consult.reports=rptMergeReports(current.reports??[],added.reports??[]);
   if(current.coursePlans!=null||added.coursePlans!=null)consult.coursePlans=cpMergePlans(current.coursePlans??[],added.coursePlans??[]);
+  if(current.care!=null||added.care!=null)consult.care=csMergeCare(current.care,added.care);
   const apply=[...(existing.apply||[])];
   for(const a of incoming.apply||[])if(!apply.some(b=>(a.id&&a.id===b.id)||aplSame(a,b)))apply.push(a);
   return{consult,apply};
@@ -5212,6 +5323,7 @@ function render(){
   else if(view.page==="ipsi")renderIpsi();
   else if(view.page==="jeongsi")renderJeongsi();
   else if(view.page==="report")renderReport();
+  else if(view.page==="care")renderCare();
   else if(view.page==="mock")renderMock();
   else if(view.page==="hssim")renderHsSim();
   else if(view.page==="partner")renderPartner();
