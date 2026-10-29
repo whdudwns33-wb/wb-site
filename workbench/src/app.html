@@ -414,7 +414,7 @@ const SEED_PRIV={univs:{},profiles:{}}; /*BUILD:PRIVATE_SEED*/
         exams:[],subjectsMgmt:[],univs:[],tongLogs:[],commLogs:[],consult:{},
         ...r,id:r.id||uid()});
       ch=true;}
-    const ORD={"고3":0,"고2":1,"고1":2};
+    const ORD={"고3":0,"고2":1,"고1":2,"중3":3};
     db.students.sort((a,b)=>(ORD[a.grade]??9)-(ORD[b.grade]??9));
   }
   for(const s of db.students){
@@ -591,7 +591,7 @@ function odChip(s){const od=overdueDays(s);
   if(od>40)return `<span class="chip danger">마지막 상담 ${od}일 전</span>`;
   return `<span class="chip">마지막 상담 ${od}일 전</span>`;}
 function focusList(){
-  return db.students.map(s=>{
+  return db.students.filter(s=>s.enrollmentStatus!=="withdrawn").map(s=>{
     const reasons=[];let score=0;
     const od=overdueDays(s);
     if(od===null){score+=3;reasons.push(["상담 기록 없음","danger"]);}
@@ -612,7 +612,7 @@ function focusList(){
 
 /* ═══════════ 사이드바 ═══════════ */
 function renderSide(){
-  const grades=["고3","고2","고1"];
+  const grades=["고3","고2","고1","중3","퇴원"];
   $("#side").innerHTML=`
   <div class="brand" onclick="go('home')"><div class="mark">WB</div><div><b>컨설팅 워크벤치</b><small>웩슬러브레인센터</small></div></div>
   <button class="navbtn ${view.page==='home'?'on':''}" onclick="go('home')">🏠 <span class="txt">대시보드</span></button>
@@ -629,7 +629,7 @@ function renderSide(){
   <button class="navbtn ${view.page==='adiga'?'on':''}" onclick="go('adiga')">🏛 <span class="txt">어디가 데이터</span></button>
   <button class="navbtn ${view.page==='knowhow'?'on':''}" onclick="go('knowhow')">📚 <span class="txt">노하우 라이브러리</span></button>
   ${grades.map(g=>{
-    const list=db.students.filter(s=>s.grade===g);
+    const list=db.students.filter(s=>g==="퇴원"?s.enrollmentStatus==="withdrawn":s.grade===g&&s.enrollmentStatus!=="withdrawn");
     if(!list.length)return"";
     return `<div class="grp">${g} · ${list.length}명</div>`+list.map(s=>{
       const nTask=(s.tasks||[]).filter(t=>t.status!=="제출완료").length;
@@ -652,9 +652,10 @@ function openStu(id){view.page="stu";view.stuId=id;view.tab="overview";view.edit
 
 /* ═══════════ 대시보드 ═══════════ */
 function renderHome(){
-  const allTasks=db.students.flatMap(s=>(s.tasks||[]).filter(t=>t.status!=="제출완료").map(t=>({...t,stu:s})));
+  const students=db.students.filter(s=>s.enrollmentStatus!=="withdrawn");
+  const allTasks=students.flatMap(s=>(s.tasks||[]).filter(t=>t.status!=="제출완료").map(t=>({...t,stu:s})));
   allTasks.sort((a,b)=>(a.due||"9999")<(b.due||"9999")?-1:1);
-  const drafts=db.students.reduce((n,s)=>n+(s.saenggibu||[]).length,0);
+  const drafts=students.reduce((n,s)=>n+(s.saenggibu||[]).length,0);
   const lb=db.meta&&db.meta.lastExport;
   const lbd=lb?Math.max(0,Math.floor((new Date(today())-new Date(lb))/864e5)):null;
   const bkChip=lbd===null
@@ -665,15 +666,15 @@ function renderHome(){
   $("#main").innerHTML=`
   <div class="pagehead"><div>
     <h1>컨설팅 대시보드</h1>
-    <div class="sub">학생 ${db.students.length}명 · 진행 중 수행평가 ${allTasks.length}건 · 생기부 초안 ${drafts}건 — ${today()} ${bkChip}</div>
+    <div class="sub">재원 ${students.length}명 · 퇴원 ${db.students.length-students.length}명 · 진행 중 수행평가 ${allTasks.length}건 · 생기부 초안 ${drafts}건 — ${today()} ${bkChip}</div>
   </div><button class="btn pri" onclick="addStudent()">＋ 학생 추가</button></div>
 
-  ${db.students.length===0?`<div class="card empty"><b>학생 데이터가 비어 있습니다</b>
+  ${students.length===0?`<div class="card empty"><b>학생 데이터가 비어 있습니다</b>
     좌측 하단 <u>가져오기</u>로 시드 JSON(students.json)을 불러오거나, 학생을 직접 추가하세요.<br>
     모든 데이터는 이 브라우저에만 저장됩니다.</div>`:`
 
-  ${db.students.some(s=>s.grade==="고3")?(()=>{const d=dday(db.meta.suneung);
-    const g3=db.students.filter(s=>s.grade==="고3").map(s=>esc(s.name)).join(" · ");
+  ${students.some(s=>s.grade==="고3")?(()=>{const d=dday(db.meta.suneung);
+    const g3=students.filter(s=>s.grade==="고3").map(s=>esc(s.name)).join(" · ");
     return `<div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:4px;border-color:var(--danger)">
     <span style="font-size:var(--fs-xl)">🎯</span>
     <div style="flex:1"><b style="font-size:var(--fs-lg)">수능 ${d!==null&&d>=0?"D-"+d:"날짜 확인 필요"}</b>
@@ -682,7 +683,7 @@ function renderHome(){
     </div>`;})():""}
 
 
-  ${(()=>{const up=db.students.flatMap(st=>aplList(st).filter(a=>!aplDead(a)).flatMap(a=>[
+  ${(()=>{const up=students.flatMap(st=>aplList(st).filter(a=>!aplDead(a)).flatMap(a=>[
       a.ex&&a.ex.date?{d:a.ex.date,st,a,l:`${a.ex.kind||"대학별고사"}${a.ex.time?" "+a.ex.time:""}`}:null,
       a.res&&a.res.date&&a.status!=="최종 합격"?{d:a.res.date,st,a,l:"발표"}:null].filter(Boolean)))
       .filter(e=>{const n=dday(e.d);return n>=0&&n<=30;}).sort((x,y)=>x.d<y.d?-1:1);
@@ -709,7 +710,7 @@ function renderHome(){
     </div>`).join(""):`<div class="empty" style="padding:14px"><b>전원 관리 상태 양호</b>밀린 상담·임박 마감·임박 시험이 없습니다.</div>`})()}</div></div>
 
   <div class="sec"><h2>상담 레이더 <span class="n">정기 상담 사이클</span></h2>
-  <div class="card">${(()=>{const rows=db.students.map(s=>({s,next:nextConsult(s),od:overdueDays(s)}));
+  <div class="card">${(()=>{const rows=students.map(s=>({s,next:nextConsult(s),od:overdueDays(s)}));
     const on=rows.filter(r=>r.next).sort((a,b)=>a.next<b.next?-1:1),off=rows.filter(r=>!r.next);
     return on.map(({s,next,od})=>`
     <div class="duer" onclick="openStu('${s.id}');view.tab='records';render()">
@@ -722,7 +723,7 @@ function renderHome(){
       <span class="hint">학생 › 상담 관리에서 주기를 정하면 이 목록에 일정으로 뜹니다</span></div>`:"");})()}</div></div>
 
   <div class="sec"><h2>학생별 현황</h2>
-  <div class="grid cols3">${db.students.map(s=>{
+  <div class="grid cols3">${students.map(s=>{
     const nT=(s.tasks||[]).filter(t=>t.status!=="제출완료").length;
     const nS=(s.saenggibu||[]).length;
     return `<div class="card stucard" onclick="openStu('${s.id}')">
@@ -749,6 +750,8 @@ function renderStu(){
     · <span title="이 학생의 정본 폴더 — 앱에서 저장하는 파일은 전부 이 폴더 규칙 이름으로 나갑니다">📁 코워크/컨설팅/${esc(s.name)}/</span></div>
   </div><div style="display:flex;gap:8px">
     <button class="btn sm" onclick="copyBriefing()">📋 상담 브리핑 프롬프트</button>
+    <button class="btn ghost sm" onclick="setEnrollment(stu().enrollmentStatus!=='withdrawn')">${s.enrollmentStatus==="withdrawn"?"재원 복귀":"퇴원 처리"}</button>
+    ${s.enrollmentStatus==="withdrawn"?`<span class="chip">퇴원 · ${esc(s.withdrawnAt||"날짜 미입력")}</span>`:""}
     <button class="btn ghost sm" onclick="delStudent()">삭제</button>
   </div></div>
   ${(()=>{ // 360° 신호등
@@ -780,7 +783,7 @@ function tabOverview(){
     <div class="formgrid">
       ${[["name","이름"],["grade","학년"],["school","학교"],["career","진로 목표"],["targetUniv","목표 대학/학과"],["lcsi","LCSI 유형"]].map(([k,l])=>`
       <div class="frow"><label>${l}</label>${
-        k==="grade"?`<select onchange="upStu('${k}',this.value)">${["고1","고2","고3"].map(g=>`<option ${s.grade===g?"selected":""}>${g}</option>`).join("")}</select>`
+        k==="grade"?`<select onchange="upStu('${k}',this.value)">${["중3","고1","고2","고3"].map(g=>`<option ${s.grade===g?"selected":""}>${g}</option>`).join("")}</select>`
         :k==="lcsi"?`<select onchange="upStu('${k}',this.value)">${Object.keys(LCSI).map(g=>`<option ${s.lcsi===g?"selected":""}>${g}</option>`).join("")}</select>`
         :`<input value="${esc(s[k]||"")}" onchange="upStu('${k}',this.value)">`}</div>`).join("")}
     </div>
@@ -912,6 +915,14 @@ function trajHtml(s){
     ${grid}${band(msBand,"var(--w1,#2F6DB5)","중3 예측",true)}${band(potBand,"var(--accent)",potLabel,false)}${line}${dots}${xlabels}</svg></div>
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${gapLine}${predLine}</div>
   <p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0 0">고교 보정: ${esc(ha.why)}. 밴드는 참고치 — 예측이 아니라 상담의 출발선입니다. 등급 축은 1(위)~${gmax}(아래).</p>`;}
+function setEnrollment(withdrawn){
+  const s=stu();if(!s)return;
+  if(!confirm(withdrawn?"기존 상담·성적·지원안을 보존하고 퇴원 처리할까요?":"기존 기록을 유지하고 재원으로 복귀할까요?"))return;
+  s.enrollmentStatus=withdrawn?"withdrawn":"active";
+  if(withdrawn)s.withdrawnAt=today();
+  s.enrollmentHistory=[...(s.enrollmentHistory||[]),{status:s.enrollmentStatus,date:today()}];
+  save();render();
+}
 function upStu(k,v){stu()[k]=v;save();renderSide();}
 function addGrade(){const s=stu();s.grades=s.grades||[];
   const g={date:$("#g_date").value||today(),exam:$("#g_exam").value.trim(),subject:$("#g_subject").value.trim(),score:$("#g_score").value.trim()};
@@ -4893,7 +4904,7 @@ WB 웩슬러브레인센터 드림</div></div>`;}
 function addStudent(){
   modal(`<h2>학생 추가</h2>
   <div class="frow"><label>이름</label><input id=ns_name></div>
-  <div class="frow"><label>학년</label><select id=ns_grade><option>고1</option><option>고2</option><option>고3</option></select></div>
+  <div class="frow"><label>학년</label><select id=ns_grade><option>중3</option><option>고1</option><option>고2</option><option>고3</option></select></div>
   <div class=mfoot><button class=btn onclick=closeModal()>취소</button>
   <button class="btn pri" onclick="doAddStudent()">추가</button></div>`);}
 function doAddStudent(){
