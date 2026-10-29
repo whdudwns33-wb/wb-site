@@ -28,6 +28,24 @@ test('catalog separates same-name curricula and career/general/convergence class
  assert.throws(()=>ctx.cpNewCourse('2022','2015:기하'),/교육과정/);
 });
 
+test('catalog searches refresh results while preserving the draft and all student records',()=>{
+ const {ctx,s}=setup(),p=complete(ctx,s),results={innerHTML:''};
+ ctx.cpDraft=()=>p;ctx.$=selector=>selector==='#cp_catalog_results'?results:null;
+ ctx.esc=v=>String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;');
+ vm.runInContext('const cpCatalogView={group:"전체",query:"",type:"진로 선택"};',ctx);
+ vm.runInContext(html.slice(html.indexOf('function cpLink('),html.indexOf('function tabCourse(')),ctx);
+ const before=JSON.stringify({p,db:ctx.db});
+ ctx.cpSearch('경제');assert.match(results.innerHTML,/경제 수학/);assert.doesNotMatch(results.innerHTML,/인공지능 기초/);
+ ctx.cpSearch('컴퓨터');assert.match(results.innerHTML,/인공지능 기초/);assert.match(results.innerHTML,/데이터 과학/);assert.doesNotMatch(results.innerHTML,/경제 수학/);
+ ctx.cpSearch('없는검색어');assert.match(results.innerHTML,/검색 결과 0개/);
+ ctx.cpSearch('');assert.match(results.innerHTML,/경제 수학/);assert.match(results.innerHTML,/인공지능 기초/);
+ assert.equal(JSON.stringify({p,db:ctx.db}),before);
+ p.curriculum='';ctx.cpSearch('기하');assert.match(results.innerHTML,/교육과정을 먼저 선택/);assert.doesNotMatch(results.innerHTML,/후보에 추가/);
+ p.curriculum='2015';ctx.cpSearch('사회문제');assert.match(results.innerHTML,/사회문제 탐구/);
+ p.curriculum='2022';ctx.cpSearch('사회문제');assert.doesNotMatch(results.innerHTML,/후보에 추가/);
+ vm.runInContext('cpCatalogView.type="전체";',ctx);ctx.cpSearch();assert.match(results.innerHTML,/융합 선택/);
+});
+
 test('school list parser accepts pasted Excel/text and rejects invalid or duplicate rows atomically',()=>{
  const {ctx}=setup();
  assert.equal(ctx.cpParseSchool('과목명 | 학기 | 학점\n경제 수학 | 고2-1 | 3\n기하').length,2);
