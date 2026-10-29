@@ -4686,6 +4686,26 @@ function adigaNote(previous,draft){
  }
  return{note:n};
 }
+// ADMISSIONS_COVERAGE_START
+const ADMISSIONS_GUIDES=[{"label": "수시 — 학생부종합·교과 구분", "checked": "2026-10-29", "url": "https://enter.jbnu.ac.kr/file/download.do?sfn=20260813043538639_%ec%a0%84%eb%b6%81%eb%8c%80%ed%95%99%ea%b5%90+2027%ed%95%99%eb%85%84%eb%8f%84+%eb%8c%80%ec%9e%85%ec%a0%84%ed%98%95+%ec%88%98%ec%8b%9c+%eb%aa%a8%ec%a7%91%ec%9a%94%ea%b0%95(%ec%95%88)_26%eb%85%84+8%ec%9b%94+%ec%88%98%ec%a0%95.pdf&ofn=%ec%a0%84%eb%b6%81%eb%8c%80%ed%95%99%ea%b5%90+2027%ed%95%99%eb%85%84%eb%8f%84+%eb%8c%80%ec%9e%85%ec%a0%84%ed%98%95+%ec%88%98%ec%8b%9c+%eb%aa%a8%ec%a7%91%ec%9a%94%ea%b0%95(%ec%95%88)_26%eb%85%84+8%ec%9b%94+%ec%88%98%ec%a0%95.pdf", "pages": "요강 18~23, 50~58쪽 / 모집인원 14~16쪽", "content": "학생부종합은 서류·면접 등 전형별 단계평가를 구분합니다. 큰사람·지역인재의 간호·수의·약학·의학·치의학 모집단위는 수능최저를 별도 확인해야 합니다. 학생부교과와 종합의 자격·평가·최저를 서로 복사하지 않습니다. 학과별 모집인원과 정확한 최저 등급 합은 아직 구조화하지 않았습니다."}, {"label": "정시 — 가·나군 및 예체능 구분", "checked": "2026-10-29", "url": "https://enter.jbnu.ac.kr/file/download.do?sfn=20260901013621874_2027%ed%95%99%eb%85%84%eb%8f%84+%ec%a0%95%ec%8b%9c+%ea%b0%80%c2%b7%eb%82%98%ea%b5%b0+%eb%8c%80%ed%95%99+%ec%8b%a0%ec%9e%85%ec%83%9d+%eb%aa%a8%ec%a7%91%ec%9a%94%ea%b0%95.pdf&ofn=2027%ed%95%99%eb%85%84%eb%8f%84+%ec%a0%95%ec%8b%9c+%ea%b0%80%c2%b7%eb%82%98%ea%b5%b0+%eb%8c%80%ed%95%99+%ec%8b%a0%ec%9e%85%ec%83%9d+%eb%aa%a8%ec%a7%91%ec%9a%94%ea%b0%95.pdf", "pages": "요강 3, 7~10, 38, 40~46쪽", "content": "일반학생 모집인원은 가군 407명·나군 492명이며 수시 미충원 이월로 변경될 수 있습니다. 일반학생은 고교 졸업(예정) 또는 동등 학력 및 모집단위별 2027 수능 반영영역 응시 조건을 확인합니다. 예술대학 예체능 실기 전형은 수능 미응시 지원 가능 예외가 있습니다. 일반 모집단위 수능 500점 전형과 체육교육·스포츠과학·예술 실기 전형은 평가방법이 다릅니다. 기존 전북대 엔진은 수능 부분만 지원하며 실기·면접·학교폭력·최종 총점과 지원자격 자동 판정은 지원하지 않습니다. 탐구 변환표는 해당 학년도 공식 표 확인 전 계산 보류이며 전년도 예시 표로 대체하지 않습니다."}];
+function admissionsCoverage(target,records=allIpRows(),notes=db.adiga||[]){
+ const match=r=>uniNorm(r.univ)===uniNorm(target.univ)&&(!target.major||adigaText(r.major)===adigaText(target.major))&&(!target.track||adigaText(r.track)===adigaText(target.track));
+ const rows=records.filter(match),evidence=notes.filter(n=>match(n)&&adigaText(n.admissionYear)===adigaText(target.admissionYear));
+ const fields=[["seats","모집인원"],["eligibility","지원자격"],["evaluation","평가방법"],["minimum","수능최저"],["gradeScale","등급 체계"]];
+ const exact=evidence.filter(n=>adigaText(n.major)===adigaText(target.major)&&adigaText(n.track)===adigaText(target.track)).sort((a,b)=>adigaText(b.checked).localeCompare(adigaText(a.checked))),chosen=exact[0]||{};
+ const missing=fields.filter(([k])=>!adigaText(chosen[k])).map(([,l])=>l);
+ if(!(adigaUrl(chosen.url)&&adigaText(chosen.source)&&adigaDate(chosen.checked)&&chosen.checked<=today()))missing.push("원문·출처·확인일");
+ return {calculation:uniNorm(target.univ)==="전북대"&&String(target.admissionYear)==="2027"?"전북대 2027 수능 부분 산식 구현 · 모집단위/군/유형·공식 변환표 확인 전 계산 보류":"대학 전용 산식 미확인 · 범용 입력 가중합과 공식 환산식은 별개",rows:rows.length,years:[...new Set(rows.map(r=>adigaText(r.year)).filter(Boolean))].sort(),percentile:rows.filter(r=>r.pct!==null&&r.pct!==undefined&&adigaText(r.pct)!==""&&Number.isFinite(Number(r.pct))).length,missing,notes:evidence.length};
+}
+function admissionsCoverageHtml(target){
+ if(!target?.univ)return "";const c=admissionsCoverage(target);
+ return `<details class="acc2"><summary>자료 충족도 · ${esc(target.admissionYear||"모집학년도 미선택")} · ${c.missing.length?"조건 확인 필요":"항목 입력됨 · 원문 재확인 필요"}</summary><p>${esc(target.univ)} · ${esc(target.major||"전체 모집단위")} · ${esc(target.track||"전체 전형")}</p><p>입결 ${c.rows}행 · 결과연도 표기 ${esc(c.years.join(", ")||"없음")} · 별도 백분위 ${c.percentile}행</p><p>해당 모집학년도 근거 노트 ${c.notes}건 · 미충족: ${esc(c.missing.join(" · ")||"없음 (입력 유무 기준)")}</p><p>계산 지원: ${esc(c.calculation)}</p><p class="aplnote">입력 유무는 공식 검증·지원자격 충족을 뜻하지 않습니다. 입결 결과연도와 모집학년도, 백분위·등급·대학 환산점수는 구분합니다. 계산 가능 여부는 정시 반영방법과 실제 시험 입력에서 별도 확인합니다.</p></details>`;
+}
+function admissionsCoveragePanel(){
+ const univ=view.coverageUniversity||"전북대",year=view.coverageYear||"2027",major=view.coverageMajor||"",track=view.coverageTrack||"";
+ return `<section class="card"><h2>대학·전형별 자료 충족도</h2><div class="formgrid">${[["University","대학",univ],["Year","모집학년도",year],["Major","모집단위 (전체는 빈칸)",major],["Track","전형 (전체는 빈칸)",track]].map(([k,l,v])=>`<div class="frow"><label for="coverage_${k}">${l}</label><input id="coverage_${k}" value="${esc(v)}" oninput="view.coverage${k}=this.value;document.getElementById('coverage_result').innerHTML=admissionsCoverageHtml({univ:view.coverageUniversity||'전북대',admissionYear:view.coverageYear||'2027',major:view.coverageMajor||'',track:view.coverageTrack||''})"></div>`).join("")}</div><div id="coverage_result">${admissionsCoverageHtml({univ,admissionYear:year,major,track})}</div><h3>전북대 2027 공식 요강 대조 자료</h3><p>대학 공통 안내입니다. 모집단위·전형별 노트로 자동 적용하지 않으며 기존 지원안과 보고서는 유지합니다.</p>${ADMISSIONS_GUIDES.map(g=>`<details class="acc2"><summary>${esc(g.label)} · 확인 ${g.checked}</summary><p style="white-space:pre-wrap">${esc(g.content)}</p><a class="btn sm" href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">공식 모집요강 원문</a><p class="aplnote">${esc(g.pages)} · 원서 접수 전 변경 공지 및 학과별 인원·자격·최저 재확인 필요</p></details>`).join("")}</section>`;
+}
+// ADMISSIONS_COVERAGE_END
 function renderAdiga(){
  const notes=db.adiga||[],filter=view.adigaFilter||"";
  const shown=notes.filter(n=>n&&typeof n==="object"&&(!filter||adigaText(n.univ).includes(filter)));
@@ -4707,6 +4727,7 @@ function renderAdiga(){
  ${view.adigaReturn?'<p><button class="btn sm" onclick="returnAdigaCandidate()">수시 후보로 돌아가기</button> <span style="font-size:var(--fs-sm);color:var(--ink2)">노트 저장 후 후보 비교에 반영됩니다. 입력 중인 노트는 자동 저장되지 않습니다.</span></p>':""}
  <p style="font-size:var(--fs-sm);color:var(--ink2)">출처 표시는 이용 허락을 뜻하지 않습니다. 자료별 이용 조건과 허락 범위를 확인하세요.
  <a href="https://www.adiga.kr/mbs/cop/copyrightPolicyView.do?menuId=PCMBSCOP1000" target="_blank" rel="noopener noreferrer">어디가 저작권정책</a></p>
+ ${admissionsCoveragePanel()}
  <div class="sec"><h2>${editing?"대학 노트 편집":"대학 노트 추가"}</h2></div>
  <form id="adiga_form" class="card" onsubmit="event.preventDefault();addAdiga()" novalidate>
  <p style="font-size:var(--fs-sm);color:var(--ink2);margin-top:0">모집학년도와 입결 결과학년도는 다를 수 있습니다. 확인하지 않은 항목은 비워 두세요. 작성일은 원문 확인일로 사용하지 않습니다.</p>
