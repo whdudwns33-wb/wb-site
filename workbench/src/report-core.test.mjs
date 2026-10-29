@@ -62,6 +62,18 @@ test("empty exam selection is susi-only and keeps same-year other-exam plans sep
   assert.equal(d.exam,null);assert.equal(d.jeongsi.plans.length,0);assert.equal(d.jeongsi.otherExamPlans.length,2);
   assert.ok(d.limitations.some(x=>x.includes("정시 시험을 선택하지 않았습니다")));
 });
+
+test("course plans use the latest matching admission year and keep earlier report snapshots",()=>{
+  const {c,s,notes}=fixture(),selection={admissionYear:"2027",examId:""};
+  assert.equal(c.rptCollect(s,selection,notes).coursePlanText,"");
+  s.consult.coursePlans=[{admissionYear:"2027",reportText:"첫 설계"},{admissionYear:"2028",reportText:"다른 학년도"}];
+  const before=JSON.stringify(s),saved=c.rptCollect(s,selection,notes);
+  assert.equal(saved.coursePlanText,"첫 설계");assert.equal(JSON.stringify(s),before);
+  s.consult.coursePlans.push({admissionYear:"2027",reportText:"새 설계"});
+  assert.equal(c.rptCollect(s,selection,notes).coursePlanText,"새 설계");
+  assert.equal(saved.coursePlanText,"첫 설계");
+  assert.equal(c.rptCollect(s,{admissionYear:"2028",examId:""},notes).coursePlanText,"다른 학년도");
+});
 test("collection is deterministic, timestamp-free and deeply independent without mutating inputs",()=>{
   const {c,s,notes}=fixture(),before=JSON.stringify({s,notes}),selection={admissionYear:"2027",examId:"exam-a"};
   const a=c.rptCollect(s,selection,notes),b=c.rptCollect(s,selection,notes);
