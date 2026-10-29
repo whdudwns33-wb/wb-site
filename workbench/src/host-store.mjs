@@ -108,6 +108,34 @@ export function createHostStore(file, appKey, {clock = Date.now} = {}) {
       return session;
     } catch (error) { db.exec('ROLLBACK'); throw error; }
   }
+  async function resetPassword(principal, targetId, currentPassword, temporaryPassword) {
+    const actor = userById(principal.user.id), target = typeof targetId === 'string' && userById(targetId);
+    const activeSession = () => db.prepare('SELECT 1 FROM sessions WHERE hash=? AND user_id=? AND expires>?').get(principal.hash, actor?.id || '', clock());
+    if (principal.bearer || !actor || actor.role !== 'admin' || actor.must_change || !activeSession()) fail(403, '비밀번호를 변경한 관리자 계정으로 다시 로그인하세요.');
+    if (!target) fail(404, '초기화할 관리자 계정을 찾을 수 없습니다.');
+    if (target.id === actor.id) fail(400, '본인 계정은 비밀번호 변경을 사용하세요. 분실 시 다른 관리자에게 초기화를 요청하세요.');
+    if (typeof currentPassword !== 'string' || !currentPassword || currentPassword.length > 128 || typeof temporaryPassword !== 'string' || temporaryPassword.length < 4 || temporaryPassword.length > 128 || !temporaryPassword.trim()) fail(400, '본인 비밀번호와 4~128자 임시비밀번호를 입력하세요.');
+    if (actor.locked_until > clock()) fail(429, '비밀번호 확인이 잠겨 있습니다. 15분 후 다시 시도하세요.');
+    const candidate = await passwordHash(currentPassword, actor.salt), current = userById(actor.id);
+    if (current.password_hash !== actor.password_hash || !activeSession()) fail(409, '계정 상태가 바뀌었습니다. 다시 로그인하세요.');
+    if (!equal(candidate, current.password_hash)) {
+      db.prepare('UPDATE accounts SET failures=failures+1,locked_until=CASE WHEN failures>=4 THEN ? ELSE locked_until END WHERE id=?').run(clock() + 900000, actor.id);
+      fail(401, '초기화를 실행하는 본인의 현재 비밀번호를 확인하세요.');
+    }
+    const salt = randomBytes(16).toString('hex'), nextHash = await passwordHash(temporaryPassword, salt);
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      if (!activeSession() || userById(actor.id).password_hash !== actor.password_hash || userById(target.id)?.password_hash !== target.password_hash) fail(409, '계정 상태가 바뀌었습니다. 대상을 다시 확인하세요.');
+      if (userById(actor.id).locked_until > clock()) fail(429, '비밀번호 확인이 잠겨 있습니다. 15분 후 다시 시도하세요.');
+      db.prepare('UPDATE accounts SET password_hash=?,salt=?,must_change=1,failures=0,locked_until=0 WHERE id=?').run(nextHash, salt, target.id);
+      db.prepare('DELETE FROM sessions WHERE user_id=?').run(target.id);
+      db.prepare('DELETE FROM api_tokens WHERE user_id=?').run(target.id);
+      db.prepare('UPDATE accounts SET failures=0,locked_until=0 WHERE id=?').run(actor.id);
+      audit(actor.id, 'password_reset:' + target.id);
+      db.exec('COMMIT');
+      return {reset: true, user: safeUser(userById(target.id))};
+    } catch (error) { db.exec('ROLLBACK'); throw error; }
+  }
   function appendSnapshot(data, actor) {
     const text = JSON.stringify(data), iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', key, iv);
     const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
@@ -155,7 +183,7 @@ export function createHostStore(file, appKey, {clock = Date.now} = {}) {
     state.data.students[index] = data; return saveSnapshot(state.data, revision, actor);
   }
   return {
-    bootstrap, login, authenticate, changePassword, snapshot, saveSnapshot, listStudents, student, saveStudent,
+    bootstrap, login, authenticate, changePassword, resetPassword, snapshot, saveSnapshot, listStudents, student, saveStudent,
     summary: () => { const s = snapshot(); return {revision: s.revision, students: s.data.students.length, reports: s.data.students.reduce((n, x) => n + (x.consult?.reports?.length || 0), 0), regularPlans: s.data.students.reduce((n, x) => n + (x.consult?.jeongsi?.plans?.length || 0), 0)}; },
     checkCsrf: (principal, value) => typeof value === 'string' && equal(hash(value), principal.csrfHash),
     logout: principal => db.prepare('DELETE FROM sessions WHERE hash=?').run(principal.hash),
