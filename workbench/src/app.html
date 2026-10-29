@@ -739,7 +739,7 @@ function renderHome(){
 /* ═══════════ 학생 화면 ═══════════ */
 function renderStu(){
   const s=stu();if(!s){go("home");return;}
-  const tabs=[["overview","프로파일"],["acad","학업 관리"],["saenggibu","생기부"],["tasks","수행평가"],["inquiry","탐구보고서"],["records","상담 관리"],["adm","진학사 통"],["plan","월간 계획"]];
+  const tabs=[["overview","프로파일"],["acad","학업 관리"],["course","진로·과목 설계"],["saenggibu","생기부"],["tasks","수행평가"],["inquiry","탐구보고서"],["records","상담 관리"],["adm","진학사 통"],["plan","월간 계획"]];
   /* 고3(또는 지원 기록이 있는 학생)은 수시 지원 탭을 프로파일 바로 뒤에 둔다 */
   if(s.grade==="고3"||(s.apply||[]).length)tabs.splice(1,0,["apply","수시 지원"]);
   $("#main").innerHTML=`
@@ -772,7 +772,7 @@ function renderStu(){
     </div>`;})()}
   <div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${view.tab===k?'on':''}" onclick="view.tab='${k}';render()">${l}</button>`).join("")}</div>
   <div id="tabbody"></div>`;
-  ({overview:tabOverview,apply:tabApply,acad:tabAcad,saenggibu:tabSaenggibu,tasks:tabTasks,inquiry:tabInquiry,adm:tabAdm,records:tabRecords,plan:tabPlan})[view.tab]();
+  ({overview:tabOverview,apply:tabApply,acad:tabAcad,course:tabCourse,saenggibu:tabSaenggibu,tasks:tabTasks,inquiry:tabInquiry,adm:tabAdm,records:tabRecords,plan:tabPlan})[view.tab]();
 }
 
 /* ── 프로파일 탭 ── */
@@ -1103,6 +1103,194 @@ ${exams}
 4. 세특 전환 계획 — 어떤 수행을 생기부 어느 항목(세특/자율/동아리/진로)으로 연결할지 매핑
 5. 버릴 것 — 투자 대비 세특 가치가 낮은 수행은 "기본만" 등급으로 명시 (모든 수행에 전력하지 않는 것이 전략이다)
 6. 출력 마지막에 "전략 요약 5줄" — 워크벤치 수행평가 탭 전략 메모에 저장할 형태로`);}
+
+// COURSE_PLAN_CORE_START
+const CP_TERMS=["고1-1","고1-2","고2-1","고2-2","고3-1","고3-2"];
+const CP_TYPES=["공통","일반 선택","진로 선택","융합 선택","기타"];
+const CP_SOURCES=[
+ {title:"고교학점제 진로·학업 설계 가이드",url:"https://www.hscredit.kr/career/design",year:"2022 개정",checked:"2026-10-29"},
+ {title:"학교별 학업설계 시범 서비스 (서울 중심)",url:"https://www.hscredit.kr/planner/ykd3bg6u",year:"학교별 입학연도 확인",checked:"2026-10-29"},
+ {title:"경기도교육청 고등학교 과목 안내",url:"https://more.goe.go.kr/hagjeomje/subList/30300002205",year:"2022 개정",checked:"2026-10-29"},
+ {title:"서울대 전공 연계 과목 선택 안내 게시물",url:"https://admission.snu.ac.kr/materials/downloads/press?bbsidx=156196&md=v",year:"2028학년도 / 2025-06-30 발표",checked:"2026-10-29"},
+ {title:"교육부 2026 고교학점제 이수 기준 변경",url:"https://www.korea.kr/news/policyNewsView.do?newsId=148958710",year:"2026-01-28 발표",checked:"2026-10-29"}
+];
+// 안내자료의 학습 내용·전공 예시만 요약한다. 학교 개설·대학 권장·평가 기준과는 별도다.
+const CP_GUIDE22="https://www.goe.go.kr/resource/old/BBSMSTR_000000030136/BBS_202312050603474391.pdf";
+const CP_CATALOG=[
+ ["2015","국어","심화 국어","논리적 읽기·표현과 비판적 사고를 통한 학문 탐구","국어국문·문예창작·언론","충북교육청 2015 과목 안내 (2023-05-25 수정)","https://baro.cbe.go.kr/dept-25/cm/cntnts/cntntsView.do?cntntsId=35752&mi=13145"],
+ ["2015","수학","기하","이차곡선·평면벡터·공간도형과 좌표 탐구","수리과학·물리·건축","충북교육청 2015 과목 안내 (2023-05-25 수정)","https://baro.cbe.go.kr/dept-25/cm/cntnts/cntntsView.do?cntntsId=35759&mi=13145"],
+ ["2015","수학","경제 수학","수열·함수·미분을 경제와 금융 문제에 적용","경제·경영·소비자학","충북교육청 2015 과목 안내 (2023-05-25 수정)","https://baro.cbe.go.kr/dept-25/cm/cntnts/cntntsView.do?cntntsId=35760&mi=13145"],
+ ["2015","영어","진로 영어","직업·진로 정보를 읽고 업무 상황의 영어 의사소통 연습","국제관계·호텔경영·국제통상","충북교육청 2015 과목 안내 (2023-05-25 수정)","https://baro.cbe.go.kr/dept-25/cm/cntnts/cntntsView.do?cntntsId=35768&mi=13145"],
+ ["2015","사회","사회문제 탐구","사회문제의 자료를 수집·분석하고 해결안 제시","사회·사회복지·교육","충북교육청 2015 과목 안내 (2023-05-25 수정)","https://baro.cbe.go.kr/dept-25/cm/cntnts/cntntsView.do?cntntsId=35781&mi=13145"],
+ ["2015","과학","물리학Ⅱ","운동·전자기·파동과 현대 물리의 심화 개념 탐구","물리·기계·전자공학","충북교육청 2015 과목 안내 (2023-05-25 수정)","https://baro.cbe.go.kr/dept-25/cm/cntnts/cntntsView.do?cntntsId=35788&mi=13145"],
+ ["2015","과학","생명과학Ⅱ","세포·물질대사·유전자 발현·생명공학 탐구","생물·분자생물·약학","충북교육청 2015 과목 안내 (2023-05-25 수정)","https://baro.cbe.go.kr/dept-25/cm/cntnts/cntntsView.do?cntntsId=35790&mi=13145"],
+ ["2015","정보","인공지능 기초","인공지능 원리·기술과 협력적 문제 해결 탐구","컴퓨터공학·인공지능·데이터과학","인천교육청 2015 선택 과목 안내 PDF 37쪽 (발행일 미확인)","https://www.ice.go.kr/upload/board/3816/2022/01/1642394287259.pdf#page=37"],
+ ["2022","국어","주제 탐구 독서","관심 주제의 여러 자료를 비교·통합하며 관점 형성","국어국문·문헌정보·미디어커뮤니케이션","경기도교육청 2022 과목 안내 PDF 30쪽 (2023-12)",CP_GUIDE22+"#page=30"],
+ ["2022","수학","기하","이차곡선·공간좌표·벡터로 도형 탐구","건축·기계공학·물리","경기도교육청 2022 과목 안내 PDF 48쪽 (2023-12)",CP_GUIDE22+"#page=48"],
+ ["2022","수학","경제 수학","함수·행렬·미분으로 경제·금융 현상 해석","경영·경제·금융수학","경기도교육청 2022 과목 안내 PDF 49쪽 (2023-12)",CP_GUIDE22+"#page=49"],
+ ["2022","영어","영어 발표와 토론","목적·청중에 맞춘 영어 발표와 논리적 토론","국제통상·국제관계·무역","경기도교육청 2022 과목 안내 PDF 70쪽 (2023-12)",CP_GUIDE22+"#page=70"],
+ ["2022","사회","경제","선택·시장·국가경제·국제거래 분석","경제·경영·회계","경기도교육청 2022 과목 안내 PDF 95쪽 (2023-12)",CP_GUIDE22+"#page=95"],
+ ["2022","과학","역학과 에너지","물체 운동·열기관·탄성파 탐구","물리·기계·건축공학","경기도교육청 2022 과목 안내 PDF 118쪽 (2023-12)",CP_GUIDE22+"#page=118"],
+ ["2022","과학","생물의 유전","유전 원리·유전자 발현·생명공학 탐구","생명과학·생명공학·유전공학","경기도교육청 2022 과목 안내 PDF 123쪽 (2023-12)",CP_GUIDE22+"#page=123"],
+ ["2022","정보","인공지능 기초","탐색·추론·기계학습과 책임 있는 인공지능 활용","컴퓨터공학·인공지능·데이터과학","경기도교육청 2022 과목 안내 PDF 239쪽 (2023-12)",CP_GUIDE22+"#page=239"],
+ ["2022","정보","데이터 과학","전처리·분석·모델링으로 데이터 기반 문제 해결","데이터과학·소프트웨어·컴퓨터과학","경기도교육청 2022 과목 안내 PDF 240쪽 (2023-12)",CP_GUIDE22+"#page=240"],
+ ["2015","사회","경제","합리적 선택, 시장·국가경제·국제무역과 금융생활 탐구","경제·경영·회계","충북교육청 2015 과목 안내 (2023-05-25 수정)","https://baro.cbe.go.kr/dept-25/cm/cntnts/cntntsView.do?cntntsId=35774&mi=13145","일반 선택"],
+ ["2022","사회","사회문제 탐구","불평등·미디어·인구 변화·인공지능 관련 사회문제를 조사하고 해결안 모색","사회·사회복지·미디어","경기도교육청 2022 과목 안내 PDF 101쪽 (2023-12)","https://more.goe.go.kr/hagjeomje/module/upload/usr/file/selectPdfViewer.do?usrfileSeq=30300000147","융합 선택"]
+].map(([curriculum,group,name,learning,majors,source,url,type="진로 선택"])=>({id:curriculum+":"+name,curriculum,group,name,learning,majors,source,url,type,checked:"2026-10-29"}));
+function cpBlank(s){return {schemaVersion:2,title:"진로 선택 과목 설계",curriculum:"",entryYear:"",admissionYear:"",school:s.school||"",career:s.career||"",major:s.targetUniv||"",completed:"",schoolSource:"",schoolUrl:"",schoolChecked:"",univSource:"",univUrl:"",univChecked:"",univYear:"",schoolPaste:"",memo:"",status:"검토중",rows:[]};}
+function cpName(v){return String(v||"").normalize("NFKC").replace(/\s+/g,"");}
+function cpRow(curriculum=""){return {curriculum,name:"",type:"진로 선택",term:"",credits:"",availability:"미확인",requirement:"미확인",decision:"검토",reason:"",prerequisite:"",learning:"",majors:"",infoSource:"",infoUrl:"",infoChecked:"",condition:"",univSource:"",univUrl:"",univChecked:"",univYear:"",univTarget:"",alternative:"",schoolApplied:""};}
+function cpEditable(p){const q=JSON.parse(JSON.stringify(p));return {...cpBlank({}),...q,schemaVersion:2,status:"검토중",rows:q.rows.map(r=>({...cpRow(q.curriculum),...r}))};}
+function cpCourses(curriculum,group="전체",query="",type="진로 선택"){return CP_CATALOG.filter(c=>c.curriculum===curriculum&&(group==="전체"||c.group===group)&&(type==="전체"||c.type===type)&&cpName(c.name+c.learning+c.majors).includes(cpName(query)));}
+function cpNewCourse(curriculum,id){const c=CP_CATALOG.find(x=>x.id===id&&x.curriculum===curriculum);if(!c)throw Error("교육과정에 맞는 과목을 선택하세요.");return {...cpRow(curriculum),name:c.name,type:c.type,learning:c.learning,majors:c.majors,infoSource:c.source,infoUrl:c.url,infoChecked:c.checked};}
+function cpUniversity(p,r){const own=["univSource","univUrl","univChecked","univYear","univTarget"].some(k=>r[k]);return own?{source:r.univSource||"",url:r.univUrl||"",checked:r.univChecked||"",year:r.univYear||"",target:r.univTarget||""}:{source:p.univSource,url:p.univUrl,checked:p.univChecked,year:p.univYear,target:p.major};}
+function cpParseSchool(text){
+ if(typeof text!=="string"||text.length>60000)throw Error("학교 목록은 60,000자 이내로 입력하세요.");
+ const lines=text.replace(/^\uFEFF/,"").split(/\r?\n/).filter(x=>x.trim());if(!lines.length||lines.length>301)throw Error("학교 목록은 1~300행으로 입력하세요.");
+ const seen=new Set(),rows=[];
+ for(let i=0;i<lines.length;i++){
+  const cols=lines[i].split(/\t|\|/).map(x=>x.trim());if(i===0&&cols[0]==="과목명")continue;
+  const [name,term="",credits=""]=cols;if(cols.length>3||!name||name.length>120||!["",...CP_TERMS].includes(term)||credits!==""&&(!/^\d{1,2}$/.test(credits)||Number(credits)<1||Number(credits)>30))throw Error(`${i+1}행: 과목명 | 고2-1 | 3 형식과 학기·학점을 확인하세요.`);
+  const key=cpName(name)+":"+term;if(seen.has(key))throw Error(`${i+1}행: 같은 과목·학기가 중복되었습니다.`);seen.add(key);rows.push({name,term,credits});
+ }
+ if(!rows.length||rows.length>300)throw Error("학교 목록은 1~300과목으로 입력하세요.");return rows;
+}
+function cpSchoolCurrent(p){const o=p.schoolOffer;if(!o||o.school!==p.school||o.entryYear!==p.entryYear||o.curriculum!==p.curriculum||o.source!==p.schoolSource||o.url!==p.schoolUrl||o.checked!==p.schoolChecked)return false;try{return JSON.stringify(cpParseSchool(p.schoolPaste))===JSON.stringify(o.rows);}catch{return false;}}
+function cpImportSchool(p,text){
+ const rows=cpParseSchool(text);if(!["2015","2022"].includes(p.curriculum)||!/^20\d{2}$/.test(p.entryYear)||!p.school.trim()||!p.schoolSource.trim()||!cpDate(p.schoolChecked)||p.schoolUrl&&!adigaUrl(p.schoolUrl))throw Error("학교·입학연도·교육과정과 학교 자료 이름·확인일을 먼저 확인하세요.");
+ return {...p,status:"검토중",schoolPaste:text,schoolOffer:{id:uid(),school:p.school,entryYear:p.entryYear,curriculum:p.curriculum,source:p.schoolSource,url:p.schoolUrl,checked:p.schoolChecked,rows}};
+}
+function cpSchoolMatch(p,r){
+ if(!p.schoolOffer)return {state:"none",text:"학교 목록 미등록 — 기본안",matches:[]};
+ if(!cpSchoolCurrent(p)||r.curriculum&&r.curriculum!==p.curriculum)return {state:"stale",text:"학교·입학연도·교육과정·출처 재확인",matches:[]};
+ const matches=p.schoolOffer.rows.map((o,index)=>({...o,index})).filter(o=>cpName(o.name)===cpName(r.name));
+ if(!matches.length)return {state:"absent",text:"목록에 없음 — 미개설 확정 아님",matches};
+ const exact=matches.some(o=>o.term&&o.credits&&o.term===r.term&&Number(o.credits)===Number(r.credits));
+ return {state:exact?"match":"partial",text:exact?"과목·학기·학점 일치":"과목명 일치 — 학기·학점 확인",matches};
+}
+function cpApplySchool(p,rowIndex,offerIndex){
+ const r=p.rows[rowIndex],o=p.schoolOffer?.rows?.[offerIndex];if(!r||!o||!cpSchoolCurrent(p)||r.curriculum!==p.curriculum||cpName(r.name)!==cpName(o.name)||!o.term||!o.credits)throw Error("같은 교육과정의 학교 과목·학기·학점을 먼저 확인하세요.");
+ const next=JSON.parse(JSON.stringify(p));Object.assign(next.rows[rowIndex],{term:o.term,credits:o.credits,availability:"교내 확인",schoolApplied:p.schoolOffer.id});next.status="검토중";return next;
+}
+function cpDate(v){return adigaDate(v)&&v<=today();}
+function cpAudit(p){
+ const missing=[],totals=Object.fromEntries(CP_TERMS.map(t=>[t,0])),seen=new Set(),completed=String(p.completed||"").split(/[,\n]/).map(cpName).filter(Boolean);
+ if(!["2015","2022"].includes(p.curriculum))missing.push("적용 교육과정 미확인");
+ for(const k of ["entryYear","admissionYear"])if(!/^20\d{2}$/.test(p[k]||""))missing.push(k==="entryYear"?"고교 입학연도 미입력":"대입 학년도 미입력");
+ if(p.entryYear&&p.admissionYear&&Number(p.admissionYear)!==Number(p.entryYear)+3)missing.push("고교 입학연도와 대입 학년도 관계 재확인 (통상 3년 차이)");
+ if(p.entryYear&&p.curriculum&&((Number(p.entryYear)>=2025)!==(p.curriculum==="2022")))missing.push("입학연도와 교육과정 적용 여부 재확인");
+ if(!p.school?.trim())missing.push("학교·희망 학교 미입력");
+ if(!p.career?.trim()||!p.major?.trim())missing.push("진로·희망 전공 미입력");
+ if(!p.schoolSource?.trim()||!cpDate(p.schoolChecked)||p.schoolUrl&&!adigaUrl(p.schoolUrl))missing.push("해당 입학연도 학교 편제표의 자료 이름·확인일 미확인");
+ if(p.schemaVersion!==2&&(!p.univSource?.trim()||!adigaUrl(p.univUrl)||!cpDate(p.univChecked)||p.univYear!==p.admissionYear))missing.push("해당 대입 학년도 대학·전공 권장 과목 근거 미확인");
+ if(p.schoolOffer&&!cpSchoolCurrent(p))missing.push("학교 목록이나 학교·입학연도·교육과정·출처가 바뀜 — 목록을 다시 대조하세요.");
+ if(!p.rows.some(r=>r.decision==="선택"))missing.push("선택한 과목 없음");
+ for(const r of p.rows){
+  const label=r.name||"이름 없는 과목",key=r.term+":"+cpName(r.name);
+  if(!r.name.trim())missing.push("과목명 미입력");
+  if(!r.reason.trim())missing.push(label+": 선택·제외·검토 사유 미입력");
+  if(p.schemaVersion===2){
+   if(r.curriculum!==p.curriculum)missing.push(label+": 과목 교육과정 불일치 — 이전 과목을 자동 변환하지 않습니다.");
+   const known=CP_CATALOG.find(c=>c.curriculum===r.curriculum&&cpName(c.name)===cpName(r.name));
+   if(known&&known.type!==r.type||p.curriculum==="2015"&&r.type==="융합 선택")missing.push(label+": 공식 과목 분류 재확인");
+   if(!r.learning?.trim()||!r.majors?.trim())missing.push(label+": 학습 내용·관련 전공 미확인");
+   if(!r.infoSource?.trim()||!adigaUrl(r.infoUrl)||!cpDate(r.infoChecked))missing.push(label+": 과목 안내 출처·원문·확인일 미확인");
+   const u=cpUniversity(p,r);if(!u.source?.trim()||!u.target?.trim()||!adigaUrl(u.url)||!cpDate(u.checked)||u.year!==p.admissionYear||!r.condition?.trim())missing.push(label+": 해당 대입 학년도 대학·전공 권장 조건·근거 미확인");
+   if(r.schoolApplied&&(r.schoolApplied!==p.schoolOffer?.id||!cpSchoolCurrent(p)||cpSchoolMatch(p,r).state!=="match"))missing.push(label+": 적용한 학교 목록이 바뀌었거나 학기·학점이 다름 — 재확인");
+  }
+  if(r.decision==="검토")missing.push(label+": 선택 여부 검토 중");
+  if(r.requirement==="미확인")missing.push(label+": 대학 권장 여부 미확인");
+  if(r.decision==="제외"&&r.requirement==="필수")missing.push(label+": 대학 필수로 입력한 과목을 제외함 — 원문 재확인");
+  if(r.decision!=="선택")continue;
+  const duplicate=seen.has(key);if(duplicate)missing.push(label+": 같은 학기 중복 선택");seen.add(key);
+  if(!CP_TERMS.includes(r.term))missing.push(label+": 배치 학기 미입력");
+  if(!["교내 확인","공동교육과정 확인","온라인학교 확인"].includes(r.availability))missing.push(label+": 개설·수강 가능 여부 미확인");
+  if(r.credits==="")missing.push(label+": 학점 미입력");else if(!duplicate&&CP_TERMS.includes(r.term))totals[r.term]+=Number(r.credits);
+  for(const pre of r.prerequisite.split(/[,\n]/).map(x=>x.trim()).filter(Boolean)){
+   if(!completed.includes(cpName(pre))&&!p.rows.some(x=>cpName(x.name)===cpName(pre)&&x.decision==="선택"&&CP_TERMS.includes(x.term)&&CP_TERMS.indexOf(x.term)<CP_TERMS.indexOf(r.term)))missing.push(label+": 선수 과목 ‘"+pre+"’의 선행 이수 미확인");
+  }
+ }
+ return {missing:[...new Set(missing)],totals};
+}
+function cpValidate(p,archive=false){
+ if(!p||typeof p!=="object"||Array.isArray(p)||!Array.isArray(p.rows)||p.rows.length>100)throw Error("설계안 형식을 확인하세요 (최대 100과목).");
+ if(p.schemaVersion!=null&&p.schemaVersion!==2)throw Error("지원하지 않는 설계안 버전입니다.");
+ for(const key of Object.keys(cpBlank({})).filter(k=>!["rows","schemaVersion","schoolPaste"].includes(k)))if(typeof p[key]!=="string"||p[key].length>4000)throw Error("설계안 입력 길이·형식을 확인하세요.");
+ if(p.schoolPaste!=null&&(typeof p.schoolPaste!=="string"||p.schoolPaste.length>60000))throw Error("학교 목록 입력 길이를 확인하세요.");
+ if(!["","2015","2022"].includes(p.curriculum)||!["검토중","원장 검토 완료"].includes(p.status))throw Error("교육과정·검토 상태를 확인하세요.");
+ for(const key of ["schoolUrl","univUrl"])if(p[key]&&!adigaUrl(p[key]))throw Error("원문 주소는 계정 정보 없는 http 또는 https 주소여야 합니다.");
+ for(const key of ["schoolChecked","univChecked"])if(p[key]&&!cpDate(p[key]))throw Error("확인일은 오늘까지의 실제 날짜로 입력하세요.");
+ for(const r of p.rows){
+  if(!r||typeof r!=="object"||Array.isArray(r))throw Error("과목 행 형식을 확인하세요.");
+  for(const key of ["name","type","term","credits","availability","requirement","decision","reason","prerequisite"])if(typeof r[key]!=="string"||r[key].length>4000)throw Error("과목 입력 형식을 확인하세요.");
+  for(const key of Object.keys(cpRow()).filter(k=>!['name','type','term','credits','availability','requirement','decision','reason','prerequisite'].includes(k)))if(r[key]!=null&&(typeof r[key]!=="string"||r[key].length>4000))throw Error("과목 상세 입력 형식을 확인하세요.");
+  if(r.curriculum!=null&&!["","2015","2022"].includes(r.curriculum))throw Error("과목 교육과정을 확인하세요.");
+  for(const key of ["infoUrl","univUrl"])if(r[key]&&!adigaUrl(r[key]))throw Error("과목 근거 원문 주소를 확인하세요.");
+  for(const key of ["infoChecked","univChecked"])if(r[key]&&!cpDate(r[key]))throw Error("과목 근거 확인일을 확인하세요.");
+  if(!CP_TYPES.includes(r.type)||!["",...CP_TERMS].includes(r.term)||!["선택","검토","제외"].includes(r.decision)||!["미확인","권장","필수","해당없음"].includes(r.requirement)||!["미확인","교내 확인","공동교육과정 확인","온라인학교 확인","미개설"].includes(r.availability))throw Error("과목의 분류·상태를 확인하세요.");
+  if(r.credits!==""&&(!/^\d{1,2}$/.test(r.credits)||Number(r.credits)<1||Number(r.credits)>30))throw Error("학점은 1~30의 정수 또는 미입력으로 두세요.");
+ }
+ if(p.schoolOffer!=null){
+  const o=p.schoolOffer;if(!o||typeof o!=="object"||Array.isArray(o)||!Array.isArray(o.rows)||o.rows.length>300)throw Error("학교 목록 형식을 확인하세요.");
+  for(const k of ["id","school","entryYear","curriculum","source","url","checked"])if(typeof o[k]!=="string"||o[k].length>4000)throw Error("학교 목록 근거 형식을 확인하세요.");
+  if(!o.id||!["2015","2022"].includes(o.curriculum)||!/^20\d{2}$/.test(o.entryYear)||!o.school.trim()||!o.source.trim()||!cpDate(o.checked)||o.url&&!adigaUrl(o.url))throw Error("학교 목록 근거를 확인하세요.");
+  for(const r of o.rows)if(!r||["name","term","credits"].some(k=>typeof r[k]!=="string"||/[\t|\r\n]/.test(r[k])))throw Error("학교 목록 과목 형식을 확인하세요.");
+  cpParseSchool(o.rows.map(r=>[r.name,r.term,r.credits].join("\t")).join("\n"));
+ }
+ const audit=cpAudit(p);if(!archive&&p.status==="원장 검토 완료"&&audit.missing.length)throw Error("미확인 항목을 해결하거나 검토중으로 저장하세요.");return audit;
+}
+function cpText(p){
+ const a=cpValidate(p),o=p.schoolOffer;
+ return `${p.title} · ${p.status}\n고교 입학 ${p.entryYear||"미확인"} / 대입 ${p.admissionYear||"미확인"} / ${p.curriculum||"미확인"} 교육과정\n학교: ${p.school||"미입력"}\n진로: ${p.career||"미입력"} / 대학·전공: ${p.major||"미입력"}\n학교 근거: ${p.schoolSource||"미확인"} / ${p.schoolUrl||"제공 자료 원본 확인"} / 확인 ${p.schoolChecked||"미확인"}\n학교 목록: ${o?`${o.school} · ${o.entryYear} 입학 · ${o.curriculum} 교육과정 · ${o.rows.length}행` : "미등록 — 기본안"}\n\n${p.rows.map(r=>{const u=cpUniversity(p,r);return `${r.decision} · ${r.term||"학기 미정"} · ${r.name||"과목 미입력"} (${r.curriculum||p.curriculum} / ${r.type}, ${r.credits||"미확인"}학점)\n학습 내용: ${r.learning||"미확인"}\n관련 전공 예시: ${r.majors||"미확인"} (대학 권장 조건과 별도)\n과목 근거: ${r.infoSource||"미확인"} / ${r.infoUrl||"미확인"} / 확인 ${r.infoChecked||"미확인"}\n학교: ${r.availability} / ${cpSchoolMatch(p,r).text} / 선수: ${r.prerequisite||"미입력"}\n대학 조건: ${r.requirement} · ${r.condition||"내용 미확인"}\n대학 근거: ${u.target||"대학·전공 미확인"} / ${u.year||"미확인"}학년도 / ${u.source||"미확인"} / ${u.url||"미확인"} / 확인 ${u.checked||"미확인"}\n사유: ${r.reason||"미입력"}\n대안 과목·확인 계획: ${r.alternative||"미입력"}`;}).join("\n\n")}\n\n입력한 선택 과목 학점: ${CP_TERMS.map(t=>t+" "+a.totals[t]).join(" / ")}\n미확인: ${a.missing.join(" · ")||"입력 범위 내 추가 항목 없음"}\n상담 메모: ${p.memo}\n상담용 설계안입니다. 학교 시간표·선택군·졸업요건 전체 검증 및 합격 보장은 하지 않습니다. 학점 합계는 선택한 행만 포함하며 학교의 최종 수강 승인이 필요합니다.`;
+}
+function cpSavePlan(s,p){
+ cpValidate(p);if(!s||!s.id)throw Error("학생을 확인하세요.");
+ if(s.consult!=null&&(typeof s.consult!=="object"||Array.isArray(s.consult)))throw Error("기존 상담 기록 형식을 확인하세요.");
+ const history=s.consult?.coursePlans;if(history!=null&&!Array.isArray(history))throw Error("기존 설계 이력 형식을 확인하세요.");
+ const saved={...JSON.parse(JSON.stringify(p)),id:uid(),createdAt:new Date().toISOString(),reportText:cpText(p)};
+ const next=JSON.parse(JSON.stringify(db)),target=next.students.find(x=>String(x.id)===String(s.id));
+ if(!target)throw Error("학생을 찾을 수 없습니다.");target.consult=target.consult||{};target.consult.coursePlans=[...(history||[]),saved];save(next);return saved;
+}
+// COURSE_PLAN_CORE_END
+const cpDrafts=new Map(),cpCatalogView={group:"전체",query:"",type:"진로 선택"};
+function cpDraft(){const s=stu();if(!cpDrafts.has(s.id))cpDrafts.set(s.id,cpBlank(s));return cpDrafts.get(s.id);}
+function cpField(k,v,i){const p=cpDraft();if(i==null){if(k==="major"&&p[k]!==v){Object.assign(p,{univSource:"",univUrl:"",univChecked:"",univYear:""});for(const r of p.rows)if(!["univSource","univUrl","univChecked","univYear","univTarget"].some(x=>r[x]))Object.assign(r,{condition:"",requirement:"미확인"});}p[k]=v;}else{const r=p.rows[i];if(["name","curriculum"].includes(k)&&r[k]!==v)Object.assign(r,{learning:"",majors:"",infoSource:"",infoUrl:"",infoChecked:"",condition:"",requirement:"미확인",availability:"미확인",schoolApplied:""});if(k==="availability")r.schoolApplied="";r[k]=v;}if(k!=="status")p.status="검토중";}
+function cpAdd(index=-1){try{const p=cpDraft();if(p.rows.length>=100)throw Error("최대 100과목입니다.");p.rows.push(index<0?cpRow(p.curriculum):cpNewCourse(p.curriculum,CP_CATALOG[index]?.id));p.status="검토중";tabCourse();}catch(e){toast(e.message);}}
+function cpLoad(index){const p=stu().consult?.coursePlans?.[index];if(!p)return;if(!confirm("현재 미저장 초안을 선택한 이력의 사본으로 바꿀까요? 저장된 이력은 유지됩니다."))return;cpDrafts.set(stu().id,cpEditable(p));tabCourse();}
+function cpReset(){if(confirm("미저장 초안을 비울까요? 저장된 설계 이력은 유지됩니다.")){cpDrafts.set(stu().id,cpBlank(stu()));tabCourse();}}
+function cpSave(){try{cpSavePlan(stu(),cpDraft());tabCourse();toast("설계안을 새 버전으로 저장했습니다.");}catch(e){toast(e.message);}}
+function cpCopy(){try{copy(cpText(cpDraft()));}catch(e){toast(e.message);}}
+function cpReview(){try{cpValidate(cpDraft());tabCourse();}catch(e){toast(e.message);}}
+function cpImport(){try{cpDrafts.set(stu().id,cpImportSchool(cpDraft(),cpDraft().schoolPaste));tabCourse();toast("학교 목록을 초안에 반영했습니다. 각 과목의 적용 버튼으로 학기·학점을 확인하세요.");}catch(e){toast(e.message);}}
+function cpApply(i,j){try{cpDrafts.set(stu().id,cpApplySchool(cpDraft(),i,j));tabCourse();}catch(e){toast(e.message);}}
+async function cpReadSchool(file){if(!file)return;const id=stu().id,p=cpDraft();try{if(file.size>240000||!(/\.(txt|tsv)$/i).test(file.name))throw Error("240KB 이하의 UTF-8 TXT·TSV 파일을 사용하세요. PDF·사진은 과목 목록을 확인한 뒤 붙여넣으세요.");const text=await file.text();cpParseSchool(text);if(cpDrafts.get(id)!==p)throw Error("초안이 바뀌었습니다. 파일을 다시 선택하세요.");p.schoolPaste=text;p.status="검토중";if(view.stuId===id)tabCourse();toast("목록을 읽었습니다. 학교 자료 정보를 확인하고 대조 버튼을 누르세요.");}catch(e){toast(e.message);}}
+function cpLink(url,label){return adigaUrl(url)?`<a href="${esc(adigaUrl(url))}" target="_blank" rel="noopener noreferrer">${esc(label)}</a>`:esc(label||"원문 미확인");}
+function tabCourse(){
+ const s=stu(),p=cpDraft(),audit=cpAudit(p),history=Array.isArray(s.consult?.coursePlans)?s.consult.coursePlans:[],catalog=cpCourses(p.curriculum,cpCatalogView.group,cpCatalogView.query,cpCatalogView.type);
+ const field=(k,label,type="text",i)=>{const value=i==null?p[k]:p.rows[i][k],id=`cp_${k}${i==null?"":"_"+i}`;return `<div class="frow"><label for="${id}">${label}</label><input id="${id}" type="${type}" value="${esc(value||"")}" oninput="cpField('${k}',this.value${i==null?"":","+i})"></div>`;};
+ const area=(k,label,i)=>{const value=i==null?p[k]:p.rows[i][k],id=`cp_${k}${i==null?"":"_"+i}`;return `<div class="frow"><label for="${id}">${label}</label><textarea id="${id}" rows="2" oninput="cpField('${k}',this.value${i==null?"":","+i})">${esc(value||"")}</textarea></div>`;};
+ const select=(k,label,values,i)=>`<label>${label}<select aria-label="${label}" onchange="cpField('${k}',this.value${i==null?"":","+i});tabCourse()">${values.map(v=>`<option value="${esc(v)}" ${v===(i==null?p[k]:p.rows[i][k])?"selected":""}>${esc(v||"미확인")}</option>`).join("")}</select></label>`;
+ $("#tabbody").innerHTML=`<div class="card"><h2>진로 선택 과목 설계</h2><p class="aplnote">기본안 설계 → 학교 개설 목록 대조 → 원장 검토 → 새 버전 저장. 진로 선택은 교육과정의 공식 분류입니다. 관련 전공 예시가 대학의 필수·권장 조건을 뜻하지는 않습니다. 저장 전 입력은 초안입니다.</p>
+ <div class="formgrid">${field("title","설계안 이름")}${select("curriculum","교육과정",["","2015","2022"])}${field("entryYear","고교 입학연도")}${field("admissionYear","대입 학년도")}${field("school","학교·희망 학교")}${field("career","관심 진로")}${field("major","희망 대학·전공")}${field("completed","이미 이수한 선수 과목 (쉼표 구분)")}</div>
+ <p class="aplnote">교육과정을 바꾸어도 기존 후보는 유지됩니다. 다른 교육과정의 과목은 새 자료로 다시 검토하세요. 일반·융합 선택 과목도 보완 후보로 함께 기록할 수 있습니다.</p>
+ <details><summary>공식 참고 자료 · 2026-10-29 확인</summary><ul>${CP_SOURCES.map(x=>`<li>${cpLink(x.url,x.title)} · ${esc(x.year)} · 확인 ${x.checked}</li>`).join("")}<li>${cpLink("https://home.pen.go.kr/hscredit/cm/cntnts/cntntsView.do?cntntsId=3728&mi=17410","부산교육청 2015 과목 분류")} · 2015 교육과정 · 확인 2026-10-29</li><li>${cpLink("https://star.moe.go.kr/web/contents/m30103.do?id=106157&schM=view","교육부 과목 분류·성적 기재 안내")} · 2026-01-22 답변 · 확인 2026-10-29</li></ul><p>오래된 과목 안내자료는 학습 내용·전공 예시를 참고하는 용도입니다. 평가 방식·이수 기준은 해당 학생에게 적용되는 최신 학교 지침으로 별도 확인하세요.</p></details></div>
+ <div class="card"><h2>1. 진로 선택 과목으로 기본안 만들기</h2><p class="aplnote">공식 안내에서 확인한 대표 과목 예시입니다. 전체 과목 DB가 아니며, 목록에 없는 과목은 원문을 확인해 직접 추가할 수 있습니다.</p>
+ <div class="formgrid"><label>교과<select aria-label="과목 안내 교과" onchange="cpCatalogView.group=this.value;tabCourse()">${["전체","국어","수학","영어","사회","과학","정보"].map(x=>`<option ${cpCatalogView.group===x?"selected":""}>${x}</option>`).join("")}</select></label><label>분류<select aria-label="과목 안내 분류" onchange="cpCatalogView.type=this.value;tabCourse()">${["진로 선택","일반 선택","융합 선택","전체"].map(x=>`<option ${cpCatalogView.type===x?"selected":""}>${x}</option>`).join("")}</select></label><label for="cp_catalog_query">과목·관련 전공 검색</label><input id="cp_catalog_query" value="${esc(cpCatalogView.query)}" oninput="cpCatalogView.query=this.value"></div><button class="btn sm" onclick="tabCourse()">과목 검색</button> <button class="btn sm" onclick="cpAdd()">과목 직접 추가</button>
+ ${catalog.map(c=>`<details class="card"><summary>${esc(c.name)} · ${c.curriculum} · ${esc(c.group)} · ${esc(c.type)}</summary><p>학습 내용: ${esc(c.learning)}</p><p>관련 전공 예시: ${esc(c.majors)}</p><p>${cpLink(c.url,c.source)} · 확인 ${c.checked}</p><button class="btn sm" onclick="cpAdd(${CP_CATALOG.indexOf(c)})">${esc(c.name)} 후보에 추가</button></details>`).join("")||`<p class="empty">${p.curriculum?"조건에 맞는 예시가 없습니다. 원문 확인 후 직접 추가할 수 있습니다.":"교육과정을 먼저 선택하세요."}</p>`}</div>
+ <div class="card"><h2>2. 학생이 가져온 학교 개설 목록 대조</h2><p class="aplnote">기본안은 학교 목록 없이도 검토중으로 저장할 수 있습니다. 해당 입학연도 학교 자료를 받으면 아래에 입력하세요. 목록에 없다는 이유만으로 미개설이나 수강 불가를 확정하지 않습니다.</p>
+ <div class="formgrid">${field("schoolSource","입학연도별 학교 자료 이름·파일명·쪽")}${field("schoolUrl","학교 원문 URL (있으면)","url")}${field("schoolChecked","학교 자료 확인일","date")}</div>
+ <label for="cp_schoolPaste">개설 과목 목록 — 한 줄에 과목명 | 학기 | 학점 (탭 구분도 가능)</label><textarea id="cp_schoolPaste" rows="5" style="width:100%" placeholder="과목명 | 학기 | 학점&#10;경제 수학 | 고2-1 | 3&#10;기하 | 고2-2 | 3" oninput="cpField('schoolPaste',this.value)">${esc(p.schoolPaste||"")}</textarea><p class="aplnote">과목명만 입력해도 대조할 수 있지만 학기·학점은 따로 확인해야 합니다. 사진·PDF의 표는 확인 후 붙여넣으세요.</p><label for="cp_schoolFile">UTF-8 TXT·TSV 파일 읽기</label> <input id="cp_schoolFile" type="file" accept=".txt,.tsv" onchange="cpReadSchool(this.files[0])"><button class="btn" onclick="cpImport()">목록 읽고 기본안과 대조</button>
+ ${p.schoolOffer?`<details><summary>대조 중인 학교 목록 · ${esc(p.schoolOffer.school)} · ${esc(p.schoolOffer.entryYear)} 입학 · ${p.schoolOffer.rows.length}행</summary><p>${esc(p.schoolOffer.source)} · 확인 ${esc(p.schoolOffer.checked)} · ${esc(p.schoolOffer.curriculum)} 교육과정</p><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(p.schoolOffer.rows.map(r=>`${r.name} | ${r.term||"학기 미확인"} | ${r.credits||"학점 미확인"}`).join("\n"))}</pre></details>`:""}</div>
+ <div class="card"><h2>3. 후보 비교</h2><div class="mdv" style="overflow:auto"><table><caption>학생별 과목 선택안 비교</caption><thead><tr><th scope="col">과목·교육과정</th><th scope="col">학습 내용·관련 전공</th><th scope="col">학교 개설·배치</th><th scope="col">대학 권장 조건</th><th scope="col">판단·대안</th></tr></thead><tbody>${p.rows.map(r=>{const u=cpUniversity(p,r);return `<tr><td>${esc(r.name||"이름 미입력")}<br>${esc(r.curriculum||"교육과정 미확인")} · ${esc(r.type)}</td><td>${esc(r.learning||"학습 내용 미확인")}<br>관련 전공 예시: ${esc(r.majors||"미확인")}<br>${cpLink(r.infoUrl,r.infoSource||"과목 원문 미확인")} · ${esc(r.infoChecked||"확인일 미확인")}</td><td>${esc(cpSchoolMatch(p,r).text)}<br>${esc(r.availability)} · ${esc(r.term||"학기 미정")} · ${esc(r.credits||"?")}학점</td><td>${esc(r.requirement)} · ${esc(r.condition||"조건 미확인")}<br>${esc(u.target||"대학·전공 미확인")} · ${esc(u.year||"학년도 미확인")}<br>${cpLink(u.url,u.source||"대학 원문 미확인")} · ${esc(u.checked||"확인일 미확인")}</td><td>${esc(r.decision)} · ${esc(r.reason||"사유 미입력")}<br>대안: ${esc(r.alternative||"미입력")}</td></tr>`;}).join("")||'<tr><td colspan="5">과목 후보를 추가하세요.</td></tr>'}</tbody></table></div>
+ <details><summary>후보가 함께 사용하는 대학·전공 근거 (과목별 입력이 없을 때 적용)</summary><div class="formgrid">${field("univSource","공통 대학 자료 이름·쪽")}${field("univYear","공통 대학 근거 학년도")}${field("univUrl","공통 대학 원문 URL","url")}${field("univChecked","공통 대학 확인일","date")}</div><p class="aplnote">과목별 조건을 아래에 입력하세요. 과목별 근거를 하나라도 입력하면 공통 근거와 섞지 않습니다.</p></details>
+ ${p.rows.map((r,i)=>{const match=cpSchoolMatch(p,r);return `<details class="card" open><summary>후보 ${i+1} · ${esc(r.name||"새 과목")} · ${esc(r.decision)}</summary><div class="formgrid">${field("name","과목명","text",i)}${select("curriculum","과목 교육과정",["","2015","2022"],i)}${select("type","과목 분류",CP_TYPES,i)}${select("term","배치 학기",["",...CP_TERMS],i)}${field("credits","학점","number",i)}${select("availability","개설·수강 가능 여부",["미확인","교내 확인","공동교육과정 확인","온라인학교 확인","미개설"],i)}${field("prerequisite","선수 과목 (학교 기준·쉼표 구분)","text",i)}</div>
+ <p>${esc(match.text)} ${match.matches.filter(o=>o.term&&o.credits).map(o=>`<button class="btn sm" onclick="cpApply(${i},${o.index})">학교 목록 ${esc(o.term)} · ${esc(o.credits)}학점 적용</button>`).join(" ")}</p>
+ ${area("learning","학습 내용",i)}${field("majors","관련 전공 예시 (권장 조건과 별도)","text",i)}<div class="formgrid">${field("infoSource","과목 안내 출처·쪽","text",i)}${field("infoUrl","과목 안내 원문 URL","url",i)}${field("infoChecked","과목 안내 확인일","date",i)}</div>
+ ${select("requirement","대학 원문 확인 결과",["미확인","권장","필수","해당없음"],i)}${area("condition","대학·전공별 조건과 적용 범위",i)}<div class="formgrid">${field("univTarget","과목별 근거 대상 대학·전공","text",i)}${field("univYear","과목별 근거 학년도","text",i)}${field("univSource","과목별 대학 자료 이름·쪽","text",i)}${field("univUrl","과목별 대학 원문 URL","url",i)}${field("univChecked","과목별 대학 확인일","date",i)}</div>
+ ${select("decision","선택 판단",["검토","선택","제외"],i)}${area("reason","진로 연관성·선택 또는 제외 사유",i)}${area("alternative","대안 과목·후속 확인",i)}<button class="btn ghost sm" onclick="cpDraft().rows.splice(${i},1);cpDraft().status='검토중';tabCourse()">초안에서 제거</button></details>`;}).join("")}</div>
+ <div class="card"><h2>4. 설계 점검과 저장</h2><button class="btn sm" onclick="cpReview()">입력 내용 다시 점검</button><p>${CP_TERMS.map(t=>`${t}: ${audit.totals[t]}학점`).join(" · ")}</p><p class="aplnote">선택한 행만 합산하며 같은 학기의 중복 과목은 한 번만 셉니다. 전체 졸업학점·학교 선택군·시간표 충돌은 판정하지 않습니다.</p><ul>${audit.missing.map(x=>`<li>${esc(x)}</li>`).join("")||"<li>입력 범위에서 추가 확인 항목 없음. 학교의 최종 수강 승인이 필요합니다.</li>"}</ul>${area("memo","상담 결론·후속 확인")}${select("status","원장 검토 상태",["검토중","원장 검토 완료"])}<div style="display:flex;flex-wrap:wrap;gap:var(--sp-2);margin-top:var(--sp-3)"><button class="btn pri" onclick="cpSave()">새 버전 저장</button><button class="btn" onclick="cpCopy()">설계서 복사</button><button class="btn ghost" onclick="cpReset()">새 초안</button></div></div>
+ <div class="card"><h2>저장한 설계 이력 · ${history.length}건</h2>${history.map((v,i)=>`<details><summary>${esc(v.title)} · ${esc(v.admissionYear||"학년도 미정")} · ${esc(v.status)} · ${esc(v.createdAt)}</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(v.reportText||"요약 없음")}</pre><button class="btn sm" onclick="cpLoad(${i})">사본으로 이어서 설계</button></details>`).join("")||"저장한 설계안이 없습니다."}<p class="aplnote">같은 대입 학년도의 최근 저장 설계안을 새 통합 보고서에 포함합니다. 이전 보고서와 설계 이력은 유지됩니다.</p></div>`;
+}
 
 /* ── 학업 관리 탭 ── */
 function tabAcad(){
@@ -2807,7 +2995,7 @@ function rptCollect(s,selection,notes=db.adiga){
   if(examId&&matches.length!==1)throw Error("이 학생의 보고서용 시험을 하나만 선택하세요.");
   const exam=examId?jExam(matches[0]):null;
   if(exam&&exam.admissionYear!==year)throw Error("보고서와 선택한 시험의 모집학년도가 다릅니다.");
-  const data={student:{id:s.id,name:s.name||"",grade:s.grade||"",school:s.school||""},admissionYear:year,exam,
+  const data={coursePlanText:(Array.isArray(consult.coursePlans)?consult.coursePlans:[]).filter(p=>p.admissionYear===year).at(-1)?.reportText||"",student:{id:s.id,name:s.name||"",grade:s.grade||"",school:s.school||""},admissionYear:year,exam,
     susi:{input:adigaText(susi.admissionYear)===year?susi:null,minimumRef,cards:[],decisions:[],legacyCards:[],otherYearCount:0},
     jeongsi:{plans:[],otherExamPlans:[],otherYearCount:0},sourceState:{susiInput:susi,susiNotes:[],jeongsiSources:[]},missing:[],limitations:[
       "상담용 참고 기록이며 합격을 보장하지 않습니다. 저장된 점수와 원장 판단을 보존하며 새 합격 판정이나 환산점수를 만들지 않습니다.",
@@ -2956,6 +3144,7 @@ function rptSections(data){
   const cardLinks=entries=>entries.flatMap(x=>[x.card.evidence?.note,x.card.evidence]).filter(Boolean);
   const planLinks=entries=>entries.map(x=>x.plan.ruleSnapshot).filter(Boolean);
   const sections=[
+    {title:"진로·과목 설계",text:data.coursePlanText||"이 보고서에 포함된 해당 학년도 과목 설계안 없음"},
     {title:"학생·상담 범위",text:`학생: ${data.student.name} / ${data.student.grade||"학년 미입력"} / ${data.student.school||"학교 미입력"}\n모집학년도: ${data.admissionYear}\n기준 시험: ${data.exam?jExamText(data.exam):"미선택 — 수시 중심 보고서"}\n다른 학년도 기록: 수시 ${su.otherYearCount}건 / 정시 ${j.otherYearCount}건 (이번 보고서에서 제외, 원기록 보존)`},
     {title:"미확인·재확인 항목",text:data.missing.length?data.missing.map(x=>"• "+x).join("\n"):"수집된 기록에 추가 확인 항목 없음. 공식 원문과 학생 자격의 최종 확인은 필요합니다."},
     {title:"실제 시험 성적",text:data.exam?jSnapshotText(data.exam):"실제 시험을 선택하지 않았습니다. 내신에서 시험 점수를 추정하거나 다른 시험을 자동 선택하지 않습니다."},
@@ -4933,6 +5122,8 @@ function checkBackup(data){
     for(const k of ["apply","grades","exams","saenggibu","tasks","records","planners"])array(s[k],"학생 "+k);
     object(s.consult,"상담 기록");object(s.consult?.susi,"수시 입력");object(s.consult?.susiDecisions,"수시 판단");
     object(s.consult?.jeongsi,"정시 기록");
+    array(s.consult?.coursePlans,"진로·과목 설계");
+    for(const p of s.consult?.coursePlans||[])cpValidate(p,true);
     for(const k of ["exams","plans","history"])array(s.consult?.jeongsi?.[k],"정시 "+k);
     if(s.consult?.reports!=null){
       rptMergeReports([],s.consult.reports);
