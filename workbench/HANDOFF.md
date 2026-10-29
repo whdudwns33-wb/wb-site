@@ -1,6 +1,6 @@
 # 워크벤치 인수인계서 — Claude Code → Codex
 
-> 기준일 **2026-10-27** · 라이브 **v40 후속 / 전북대 2027 정시 환산** · 작업 브랜치 `claude/agent-performance-optimization-rj8ql6`
+> 기준일 **2026-10-29** · 라이브 **v40 후속 / 중3·퇴원 관리** · 작업 브랜치 `claude/agent-performance-optimization-rj8ql6`
 > 이 문서는 **공개 저장소**에 있다. 비밀번호·학생 실명·Drive 파일 ID를 여기에 적지 말 것.
 > 규칙의 정본은 루트 `AGENTS.md`, 빌드 절차의 정본은 `workbench/src/README.md`다. 이 문서는 그 둘을 읽기 전에 보는 지도다.
 
@@ -11,6 +11,12 @@
 **무엇** — WB 웩슬러브레인센터 원장 전용 고교 컨설팅 웹앱. 단일 HTML(`workbench/src/app.html`)을
 비밀번호로 암호화해 WB1 PC 서버에서 Cloudflare Tunnel을 통해 서비스한다. https://workbench.wbcowork.com/workbench/
 기존 GitHub Pages 주소는 기록 이전과 복구를 위해 유지한다. https://whdudwns33-wb.github.io/wb-site/workbench/
+
+**최신 배포(2026-10-29)** — 중3 등록·수정·사이드바 목록과 기록을 보존하는 퇴원/재원 복귀를 추가했다. 퇴원 학생은 별도 목록에서 조회하며 재원 대시보드 집계·상담 레이더·관리 포커스에서 제외한다. 성적·상담·지원안·보고서는 삭제하지 않는다. 소스 `ceafd88`, 암호화 산출물 `ea08497`, [PR #518](https://github.com/whdudwns33-wb/wb-site/pull/518), main `94cd4c3a38ad6364b6cbbaa4f5ea50d46cdf88c9`, 빌드 **`298c899d`**. 워크벤치 178개·최신 main 343개 검사와 GitHub checks 두 건을 통과했다. 15:18 KST에 Pages와 PC 서버 두 파일 지문 일치, 운영 응답의 새 코드, 요청된 학생 상태와 배포 전후 상담 스냅샷·기존 백업 지문 보존을 확인했다. 실제 로그인 후 화면 클릭 검증은 이번 배포에서 수행하지 않았으며 스크린샷은 만들지 않았다. 원장의 이번 배포 명시 승인으로 기존 DPAPI 보관키 복호화·KDF 일치 검증을 WB_PASSWORD 검사 대신 사용했고 비밀번호·키·기존 암호화 백업은 변경하지 않았다.
+- 최신 index.html SHA-256 `49de3311edc0ec93cfeafc3001275e351649324cdcae782e02c350a9a35a842b`
+- 최신 bulk.enc.json SHA-256 `dae2760b6cf85150bee1947268b7636f27d6c2747e76d2941d8f0f58281f632b`
+
+아래는 이전 배포 이력이다.
 
 **지금 상태** — v40 후속 라이브 + 2026-10-23 계정 호스팅 (학교 성취도 539개교 + 수시·정시 비교 + 통합 보고서). 아래는 암호화 원본 지문이며 PC는 `/healthz`로 대조한다.
 전북대 후속(2026-10-27 배포 완료): [PR #506](https://github.com/whdudwns33-wb/wb-site/pull/506)의 암호화 두 파일만 스쿼시 병합했다(`3fac942b25f6d402f17f04cd1c5c5ea234acd7fb`, 14:14:12 KST). 소스 `4d990a2`, 산출물 `8f11ef0`. 워크벤치 176개·최신 main 339개 검사 및 GitHub checks 2건을 통과했다. Pages 지문 일치 후 PC 동기화를 실행했고 14:16:38 KST에 운영 코드의 계산 보류와 변환표 미발표 사유가 실제 표시됨을 읽기 전용 브라우저에서 확인했다. 서버 쓰기 요청·스크린샷 0건, 상담 전체 스냅샷 지문과 암호화 백업 두 파일의 지문도 배포 전후 일치했다. 공식 예시의 전년도 변환값은 테스트에서만 사용하며 실제 2027 표로 등록하지 않는다. 적용 범위는 `src/README.md`의 전북대 절을 따른다.
