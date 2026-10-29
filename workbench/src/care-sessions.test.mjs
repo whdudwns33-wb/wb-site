@@ -31,8 +31,18 @@ test('care board filters and prioritizes without changing records; missing targe
  assert.equal(x.c.csBoardRows('2026-10-29','','unconfigured').length,1);
  assert.equal(x.c.csBoardRows('2026-10-29',' 합성 a ')[0].s.id,'student-a');assert.equal(x.c.csBoardRows('2026-10-29','일치없음').length,0);
  assert.match(x.c.csMetric(rows.find(r=>r.s.id==='student-a').p,'weeklyMeet'),/목표 0회/);
- x.c.renderCare();const rendered=x.c.$('#main').innerHTML;assert.match(rendered,/기록 확인 필요/);assert.match(rendered,/관리 목표 설정/);assert.match(rendered,/data-label="월간 관리"/);
+ x.c.renderCare();const rendered=x.c.$('#main').innerHTML;assert.match(rendered,/기록 확인 필요/);assert.match(rendered,/관리 목표 설정/);assert.match(rendered,/data-label="월 정규 상담"/);assert.match(rendered,/colspan="5"/);
  assert.equal(JSON.stringify(x.c.db),before);
+});
+
+test('comparison columns distinguish unknown, zero, remaining and exceeded targets without changing counts',()=>{
+ const {c}=setup(),p={counts:{monthlyRegular:3,weeklyMeet:0,weeklyPlanner:1,monthlyDesign:0},policy:null};
+ assert.match(c.csBoardMetric(p,'monthlyRegular'),/data-state="unknown"/);assert.match(c.csBoardMetric(p,'monthlyRegular'),/완료 3회, 목표 미설정/);
+ p.policy={monthlyRegular:'2',weeklyMeet:'0',weeklyPlanner:'2',monthlyDesign:'1'};const before=JSON.stringify(p);
+ assert.match(c.csBoardMetric(p,'monthlyRegular'),/목표 달성/);assert.match(c.csBoardMetric(p,'monthlyRegular'),/<strong>3<\/strong>/);
+ assert.match(c.csBoardMetric(p,'weeklyMeet'),/data-state="off"/);assert.doesNotMatch(c.csBoardMetric(p,'weeklyMeet'),/목표 달성/);
+ assert.match(c.csBoardMetric(p,'weeklyPlanner'),/남은 1회/);assert.match(c.csBoardMetric(p,'monthlyDesign'),/data-state="pending"/);
+ assert.equal(JSON.stringify(p),before);assert.equal((c.csBoardHtml().match(/scope="col"/g)||[]).length,6);
 });
 
 test('existing records and every saved version remain independent; editing does not double-count',()=>{

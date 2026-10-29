@@ -102,21 +102,34 @@ a.btn{text-decoration:none;color:var(--ink)}
 .stucard{cursor:pointer;transition:border-color .15s}
 .stucard:hover{border-color:var(--accent)}
 .stucard h3{font-size:var(--fs-lg);display:flex;align-items:center;gap:7px}
-/* 상담 현황은 학생 행 안에서 월간·주간 기준을 함께 읽는다. */
+/* 항목별 열과 고정 학생 이름으로 긴 목록에서도 횟수를 비교한다. */
 .care-toolbar{display:grid;grid-template-columns:minmax(160px,1fr) minmax(0,2fr) minmax(160px,1fr);gap:var(--sp-4);align-items:end}
 .care-toolbar label{display:grid;gap:var(--sp-2);font-size:var(--fs-sm);font-weight:600}
 .care-toolbar input,.care-toolbar select,.care-board .btn{min-height:calc(var(--sp-6) + var(--sp-3))}
 .care-count{margin:var(--sp-5) 0 var(--sp-2);font-weight:600}
-.care-table{width:100%;table-layout:fixed;border-collapse:collapse;text-align:left}
-.care-table caption{text-align:left;font-size:var(--fs-sm);color:var(--ink2);padding:var(--sp-2) 0}
-.care-table th,.care-table td{padding:var(--sp-3) var(--sp-2);vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere;white-space:normal}
-.care-table thead th{font-size:var(--fs-sm);color:var(--ink2);font-weight:600}
+.care-scroll{overflow:auto;max-height:68vh;border:1px solid var(--line);border-radius:8px;scrollbar-color:var(--ink2) var(--bg);scroll-padding-inline-start:160px}
+.care-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.care-table{width:100%;min-width:880px;table-layout:fixed;border-collapse:separate;border-spacing:0;text-align:left;margin:0}
+.care-table caption{text-align:left;font-size:var(--fs-sm);color:var(--ink2);padding:var(--sp-3);background:var(--panel)}
+.care-table th,.care-table td{padding:var(--sp-4) var(--sp-3);vertical-align:middle;border-bottom:1px solid var(--line);overflow-wrap:anywhere;white-space:normal;background:var(--panel)}
+.care-table thead th{position:sticky;top:0;z-index:2;font-size:var(--fs-sm);color:var(--ink);font-weight:600;background:var(--bg)}
+.care-table th:first-child{position:sticky;left:0;width:160px;z-index:1;border-right:1px solid var(--line)}
+.care-table thead th:first-child{z-index:3}
+.care-table th:last-child{width:220px}
 .care-table tbody th{font-weight:400}
-.care-table .btn{text-align:left;justify-content:flex-start}
+.care-table tbody tr:last-child>*{border-bottom:0}
+.care-table tbody tr:hover>*,.care-table tbody tr:focus-within>*{background:var(--accent-soft)}
+.care-table .btn{text-align:left;justify-content:flex-start;white-space:normal;max-width:100%}
+.care-table th .btn{color:var(--accent-ink);border-color:transparent;background:transparent;padding-inline:0}
+.care-table th .btn:hover{text-decoration:underline;text-underline-offset:3px}
 .care-student-meta{display:block;color:var(--ink2);font-size:var(--fs-sm);margin-top:var(--sp-1)}
-.care-metric+.care-metric{margin-top:var(--sp-3)}
-.care-metric span{display:block;color:var(--ink2);font-size:var(--fs-sm)}
-.care-metric b,.care-metrics dd{font-variant-numeric:tabular-nums}
+.care-metric{font-variant-numeric:tabular-nums;white-space:nowrap}
+.care-metric strong{font-size:var(--fs-lg)}
+.care-metric small{font-size:var(--fs-sm);color:var(--ink2)}
+.care-metric span{display:block;color:var(--ink2);font-size:var(--fs-sm);margin-top:var(--sp-1);white-space:normal}
+.care-metric[data-state="met"] span{color:var(--ok);font-weight:600}
+.care-metrics dd{font-variant-numeric:tabular-nums}
+.care-scroll-hint{font-size:var(--fs-sm);color:var(--ink2);margin:var(--sp-2) 0}
 .care-attention{color:var(--danger);font-size:var(--fs-sm);margin:var(--sp-2) 0}
 .care-guide{margin-top:var(--sp-4);font-size:var(--fs-sm);color:var(--ink2)}
 .care-guide summary{cursor:pointer;padding:var(--sp-2) 0}
@@ -128,15 +141,16 @@ a.btn{text-decoration:none;color:var(--ink)}
 @media(max-width:900px){
  .care-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}
  .care-toolbar label:nth-child(2){grid-column:1 / -1;grid-row:2}
- .care-table,.care-table tbody,.care-table tr,.care-table th,.care-table td{display:block;width:100%}
- .care-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
- .care-table tr{padding:var(--sp-4) 0;border-bottom:1px solid var(--line)}
- .care-table th,.care-table td{border:0;padding:var(--sp-2) 0}
- .care-table td[data-label]::before{content:attr(data-label);display:block;font-size:var(--fs-sm);font-weight:700;margin-bottom:var(--sp-2)}
- .care-table td[data-label]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-1) var(--sp-3)}
- .care-table td[data-label]::before,.care-table td:last-child>*{grid-column:1 / -1}
- .care-metric+.care-metric{margin:0}
- .care-table .btn{width:100%}
+ .care-scroll{scroll-padding-inline-start:120px}
+ .care-table th:first-child{width:120px}
+}
+@media(max-width:600px){
+ .care-board{padding:var(--sp-3)}
+ .care-scroll{scroll-padding-inline-start:96px}
+ .care-table{min-width:596px}
+ .care-table th,.care-table td{padding:var(--sp-3) var(--sp-2)}
+ .care-table th:first-child{width:96px}
+ .care-table th:last-child{width:100px}
 }
 /* ── 입시 검색 A안 (디렉터리) ── */
 .ugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px}
@@ -1599,10 +1613,17 @@ async function csReadFile(file,kind){
  }catch(e){toast("가져오기 실패: "+e.message);}
 }
 function csMetric(p,key){return p.policy?(+p.policy[key]===0?`${p.counts[key]}회 완료 · 목표 0회`:`${p.counts[key]} / ${esc(p.policy[key])}회`):`${p.counts[key]}회 완료 · 목표 미설정`;}
+function csBoardMetric(p,key){
+ const count=p.counts[key],target=p.policy?+p.policy[key]:null,state=target===null?"unknown":target===0?"off":count>=target?"met":"pending";
+ const label=state==="unknown"?"목표 미설정":state==="off"?"목표 0회":state==="met"?"목표 달성":`남은 ${target-count}회`;
+ return `<div class="care-metric" role="group" data-state="${state}" aria-label="${esc(CS_TARGETS.find(x=>x[0]===key)[1])}: 완료 ${count}회, ${target===null?"목표 미설정":`목표 ${target}회`}"><strong>${count}</strong> <small>/ ${target===null?"—":target}회</small><span>${label}</span></div>`;
+}
 function csMetrics(s,date){const p=csProgress(s,date);return `<p class="aplnote">월 ${esc(p.period.month)} · 주 ${esc(p.period.start)}~${esc(p.period.end)} (월~일, 한국시간)</p><dl class="care-metrics">${CS_TARGETS.map(([k,label])=>`<div><dt>${label}</dt><dd>${csMetric(p,k)}</dd></div>`).join("")}</dl><p class="aplnote">이번 달 예정 ${p.planned}회 · 오늘 이전 예정 ${p.overdue}회 · 이번 달 요약/후속 조치 미기록 ${p.missingNotes}회</p>`;}
 function csBoardHtml(){
- const all=csBoardRows(csBoardDate),rows=csBoardRows(csBoardDate,csBoardQuery,csBoardFilter),period=csPeriod(csBoardDate),metric=(p,key)=>`<div class="care-metric"><span>${CS_TARGETS.find(x=>x[0]===key)[1]}</span><b>${csMetric(p,key)}</b></div>`;
- return `<p class="care-count" role="status" aria-live="polite">${rows.length}명 표시 / 재원 ${all.length}명 · 확인 필요 ${all.filter(r=>r.attention).length}명 · 목표 미설정 ${all.filter(r=>r.unconfigured).length}명</p><p class="aplnote">월간 ${esc(period.month)} · 주간 ${esc(period.start)}~${esc(period.end)} · 완료 / 목표 횟수</p>${rows.length?`<table class="care-table"><caption>학생별 상담·플래너 진행 현황</caption><thead><tr><th scope="col">학생</th><th scope="col">월간 관리</th><th scope="col">주간 관리</th><th scope="col">다음 상담·확인할 일</th></tr></thead><tbody>${rows.map(({s,i,p,next,error,attention,unconfigured})=>`<tr><th scope="row"><button class="btn" onclick="csOpen(${i})">${esc(s.name)} 상담 열기</button><span class="care-student-meta">${esc(s.grade||"학년 미입력")} · ${esc(s.school||"학교 미입력")}</span></th>${error?'<td colspan="3"><span class="chip danger">기록 확인 필요</span><p>기록 형식을 확인해 주세요. 원본은 유지됩니다.</p></td>':`<td data-label="월간 관리">${metric(p,"monthlyRegular")}${metric(p,"monthlyDesign")}</td><td data-label="주간 관리">${metric(p,"weeklyMeet")}${metric(p,"weeklyPlanner")}</td><td data-label="다음 상담·확인할 일">${next?`<b>${esc(next.date)} ${esc(next.time||"시간 미정")}</b><span class="care-student-meta">${esc(next.kind)}</span>`:'<span class="care-student-meta">기준일 이후 예정 없음</span>'}${attention?`<p class="care-attention">${p.overdue?`지난 예정 ${p.overdue}회 확인`:""}${p.overdue&&p.missingNotes?" · ":""}${p.missingNotes?`요약/후속 조치 ${p.missingNotes}회 보완`:""}</p>`:""}${unconfigured?`<button class="btn sm" onclick="csOpen(${i},true)">관리 목표 설정</button>`:""}</td>`}</tr>`).join("")}</tbody></table>`:`<div class="empty"><h2>${all.length?"조건에 맞는 학생이 없습니다":"등록된 재원 학생이 없습니다"}</h2><p>${all.length?"검색어를 줄이거나 확인 상태를 전체로 바꿔 보세요.":"학생을 등록한 뒤 상담 횟수와 회차를 관리할 수 있습니다. 퇴원 학생의 기록은 학생 목록에서 확인하세요."}</p>${all.length?'<button class="btn" onclick="csBoardQuery=\'\';csBoardFilter=\'all\';renderCare()">검색 조건 지우기</button>':""}</div>`}`;
+ const all=csBoardRows(csBoardDate),rows=csBoardRows(csBoardDate,csBoardQuery,csBoardFilter),period=csPeriod(csBoardDate);
+ return `<p class="care-count" role="status" aria-live="polite">${rows.length}명 표시 / 재원 ${all.length}명 · 확인 필요 ${all.filter(r=>r.attention).length}명 · 목표 미설정 ${all.filter(r=>r.unconfigured).length}명</p><p class="aplnote">월간 ${esc(period.month)} · 주간 ${esc(period.start)}~${esc(period.end)} · 완료 / 목표 횟수</p>${rows.length?`
+ <p id="cs_scroll_hint" class="care-scroll-hint">학생 이름을 누르면 상담을 엽니다. 좁은 화면에서는 표를 좌우로 밀어 비교하세요.</p>
+ <div class="care-scroll" role="region" aria-label="학생별 진행 현황 비교표" aria-describedby="cs_scroll_hint" tabindex="0"><table class="care-table"><caption>학생별 상담·플래너 진행 현황</caption><thead><tr><th scope="col">학생</th>${CS_TARGETS.map(([,label])=>`<th scope="col">${label}</th>`).join("")}<th scope="col">다음 상담·확인할 일</th></tr></thead><tbody>${rows.map(({s,i,p,next,error,attention,unconfigured})=>`<tr><th scope="row"><button class="btn" onclick="csOpen(${i})" aria-label="${esc(s.name)} 상담 열기">${esc(s.name)}</button><span class="care-student-meta">${esc(s.grade||"학년 미입력")}<br>${esc(s.school||"학교 미입력")}</span></th>${error?'<td colspan="5"><span class="chip danger">기록 확인 필요</span><p>기록 형식을 확인해 주세요. 원본은 유지됩니다.</p></td>':`${CS_TARGETS.map(([key,label])=>`<td data-label="${label}">${csBoardMetric(p,key)}</td>`).join("")}<td data-label="다음 상담·확인할 일">${next?`<b>${esc(next.date)} ${esc(next.time||"시간 미정")}</b><span class="care-student-meta">${esc(next.kind)}</span>`:'<span class="care-student-meta">기준일 이후 예정 없음</span>'}${attention?`<p class="care-attention">${p.overdue?`지난 예정 ${p.overdue}회 확인`:""}${p.overdue&&p.missingNotes?" · ":""}${p.missingNotes?`요약/후속 조치 ${p.missingNotes}회 보완`:""}</p>`:""}${unconfigured?`<button class="btn sm" onclick="csOpen(${i},true)">관리 목표 설정</button>`:""}</td>`}</tr>`).join("")}</tbody></table></div>`:`<div class="empty"><h2>${all.length?"조건에 맞는 학생이 없습니다":"등록된 재원 학생이 없습니다"}</h2><p>${all.length?"검색어를 줄이거나 확인 상태를 전체로 바꿔 보세요.":"학생을 등록한 뒤 상담 횟수와 회차를 관리할 수 있습니다. 퇴원 학생의 기록은 학생 목록에서 확인하세요."}</p>${all.length?'<button class="btn" onclick="csBoardQuery=\'\';csBoardFilter=\'all\';renderCare()">검색 조건 지우기</button>':""}</div>`}`;
 }
 function csRefreshBoard(){ $("#cs_board_results").innerHTML=csBoardHtml(); }
 function renderCare(){

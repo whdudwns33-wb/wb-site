@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {join, dirname, basename, resolve} from 'node:path';
 import {randomBytes, createCipheriv} from 'node:crypto';
 import {get as httpGet} from 'node:http';
+import {DatabaseSync} from 'node:sqlite';
 import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StreamableHTTPClientTransport} from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
@@ -178,4 +179,55 @@ test('reset password checks persistently lock after repeated failures without ch
   assert.equal((await f.call(route, {...owner, method: 'POST', body: {currentPassword: next, temporaryPassword: 'temp-fixture'}})).status, 429);
   assert.equal((await f.call('/api/auth/login', {method: 'POST', body: {username: target.username, password: initial}})).status, 200);
   assert.deepEqual(f.store.snapshot(), before);
+});
+
+test('staff registration enforces browser reauthentication and unique identities; existing records and credentials remain intact', async t => {
+  const f = await fixture(t), owner = await f.change(await f.login('owner-test'));
+  const before = f.store.snapshot(), beforeUsers = f.store.listUsers();
+  const credentials = () => {const db = new DatabaseSync(join(f.root, 'test.sqlite'), {readOnly: true});try{return db.prepare('SELECT id,salt,password_hash,must_change FROM accounts WHERE username IN (?,?) ORDER BY id').all('owner-test','wb테스트');}finally{db.close();}};
+  const original = credentials(), body = {name: '합성 강사', username: ' WB합성 ', temporaryPassword: 'temporary-fixture', currentPassword: next};
+  const create = (auth, patch={}) => f.call('/api/admin/users', {...auth, method:'POST', body:{...body,...patch}});
+  assert.equal((await create({})).status,401);
+  const teacher = await f.login('wb테스트');assert.equal((await create(teacher)).status,428);
+  const issued = (await f.call('/api/account/tokens', {...owner, method:'POST', body:{name:'preserved'}})).data.token;
+  assert.equal((await create({bearer:issued})).status,403);
+  assert.equal((await create({...owner,csrf:'wrong'})).status,403);
+  assert.equal((await create({...owner,requestOrigin:'https://attacker.invalid'})).status,403);
+  for(const patch of [{name:''},{name:'a'.repeat(61)},{name:'<script>'},{username:'a b'},{username:'a'},{temporaryPassword:'abc'},{temporaryPassword:[]},{currentPassword:''}])assert.equal((await create(owner,patch)).status,400);
+  assert.equal((await create(owner,{currentPassword:'wrong-fixture'})).status,401);
+  assert.deepEqual(f.store.listUsers(),beforeUsers);
+  const created = await create(owner);assert.equal(created.status,201);
+  assert.equal(created.data.user.username,'wb합성');assert.equal(created.data.user.role,'admin');assert.equal(created.data.user.mustChangePassword,true);
+  assert.deepEqual(Object.keys(created.data),['user']);assert.equal(created.data.user.password_hash,undefined);
+  assert.equal((await create(owner,{username:'ＷＢ합성',name:'중복 합성'})).status,409);
+  assert.deepEqual(credentials(),original);assert.deepEqual(f.store.snapshot(),before);
+  assert.equal((await f.call('/api/summary',{bearer:issued})).status,200);assert.equal((await f.call('/api/auth/me',owner)).status,200);
+  const login=await f.call('/api/auth/login',{method:'POST',body:{username:created.data.user.username,password:body.temporaryPassword}});
+  assert.equal(login.status,200);const auth={cookie:login.headers.get('set-cookie').split(';')[0],csrf:login.data.csrf};
+  assert.equal((await f.call('/api/workspace',auth)).status,428);
+  assert.equal((await f.call('/api/account/tokens',{...auth,method:'POST',body:{name:'blocked'}})).status,428);
+  const changed=await f.call('/api/auth/password',{...auth,method:'POST',body:{currentPassword:body.temporaryPassword,nextPassword:next}});
+  assert.equal(changed.status,200);const ready={cookie:changed.headers.get('set-cookie').split(';')[0],csrf:changed.data.csrf};
+  assert.equal((await f.call('/api/workspace',ready)).status,200);
+  assert.equal((await create(ready,{username:'wbsecond',name:'합성 관리자'})).status,201);
+  assert.deepEqual(credentials(),original);assert.deepEqual(f.store.snapshot(),before);
+  for(const file of readdirSync(f.root).filter(name=>name.startsWith('test.sqlite')))assert.equal(readFileSync(join(f.root,file)).includes(Buffer.from(body.temporaryPassword)),false);
+});
+
+test('registration rejects revoked sessions and concurrent duplicate usernames without partial writes', async t => {
+  const f=await fixture(t),owner=await f.change(await f.login('owner-test')),before=f.store.snapshot();
+  const body={name:'동시 합성',username:'wbconcurrent',temporaryPassword:'temporary-fixture',currentPassword:next};
+  const results=await Promise.all([1,2].map(()=>f.call('/api/admin/users',{...owner,method:'POST',body})));
+  assert.deepEqual(results.map(r=>r.status).sort(),[201,409]);assert.equal(f.store.listUsers().length,3);
+  const principal=f.store.authenticate(owner.cookie.slice(owner.cookie.indexOf('=')+1));
+  const pending=f.store.registerUser(principal,{...body,username:'wbrevoked'});f.store.logout(principal);
+  await assert.rejects(pending,error=>error.status===409);assert.equal(f.store.listUsers().length,3);assert.deepEqual(f.store.snapshot(),before);
+});
+
+test('registration password failures share persistent administrator lockout without creating accounts', async t => {
+  const f=await fixture(t),owner=await f.change(await f.login('owner-test')),before=f.store.snapshot();
+  const body={name:'합성',username:'wbblocked',temporaryPassword:'temporary-fixture',currentPassword:'wrong-fixture'};
+  for(let i=0;i<5;i++)assert.equal((await f.call('/api/admin/users',{...owner,method:'POST',body})).status,401);
+  assert.equal((await f.call('/api/admin/users',{...owner,method:'POST',body:{...body,currentPassword:next}})).status,429);
+  assert.equal(f.store.listUsers().length,2);assert.deepEqual(f.store.snapshot(),before);
 });
