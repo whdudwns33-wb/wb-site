@@ -1096,3 +1096,18 @@ test('replace is an upsert and malformed stored data fails closed', async () => 
   assert.equal(result.status, 500);
   assert.equal(result.body.error, '저장된 원생 데이터 형식이 올바르지 않습니다');
 });
+
+
+test('configured manager personal logins create all subscription types for another teacher', async () => {
+  for (const [managerId, token] of taskManagers) for (const subscriptionType of ['assessment','studyforce','readers']) {
+    const db=new TestD1();seedAuth(db);
+    const document=documentFixture();document.roster.students[0].subscriptions=[{type:subscriptionType,startDate:'2026-09-01'}];
+    await replace(db,document);
+    const result=await call(db,{auth:person(managerId,token),action:'subscription_session_create',requestId:'manager-subscription',
+      studentId:'student-a',subscriptionType,staffId:'teacher-a',date:'2026-11-01',startTime:'14:00',endTime:'15:00'},'task',
+      {TASK_MANAGER_STAFF_IDS_CONFIG:taskManagers.map(([id])=>id).join(',')});
+    assert.equal(result.status,200,JSON.stringify(result.body));
+    assert.equal(result.body.task.staffId,'teacher-a');
+    assert.equal(result.body.task.studentId,'student-a');
+  }
+});
