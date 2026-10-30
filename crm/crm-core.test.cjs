@@ -25,6 +25,22 @@ t('상태는 단계에서 유도된다 — won/lost/churned 는 요청값을 무
   assert.equal(C.statusOf('tested', 'anything'), 'open');
 });
 
+t('고객 등급은 명시한 A~D만 저장하고 미입력은 미분류로 둔다', () => {
+  const raw = Object.freeze({ child: Object.freeze({ name: '가상학생' }), memo: '블랙리스트 D등급 참고', hot: true });
+  assert.deepEqual(C.CUSTOMER_GRADES, ['A', 'B', 'C', 'D']);
+  assert.equal(C.CUSTOMER_GRADE_LABEL.D, 'D등급(블랙리스트)');
+  assert.equal(C.validateLead(raw).data.customerGrade, '', '메모나 HOT에서 등급을 추정하지 않는다');
+  for (const customerGrade of ['', ...C.CUSTOMER_GRADES]) {
+    const v = C.validateLead({ ...raw, customerGrade });
+    assert.equal(v.ok, true, v.error);
+    assert.equal(v.data.customerGrade, customerGrade);
+  }
+  for (const customerGrade of [null, false, 0, 'E', 'd', ' D ', [], {}, '__proto__']) {
+    assert.equal(C.validateLead({ ...raw, customerGrade }).ok, false);
+  }
+  assert.equal(Object.hasOwn(raw, 'customerGrade'), false);
+});
+
 t('채널 감지 — 우선순위(지인추천>블로그>맘카페>인스타>당근>센터폰), 단서 없음은 기타', () => {
   assert.equal(C.detectChannel('판교맘카페에서 글 보고 연락드려요').channel, '맘카페');
   assert.equal(C.detectChannel('맘카페 후기 보고 왔어요').channel, '맘카페');

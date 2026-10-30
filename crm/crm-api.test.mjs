@@ -423,6 +423,38 @@ test('기록·크레딧은 append-only, 크레딧·설정은 원장만, 설정�
   assert.deepEqual(settings.hubspot.map.inspection.stageMap, { inquiry: 'appointmentscheduled' });
 });
 
+test('고객 등급 저장은 기존 필드와 HubSpot 큐를 보존하고 이전 화면의 미전송 필드도 유지한다', async () => {
+  const hs = fakeHubspot(), env = envFor(hs), admin = await setupAdmin(env), staff = await makeStaff(env, admin, '가상직원');
+  const read = async () => (await call(env, 'GET', '/api/docs', { token: staff.token })).body.docs.find(d => d.c === 'leads' && d.id === 'graded');
+  await putDoc(env, staff.token, 'leads', 'graded', lead());
+  const before = await read(), queueBefore = await queue(env, admin);
+  assert.equal(before.data.customerGrade, '');
+  const grade = await putDoc(env, staff.token, 'leads', 'graded', { ...before.data, customerGrade: 'D' }, { expectedUpdatedAt: before.updatedAt });
+  assert.equal(grade.body.results[0].queued, 0);
+  const graded = await read();
+  assert.deepEqual(graded.data, { ...before.data, customerGrade: 'D' });
+  assert.ok(graded.updatedAt > before.updatedAt);
+  assert.deepEqual(await queue(env, admin), queueBefore, '이미 있던 승인 대기 큐도 수정하지 않는다');
+  assert.equal(hs.calls.length, 0, '등급 저장은 HubSpot 통신을 하지 않는다');
+
+  const stale = await putDoc(env, staff.token, 'leads', 'graded', { ...before.data, customerGrade: 'A' }, { expectedUpdatedAt: before.updatedAt });
+  assert.equal(stale.body.results[0].code, 'STALE');
+  const oldClient = { ...graded.data, memo: '확인 메모' };
+  delete oldClient.customerGrade;
+  assert.equal((await putDoc(env, staff.token, 'leads', 'graded', oldClient, { expectedUpdatedAt: graded.updatedAt })).body.results[0].queued, 0);
+  const preserved = await read();
+  assert.equal(preserved.data.customerGrade, 'D');
+  for (const customerGrade of [null, [], 'E', 'd']) {
+    const rejected = await putDoc(env, staff.token, 'leads', 'graded', { ...preserved.data, customerGrade }, { expectedUpdatedAt: preserved.updatedAt });
+    assert.equal(rejected.body.results[0].code, 'INVALID');
+  }
+  assert.deepEqual(await read(), preserved, '잘못된 등급은 저장된 자료를 바꾸지 않는다');
+  const cleared = await putDoc(env, staff.token, 'leads', 'graded', { ...preserved.data, customerGrade: '' }, { expectedUpdatedAt: preserved.updatedAt });
+  assert.equal(cleared.body.results[0].queued, 0);
+  assert.equal((await read()).data.customerGrade, '');
+  assert.deepEqual(await queue(env, admin), queueBefore);
+});
+
 test('반영 큐 — 리드 생성은 contact(quick)+deal(quick), 단계 전이는 deal(review)로 합쳐지고, 기록은 note, 승인 작업은 원장만', async () => {
   const env = envFor();
   const admin = await setupAdmin(env);
@@ -859,8 +891,10 @@ test('파트너 포털 — 소개 보내기 → 센터 리드(채널 파트너)�
   const list = await call(env, 'GET', '/api/partner/referrals', { token: partner.token });
   assert.equal(list.body.inbound.length, 1);
   assert.equal(list.body.inbound[0].phone, undefined);
+  assert.equal(list.body.inbound[0].customerGrade, undefined);
   // 센터가 단계를 옮기면 포털엔 거친 단계만
-  await putDoc(env, admin, 'leads', lead.id, Object.assign({}, lead.data, { stage: 'upsell' }));
+  await putDoc(env, admin, 'leads', lead.id, Object.assign({}, lead.data, { stage: 'upsell', customerGrade: 'D' }));
+  assert.equal((await call(env, 'GET', '/api/partner/referrals', { token: partner.token })).body.inbound[0].customerGrade, undefined);
   assert.equal((await call(env, 'GET', '/api/partner/referrals', { token: partner.token })).body.inbound[0].stage, '검사 완료');
   // 하루 상한
   for (let i = 0; i < 19; i++) await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '보호자' + i, childName: '아이' + i, consent: true } });
@@ -880,7 +914,7 @@ test('나가는 소개 — 직원이 동의와 함께 만들고, 파트너는 �
   const staff = await makeStaff(env, admin, '실장A');
   const partner = await makePartner(env, admin, '가나수학');
   const other = await makePartner(env, admin, '다라영어');
-  await putDoc(env, staff.token, 'leads', 'l1', lead({ child: { name: '아이', grade: '초5' } }));
+  await putDoc(env, staff.token, 'leads', 'l1', lead({ child: { name: '아이', grade: '초5' }, customerGrade: 'D' }));
   assert.equal((await putDoc(env, staff.token, 'referrals', 'r1', { leadId: 'l1', partnerId: partner.id, note: '수학 보강' })).body.code, 'CONSENT');
   assert.equal((await putDoc(env, staff.token, 'referrals', 'r1', { leadId: 'nope', partnerId: partner.id, consent: true })).body.code, 'INVALID');
   assert.equal((await putDoc(env, staff.token, 'referrals', 'r1', { leadId: 'l1', partnerId: 'pt_none', consent: true })).body.code, 'INVALID');
@@ -890,6 +924,7 @@ test('나가는 소개 — 직원이 동의와 함께 만들고, 파트너는 �
   const mine = await call(env, 'GET', '/api/partner/referrals', { token: partner.token });
   assert.deepEqual([mine.body.outbound.length, mine.body.outbound[0].childName, mine.body.outbound[0].grade, mine.body.outbound[0].status, mine.body.outbound[0].note], [1, '아이', '초5', 'sent', '수학 보강 권함']);
   assert.equal(mine.body.outbound[0].phone, undefined);
+  assert.equal(mine.body.outbound[0].customerGrade, undefined);
   assert.equal((await call(env, 'GET', '/api/partner/referrals', { token: other.token })).body.outbound.length, 0, '다른 파트너에게는 안 보인다');
   assert.equal((await call(env, 'POST', '/api/partner/referrals/r1/status', { token: other.token, body: { status: 'enrolled' } })).status, 404);
   assert.equal((await call(env, 'POST', '/api/partner/referrals/r1/status', { token: partner.token, body: { status: 'bogus' } })).status, 400);
