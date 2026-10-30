@@ -1,6 +1,7 @@
 // node --test crm/hubspot.test.mjs — HubSpot 클라이언트를 가짜 fetch 위에서 돌린다(망 안 탐). 토큰·실명은 자리표시.
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import CORE from './crm-core.js';
 import { createClient, contactProperties, contactPatchProperties, leadFromContact, applyDealsToLead, noteBody, dealName, hsDate, HubSpotError, WB_PROPERTY_NAMES, WB_PROPERTIES } from './hubspot.mjs';
 
 /** 경로 → 응답 함수 표. 요청은 calls 에 쌓인다. */
@@ -199,6 +200,25 @@ test('보호자 이름 미입력 — 새 연락처·기존 연락처에 이름�
   }
   const renamed = contactPatchProperties({ name: '이가상', phone: '01000005678', hubspot: { nameParts: { firstname: '가상보호', lastname: '김' } } }, {}, null, ['name']);
   assert.deepEqual(renamed, { firstname: '이가상', lastname: '' }, '실제로 입력한 보호자 이름 변경은 계속 반영한다');
+});
+
+test('내부 고객 등급은 HubSpot에 내보내지 않고 가져오기·검증 왕복에서도 보존한다', () => {
+  const base = { name: '가상보호자', child: { name: '가상학생' }, pipeline: 'inspection', stage: 'inquiry', memo: '내부 메모' };
+  const graded = { ...base, customerGrade: 'D' };
+  assert.deepEqual(contactProperties(graded), contactProperties(base));
+  assert.deepEqual(contactPatchProperties(graded, {}, null, ['customerGrade']), {});
+  assert.equal(WB_PROPERTY_NAMES.includes('wb_customer_grade'), false);
+  const contact = { id: 'qa_grade', properties: { firstname: '가상보호자', wb_child_name: '가상학생', wb_customer_grade: 'A' } };
+  for (const customerGrade of ['', ...CORE.CUSTOMER_GRADES]) {
+    const existing = Object.freeze({ ...base, customerGrade });
+    const merged = CORE.validateLead(leadFromContact(contact, existing));
+    assert.equal(merged.ok, true, merged.error);
+    assert.equal(merged.data.customerGrade, customerGrade);
+    assert.equal(existing.customerGrade, customerGrade);
+  }
+  assert.equal(CORE.validateLead(leadFromContact(contact, null)).data.customerGrade, '', '새 고객도 원격 임의 속성으로 등급을 매기지 않는다');
+  assert.equal(CORE.messageDraft(3, graded), CORE.messageDraft(3, base), '외부 발송 초안에 등급을 넣지 않는다');
+  assert.equal(CORE.retestDraft(7, graded), CORE.retestDraft(7, base));
 });
 
 test('leadFromContact — 성+이름, 전화 정규화, 날짜 두 형식, 기존 리드의 기록·메모는 보존', () => {
