@@ -304,3 +304,16 @@ test('a disabled actual-date lesson panel never exposes guardian-publication edi
   assert.match(panel, /const canEditPublication\s*=\s*editable\s*&&\s*canEditGuardianPublication\(t, date\)/,
     'recordContext.inputEnabled=false must also lock guardian-publication fields');
 });
+
+
+test('planned flexible class is visible before arrival without enabling attendance or creating a visit', () => {
+  const harness = sourceRecordHarness();
+  const task = lessonTask({weekendPlans:[{date:'2026-08-30',startTime:'14:00',endTime:'15:00'}]});
+  loadWeekendPair(harness,[],[]);
+  assert.equal(harness.api.teacherTaskCardOccursOn(task,'2026-08-30'),true);
+  assert.equal(harness.api.teacherTaskCardOccursOn(task,'2026-08-29'),false);
+  const context=harness.api.lessonRecordContext(task,'2026-08-30');
+  assert.equal(context.visible,true); assert.equal(context.inputEnabled,false); assert.equal(context.visit,null);
+  loadWeekendPair(harness,[],[visit({sourceDate:'2026-08-30'})]);
+  assert.equal(harness.api.lessonRecordContext(task,'2026-08-30').inputEnabled,true);
+});

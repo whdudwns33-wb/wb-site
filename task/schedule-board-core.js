@@ -125,7 +125,7 @@
           endMinute: endMinute,
           label: visit.projectedEnd ? clockText(startMinute) + '–등원 중' : clockText(startMinute) + '–' + clockText(endMinute),
           lessonRole: role,
-          scheduleStatus: visit.projectedEnd ? 'actual_visit_active' : 'actual_visit'
+          scheduleStatus: visit.status === 'planned' ? 'planned' : visit.projectedEnd ? 'actual_visit_active' : 'actual_visit'
         }],
         issues: [],
         sourceType: 'flexible'
