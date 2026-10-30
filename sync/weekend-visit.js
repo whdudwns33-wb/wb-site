@@ -1,4 +1,5 @@
 import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
+import { handleWeekendPlan } from './weekend-plan.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
 import { lessonHandoffCheckoutGrant } from './lesson-handoff.js';
 import {
@@ -147,6 +148,8 @@ function resolveVisitSourceDate(task, visitDate, body) {
     return String(task.start || '') === String(visitDate || '') && sourceDate === String(visitDate || '')
       ? sourceDate : '';
   }
+  if (flexibleAllowedOn(task, visitDate) && (task.weekendPlans || []).some(p => p.date === visitDate) &&
+      (!body.sourceDate || body.sourceDate === visitDate)) return visitDate;
   const pair = weekendPairDates(visitDate);
   if (pair.length !== 2) return '';
   if (Object.prototype.hasOwnProperty.call(body || {}, 'sourceDate')) {
@@ -762,6 +765,7 @@ async function changeVisit(env, app, body, auth, json, origin) {
 export async function handleWeekendVisit(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '업무 화면에서만 등·하원 기록을 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || 'list');
+  if (action === 'plan' || action === 'plan_cancel') return await handleWeekendPlan(env, app, body, auth, json, origin);
   if (action === 'list') return await listVisits(env, app, body, auth, json, origin);
   if (action === 'configure') return await configureLesson(env, app, body, auth, json, origin);
   if (action === 'check_in') return await checkIn(env, app, body, auth, json, origin);
