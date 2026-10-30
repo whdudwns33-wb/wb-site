@@ -218,6 +218,8 @@ const LEAD_PII_SKIP = new Set([...PII_ALLOWED_PATHS, 'hubspot', 'creditBalanceHs
 function ruleLeads(data, ctx) {
   const today = kstToday();
   const prev = ctx.previous;
+  // 등급 칸이 없는 이전 화면의 저장으로 내부 분류가 지워지지 않게 한다.
+  if (prev && !Object.hasOwn(data, 'customerGrade')) data = { ...data, customerGrade: prev.customerGrade };
   if (data.pipeline === 'academy' && CORE.isLegacyAcademyStage(data.stage) && (!prev || prev.pipeline !== 'academy' || prev.stage !== data.stage)) return bad('INVALID', '이전 학원 상태는 새 영업 단계로 선택할 수 없습니다');
   if (prev?.pipeline === 'academy' && CORE.isLegacyAcademyStage(prev.stage) && !data.academyStatus) data = { ...data, academyStatus: CORE.academyStatusOf(prev) };
   const v = CORE.validateLead(data, { today });

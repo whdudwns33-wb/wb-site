@@ -48,6 +48,20 @@ test('담당자와 파이프라인·단계는 독립적으로 좁혀지며 숫�
   assert.deepEqual(ids([lead('n', { owner: 42 })], { owner: '42' }), ['n']);
 });
 
+test('고객 등급 필터는 미분류와 A~D를 구분하고 다른 조건과 함께 좁힌다', () => {
+  const records = [lead('old'), lead('empty', { customerGrade: '' }),
+    ...C.CUSTOMER_GRADES.map(customerGrade => lead(customerGrade, { customerGrade }))];
+  const before = JSON.stringify(records);
+  assert.equal(ids(records, { customerGrade: '' }).length, records.length);
+  assert.deepEqual(ids(records, { customerGrade: 'unclassified' }).sort(), ['empty', 'old']);
+  for (const customerGrade of C.CUSTOMER_GRADES) assert.deepEqual(ids(records, { customerGrade }), [customerGrade]);
+  assert.deepEqual(ids(records, { customerGrade: 'D', q: '학생 D', status: 'open', channel: '블로그' }), ['D']);
+  assert.deepEqual(ids(records, { customerGrade: 'D', channel: '맘카페' }), []);
+  assert.deepEqual(ids(records, { customerGrade: 'D', q: '학생 A' }), []);
+  for (const customerGrade of ['E', 'd', '__proto__', [], {}, 0]) assert.deepEqual(ids(records, { customerGrade }), []);
+  assert.equal(JSON.stringify(records), before);
+});
+
 test('오늘·지연 보기는 표시되는 가장 이른 유효 미완료 일정과 일치한다', () => {
   assert.deepEqual(ids(sample, { followup: 'today' }), ['b']);
   assert.deepEqual(ids(sample, { followup: 'overdue' }), ['a']);
