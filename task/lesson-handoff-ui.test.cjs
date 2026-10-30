@@ -531,3 +531,25 @@ test('UI hooks poll every 15 seconds, preserve details and drafts, and show mana
   const releaseVersion = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8')).v;
   assert.equal(html.match(/const APP_VER = '([^']+)'/)[1], releaseVersion);
 });
+
+test('cancelled handoffs stay in manager history but never render as received today lessons', () => {
+  const env = harness();
+  env.asRecipient();
+  const rows = ['pending', 'accepted', 'completed', 'cancelled'].map((status, i) => handoff({
+    handoffId: 'lh_' + String(i + 1).repeat(32), status,
+    student: { id: 'student-' + i, name: '상태학생' + i, school: '테스트초', grade: '초3' }
+  }));
+  env.seed(rows);
+  for (const admin of [false, true]) {
+    env.session.isAdmin = admin;
+    env.seed(rows);
+    const rendered = env.api.lessonHandoffTeacherHtml('teacher-b', '2026-08-30');
+    for (let i = 0; i < 3; i++) assert.ok(rendered.includes('상태학생' + i));
+    assert.ok(!rendered.includes('상태학생3'));
+    assert.ok(!rendered.includes('인계 취소</b>'));
+  }
+  const history = env.api.lessonHandoffManagerHtml('2026-08-30');
+  assert.ok(history.includes('상태학생3'));
+  assert.ok(history.includes('인계 취소'));
+  assert.equal(env.api.lessonHandoffRows('2026-08-30').length, 4);
+});
