@@ -588,3 +588,12 @@ test('task page and deployment version stay aligned', () => {
       src + ' 에 현재 버전의 캐시버스터가 없습니다 — 브라우저가 옛 파일을 씁니다');
   });
 });
+
+
+test('advance flexible lesson uses reserved time without an actual-visit status', () => {
+  const task={id:'planned-lesson',studentId:'student',weekendAttendanceMode:'flexible',weekendFlexibleFrom:'2026-08-01'};
+  const result=core.classifyTaskSchedule(task,{date:'2026-08-30',dow:0,occurs:true,flexibleVisit:{
+    lessonTaskId:task.id,studentId:task.studentId,visitDate:'2026-08-30',status:'planned',startTime:'14:00',endTime:'15:00'}});
+  assert.equal(result.slots.length,1);assert.equal(result.slots[0].scheduleStatus,'planned');
+  assert.equal(result.slots[0].startMinute,840);assert.equal(result.slots[0].endMinute,900);
+});

@@ -256,7 +256,7 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
     'id', 'taskId', 'groupId', 'staffId', 'origin', 'createdAt', 'updatedAt', 'deleted', 'steps',
     'lessonRevision', 'lessonAssignmentKey', 'lessonContentHash', 'lessonDedupeKey',
     'lessonFormVersion', 'intakeVersion', 'intakeSource',
-    'weekendAttendanceMode', 'weekendAllowedDays', 'weekendMonthlyTarget', 'weekendFlexibleFrom'
+    'weekendPlans', 'weekendAttendanceMode', 'weekendAllowedDays', 'weekendMonthlyTarget', 'weekendFlexibleFrom'
   ]) {
     if (Object.prototype.hasOwnProperty.call(raw, forbidden)) {
       const error = new Error('서버가 정하는 필드는 보낼 수 없습니다');
@@ -588,7 +588,7 @@ function correctedTask(candidate, current, serverNow, actorRole) {
     updatedByScope: actorRole
   };
   for (const key of [
-    'weekendAttendanceMode', 'weekendAllowedDays', 'weekendMonthlyTarget', 'weekendFlexibleFrom'
+    'weekendPlans', 'weekendAttendanceMode', 'weekendAllowedDays', 'weekendMonthlyTarget', 'weekendFlexibleFrom'
   ]) {
     if (Object.prototype.hasOwnProperty.call(current, key)) next[key] = current[key];
   }
