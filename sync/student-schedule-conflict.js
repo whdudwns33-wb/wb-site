@@ -68,7 +68,18 @@ export function isRegularLessonScheduleTask(task) {
 
 function scheduleForTask(task) {
   const window = taskWindow(task);
-  const rawSlots = Array.isArray(task && task.scheduleSlots) ? task.scheduleSlots : [];
+  let rawSlots = Array.isArray(task && task.scheduleSlots) ? task.scheduleSlots : [];
+  // 비정기 전환 이후 참고 시간표는 반복하지 않고 예약된 날짜만 검사한다.
+  if (task?.weekendAttendanceMode === 'flexible' && validDate(task.weekendFlexibleFrom)) {
+    const before = new Date(task.weekendFlexibleFrom + 'T00:00:00Z');
+    before.setUTCDate(before.getUTCDate() - 1);
+    const lastFixed = before.toISOString().slice(0, 10);
+    rawSlots = rawSlots.map(slot => ({ ...slot, validTo: slot.validTo && slot.validTo < lastFixed ? slot.validTo : lastFixed }))
+      .filter(slot => (!slot.validFrom || slot.validFrom <= slot.validTo) && (!task.start || task.start <= slot.validTo))
+      .concat((task.weekendPlans || []).map(plan => ({ days: [weekday(plan.date)], startTime: plan.startTime,
+        endTime: plan.endTime, validFrom: plan.date, validTo: plan.date })));
+    if (!rawSlots.length) return { window, confirmed: true, slots: [] };
+  }
   if (!window.valid || String(task && task.scheduleStatus || '') === 'needs_review' || !rawSlots.length) {
     return { window, confirmed: false, slots: [] };
   }
@@ -231,7 +242,7 @@ export function sameStudentLessonSchedule(before, after) {
   if (!isRegularLessonScheduleTask(before) || !isRegularLessonScheduleTask(after) ||
       !before.id || before.id !== after.id || !before.studentId || before.studentId !== after.studentId) return false;
   const keys = ['start', 'end', 'startDate', 'endDate', 'repeat', 'scheduleStatus',
-    'weekendAttendanceMode', 'weekendAllowedDays', 'weekendFlexibleFrom', 'lessonInstanceType'];
+    'weekendPlans', 'weekendAttendanceMode', 'weekendAllowedDays', 'weekendFlexibleFrom', 'lessonInstanceType'];
   if (keys.some(key => JSON.stringify(before[key] ?? null) !== JSON.stringify(after[key] ?? null))) return false;
   const left = scheduleForTask(before), right = scheduleForTask(after);
   if (!left.confirmed || !right.confirmed || !left.slots.length || !right.slots.length) return false;

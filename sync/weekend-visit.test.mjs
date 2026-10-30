@@ -730,3 +730,64 @@ test('check-in atomically rejects a lesson transfer after authorization but befo
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visits').get().count, 0);
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visit_events').get().count, 0);
 });
+
+function planDb() {
+  const db = new D1Database(); db.seed();
+  db.sqlite.exec(`CREATE TABLE checks(app TEXT,k TEXT,data TEXT);
+    CREATE TABLE student_schedule_revisions(app TEXT,student_id TEXT,revision INTEGER,updated_at INTEGER,PRIMARY KEY(app,student_id));
+    CREATE TABLE makeup_cases(app TEXT,case_id TEXT,student_id TEXT,status TEXT,confirmed_start_at TEXT,confirmed_end_at TEXT);`);
+  const date = new Date(Date.now() + 14 * 86400000);
+  date.setUTCDate(date.getUTCDate() + (6-date.getUTCDay()+7)%7);
+  const day = date.toISOString().slice(0,10);
+  const row = db.sqlite.prepare("SELECT data FROM tasks WHERE id='lesson-a'").get();
+  const task = {...JSON.parse(row.data), weekendAttendanceMode:'flexible',weekendAllowedDays:[0,6],weekendFlexibleFrom:'2026-08-01'};
+  db.sqlite.prepare("UPDATE tasks SET data=? WHERE id='lesson-a'").run(JSON.stringify(task));
+  return {db, day, body:{action:'plan',taskId:'lesson-a',studentId:'student-a',date:day,startTime:'12:00',endTime:'13:20',expectedUpdatedAt:1}};
+}
+
+test('future flexible reservation creates a dated plan without attendance or visit; retry is idempotent', async () => {
+  const {db,day,body}=planDb();
+  const first=await call(db,body); assert.equal(first.status,200,JSON.stringify(first.body));
+  assert.deepEqual(first.body.task.weekendPlans,[{date:day,startTime:'12:00',endTime:'13:20'}]);
+  assert.equal(db.sqlite.prepare('SELECT count(*) AS n FROM weekend_actual_visits').get().n,0);
+  assert.equal(db.sqlite.prepare('SELECT count(*) AS n FROM checks').get().n,0);
+  assert.equal((await call(db,body)).body.idempotent,true);
+  const removed=await call(db,{...body,action:'plan_cancel',expectedUpdatedAt:first.body.task.updatedAt});
+  assert.equal(removed.status,200); assert.deepEqual(removed.body.task.weekendPlans,[]);
+});
+
+test('reservation checks teacher ownership, allowed day, stale version and time range', async () => {
+  const {db,body}=planDb();
+  assert.equal((await call(db,body,nextTeacher)).status,403);
+  assert.equal((await call(db,{...body,date:'2026-08-22'})).status,422);
+  assert.equal((await call(db,{...body,endTime:'11:00'})).status,422);
+  assert.equal((await call(db,{...body,expectedUpdatedAt:99})).status,409);
+});
+
+test('reservation rejects student overlaps but allows teacher to teach another student simultaneously', async () => {
+  const {db,body}=planDb();
+  db.seedTask({id:'overlap',staffId:'teacher-2',studentId:'student-a',taskKind:'lesson_instruction',repeat:'once',start:body.date,
+    scheduleSlots:[{days:[6],startTime:'12:30',endTime:'13:30'}]});
+  assert.equal((await call(db,body)).status,409);
+  db.sqlite.prepare("DELETE FROM tasks WHERE id='overlap'").run();
+  db.seedTask({id:'other',staffId:'teacher-1',studentId:'student-b',taskKind:'lesson_instruction',repeat:'once',start:body.date,
+    scheduleSlots:[{days:[6],startTime:'12:30',endTime:'13:30'}]});
+  assert.equal((await call(db,body)).status,200);
+});
+
+test('recorded reservation cannot be cancelled and planning does not allow future check-in', async () => {
+  const {db,body}=planDb(); const first=await call(db,body);
+  db.sqlite.prepare('INSERT INTO checks VALUES(?,?,?)').run('task','lesson-a|'+body.date,'{}');
+  assert.equal((await call(db,{...body,action:'plan_cancel',expectedUpdatedAt:first.body.task.updatedAt})).status,422);
+  assert.equal((await call(db,{action:'check_in',lessonTaskId:'lesson-a',studentId:'student-a',visitDate:body.date})).status,422);
+});
+
+
+test('reservation write rolls back if attendance arrives between validation and commit', async () => {
+  const {db,body}=planDb();
+  db.beforeBatch=()=>db.sqlite.prepare('INSERT INTO checks VALUES(?,?,?)').run('task','lesson-a|'+body.date,'{}');
+  assert.equal((await call(db,body)).status,409);
+  const task=JSON.parse(db.sqlite.prepare("SELECT data FROM tasks WHERE id='lesson-a'").get().data);
+  assert.equal(task.weekendPlans,undefined);
+  assert.equal(db.sqlite.prepare('SELECT count(*) AS n FROM student_schedule_revisions').get().n,0);
+});
