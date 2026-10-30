@@ -152,6 +152,54 @@ test('학원 목록 필터는 새 단계 명칭을 쓰며 남아 있는 이전 �
   assert.ok(h.html.includes('단계: 문의'));
 });
 
+test('고객 등급은 기존 조건과 함께 필터하고 미분류·조건 해제·상세 왕복에서 원본을 보존한다', async () => {
+  const h = harness([
+    lead('qa_a', { customerGrade: 'A' }), lead('qa_b', { customerGrade: 'B' }), lead('qa_c', { customerGrade: 'C' }),
+    lead('qa_d', { customerGrade: 'D' }), lead('qa_d_blog', { customerGrade: 'D', channel: '블로그' }),
+    lead('qa_empty', { customerGrade: '' }), lead('qa_legacy')
+  ]);
+  h.run('loadLeadQueue = async () => {}; loadPortalLink = async () => {};');
+  const before = h.read('state');
+  assert.deepEqual(h.document.querySelector('#f-list-customer-grade').options.map(o => o.value), ['', 'unclassified', 'A', 'B', 'C', 'D']);
+  assert.ok(h.html.includes('<span class="pill bad">D등급(블랙리스트)</span>'));
+  h.change('f-list-customer-grade', 'D');
+  assert.deepEqual(h.rows(), ['qa_d', 'qa_d_blog']);
+  h.change('f-channel', '맘카페');
+  h.search('가상');
+  assert.deepEqual(h.rows(), ['qa_d']);
+  assert.ok(h.html.includes('고객 등급: D등급(블랙리스트)'));
+  h.navigate('#/lead/qa_d');
+  assert.ok(h.html.includes('<dt>고객 등급</dt><dd><span class="pill bad">D등급(블랙리스트)</span></dd>'));
+  h.navigate('#/leads');
+  assert.deepEqual(h.rows(), ['qa_d']);
+  assert.equal(h.read('ui.listCustomerGrade'), 'D');
+  await h.click('lead-filter-clear', { filter: 'customerGrade' });
+  assert.equal(h.read('ui.channel'), '맘카페');
+  assert.equal(h.read('ui.q'), '가상');
+  h.change('f-list-customer-grade', 'unclassified');
+  assert.deepEqual(h.rows(), ['qa_empty', 'qa_legacy']);
+  await h.click('lead-filters-reset');
+  assert.equal(h.read('ui.listCustomerGrade'), '');
+  assert.equal(h.rows().length, 7);
+  h.run("route='pipeline'; render();");
+  assert.ok(h.html.includes('<span class="pill bad">D등급(블랙리스트)</span>'));
+  assert.ok(h.run('leadRow(state.leads[3])').includes('D등급(블랙리스트)'));
+  assert.deepEqual(h.read('state'), before);
+  assert.equal(h.run('outbox.size()'), 0);
+  assert.deepEqual(h.storageWrites, []);
+});
+
+test('고객 등급 필터는 페이지를 초기화하고 빠른 보기로 바꿀 때 해제된다', async () => {
+  const leads = many(60).map(l => ({ ...l, customerGrade: 'B' }));
+  const h = harness(leads, false);
+  await h.click('lead-page', { page: 2 });
+  h.change('f-list-customer-grade', 'B');
+  assert.equal(h.read('ui.listPage'), 1);
+  assert.equal(h.rows().length, 25);
+  await h.click('lead-view', { view: 'all' });
+  assert.equal(h.read('ui.listCustomerGrade'), '');
+});
+
 test('205명도 마지막 고객까지 탐색하며 페이지당 개수·범위·이전/다음을 맞춘다', async () => {
   const h = harness(many(205));
   h.change('f-list-sort', 'name');
@@ -415,12 +463,13 @@ test('로그아웃·인증 만료는 검색어와 목록 조건을 비워 다음
     h.change('f-list-pipeline', 'inspection');
     h.search('가상');
     await h.click('lead-page', { page: 2 });
+    h.change('f-list-customer-grade', 'unclassified');
     h.input('가상 검색 중');
     await h.run(action);
     h.flushTimers();
     assert.equal(h.read('session'), null);
     assert.equal(h.read('route'), 'login');
-    assert.deepEqual(h.read('[ui.q,ui.status,ui.channel,ui.owner,ui.listPipeline,ui.listStage,ui.listFollowup,ui.listPage,ui.listView]'), ['', 'open', '', '', '', '', '', 1, 'open']);
+    assert.deepEqual(h.read('[ui.q,ui.status,ui.channel,ui.owner,ui.listPipeline,ui.listStage,ui.listFollowup,ui.listCustomerGrade,ui.listPage,ui.listView]'), ['', 'open', '', '', '', '', '', '', 1, 'open']);
     assert.equal(h.read('state.leads.length'), 0);
     assert.deepEqual(h.storageWrites, [['crm.token']]);
     assert.ok(!h.html.includes('가상 검색 중'));

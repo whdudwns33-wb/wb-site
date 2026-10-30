@@ -49,6 +49,8 @@
   const LEGACY_ACADEMY_STATUS = { active: '재원', at_risk: '이탈위험', churned: '이탈' };
   const STATUSES = ['open', 'hold', 'won', 'lost'];
   const STATUS_LABEL = { open: '진행', hold: '장기보류', won: '등록', lost: '이탈' };
+  const CUSTOMER_GRADES = ['A', 'B', 'C', 'D'];
+  const CUSTOMER_GRADE_LABEL = { A: 'A등급', B: 'B등급', C: 'C등급', D: 'D등급(블랙리스트)' };
 
   const CHANNELS = ['맘카페', '블로그', '인스타', '당근', '지인추천', '파트너', '센터폰', '기타'];
   /* 파트너(연계 학원)가 보낸 가정은 소개보다 먼저 가린다 — 정산·통계가 파트너 몫으로 잡혀야 한다. */
@@ -349,6 +351,7 @@
   function validateLead(raw, ctx) {
     const o = isObj(raw) ? raw : {};
     const c = isObj(ctx) ? ctx : {};
+    if (o.customerGrade !== undefined && o.customerGrade !== '' && !CUSTOMER_GRADES.includes(o.customerGrade)) return invalid('고객 등급은 미분류·A·B·C·D 중에서 선택해 주세요');
     const name = clean(o.name, MAX_NAME);
     const pipeline = PIPELINES.includes(o.pipeline) ? o.pipeline : 'inspection';
     const legacy = pipeline === 'academy' && isLegacyAcademyStage(o.stage);
@@ -386,7 +389,7 @@
       channel: channel, channelNote: clean(o.channelNote, 120), hot: !!o.hot,
       interests: interests, source: cleanMulti(o.source, MAX_TEXT), memo: cleanMulti(o.memo, MAX_TEXT), strength: clean(o.strength, 120),
       pipeline: pipeline, stage: stage, stageAt: validYmd(str(o.stageAt).slice(0, 10)) ? str(o.stageAt).slice(0, 10) : (c.today || ymdOf(new Date())),
-      status: status, outcome: outcome,
+      status: status, outcome: outcome, customerGrade: o.customerGrade || '',
       owner: clean(o.owner, 64), referrerLeadId: clean(o.referrerLeadId, 160), partnerId: channel === '파트너' ? clean(o.partnerId, 160) : '',
       inspection: { type: INSPECTION_TYPES.includes(ins.type) ? ins.type : '', date: validYmd(ins.date) ? ins.date : '' },
       retestDue: retest, consultedAt: validYmd(o.consultedAt) ? o.consultedAt : '',
@@ -718,20 +721,23 @@
   }
   function queryLeads(leads, filters, today) {
     const f = isObj(filters) ? filters : {};
-    const keys = ['q', 'status', 'channel', 'owner', 'pipeline', 'stage', 'followup', 'sort'];
+    const keys = ['q', 'status', 'channel', 'owner', 'pipeline', 'stage', 'followup', 'sort', 'customerGrade'];
     if (keys.some(k => f[k] != null && typeof f[k] !== 'string' && typeof f[k] !== 'number')) return [];
     const status = str(f.status).trim() || 'all';
     const channel = str(f.channel).trim(), owner = str(f.owner).trim();
     const pipeline = str(f.pipeline).trim(), stage = str(f.stage).trim();
     const followup = str(f.followup).trim();
+    const customerGrade = str(f.customerGrade).trim();
     const sort = ['oldest', 'name', 'next'].includes(f.sort) ? f.sort : 'newest';
     if (!['all', ...STATUSES].includes(status) || (channel && !CHANNELS.includes(channel)) ||
       (pipeline && !PIPELINES.includes(pipeline)) || (stage && !Object.hasOwn(STAGE_LABEL, stage)) ||
+      !['', 'unclassified', ...CUSTOMER_GRADES].includes(customerGrade) ||
       !['', 'today', 'overdue'].includes(followup) || (followup && (typeof today !== 'string' || !validYmd(today)))) return [];
     const rows = (Array.isArray(leads) ? leads : []).filter(isObj).filter(l =>
       leadMatches(l, f.q) && (status === 'all' || (status === 'open' ? l.status === 'open' || l.status === 'hold' : l.status === status)) &&
       (!channel || l.channel === channel) && (!owner || str(l.owner) === owner) &&
-      (!pipeline || l.pipeline === pipeline) && (!stage || l.stage === stage)
+      (!pipeline || l.pipeline === pipeline) && (!stage || l.stage === stage) &&
+      (!customerGrade || (customerGrade === 'unclassified' ? l.customerGrade == null || l.customerGrade === '' : l.customerGrade === customerGrade))
     ).map(l => ({ lead: l, next: nextLeadFollowup(l) })).filter(row => !followup ||
       (row.next && (followup === 'today' ? row.next.due === today : row.next.due < today)));
     const newest = (a, b) => str(b.createdAt).localeCompare(str(a.createdAt));
@@ -883,6 +889,7 @@
   return {
     PIPELINES: PIPELINES, PIPELINE_LABEL: PIPELINE_LABEL, STAGES: STAGES, STAGE_LABEL: STAGE_LABEL, STAGE_ALIASES: STAGE_ALIASES,
     CLOSED_STAGES: CLOSED_STAGES, STATUSES: STATUSES, STATUS_LABEL: STATUS_LABEL, ACADEMY_STATUS: ACADEMY_STATUS,
+    CUSTOMER_GRADES: CUSTOMER_GRADES, CUSTOMER_GRADE_LABEL: CUSTOMER_GRADE_LABEL,
     stageLabel: stageLabel, isLegacyAcademyStage: isLegacyAcademyStage, academyStatusOf: academyStatusOf,
     CHANNELS: CHANNELS, CHANNEL_KEYWORDS: CHANNEL_KEYWORDS, HOT_KEYWORDS: HOT_KEYWORDS,
     INSPECTION_TYPES: INSPECTION_TYPES, RETEST_WINDOWS: RETEST_WINDOWS,

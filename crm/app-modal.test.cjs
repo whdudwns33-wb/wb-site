@@ -20,6 +20,7 @@ function harness() {
   const document = {
     activeElement: opener, contains: el => el === opener,
     querySelector: sel => sel === '#modalHost' ? host : surfaces[sel] || host.fields.find(el => '#' + el.id === sel) || null,
+    querySelectorAll: () => [],
     addEventListener: (name, fn) => { handlers[name] = fn; }
   };
   const context = vm.createContext({
@@ -125,6 +126,91 @@ test('저장 검증 실패는 입력을 남기고 저장 성공은 추가 확인
   assert.equal(h.context.writes.length, 1);
   assert.equal(h.host.hidden, true);
   assert.equal(h.confirmations, 0);
+});
+
+test('고객 등급 수정은 선택값을 저장하고 학년·상담 단계는 유지하며 미분류로 돌릴 수 있다', () => {
+  for (const grade of ['A', 'B', 'C', 'D', '']) {
+    const h = harness();
+    h.context.fixture = { ...C.validateLead({ name: '가상 보호자', relation: '모', owner: 'admin', child: { name: '가상 학생', grade: '초3' }, customerGrade: 'B', pipeline: 'inspection', stage: 'booked', status: 'open', inspection: { type: '웩슬러', date: '2026-01-15' }, retestDue: '2028-04-10', consultedAt: '2026-10-01', followups: [] }, { today: '2026-10-30' }).data, id: 'qa_grade' };
+    h.run("session = {canApprove:true,staffId:'admin'}; state.leads=[fixture]; today=()=> '2026-10-30'; queueChange=(c,id,data)=>writes.push({c,id,data}); render=()=>{}; toast=()=>{};");
+    h.open([
+      { id: 'f-child', value: '가상 학생' }, { id: 'f-grade', value: '초3' }, { id: 'f-name', value: '가상 보호자' },
+      { id: 'f-rel', value: '모' }, { id: 'f-channel2', value: '기타' }, { id: 'f-customer-grade', value: 'B' },
+      { id: 'f-itype', value: '웩슬러' }, { id: 'f-idate', value: '2026-01-15' }, { id: 'f-consulted', value: '2026-10-01' }
+    ]);
+    h.run("openLeadForm('qa_grade')");
+    assert.ok(h.host.html.includes('for="f-customer-grade">고객 등급</label>'));
+    assert.ok(h.host.html.includes('<option value="B" selected>B등급</option>'));
+    assert.ok(h.host.html.includes('<option value="D">D등급(블랙리스트)</option>'));
+    h.host.fields.find(f => f.id === 'f-customer-grade').value = grade;
+    h.run("saveLeadForm('qa_grade')");
+    assert.equal(h.context.writes.length, 1);
+    const saved = h.context.writes[0].data;
+    assert.equal(saved.customerGrade, grade);
+    assert.equal(saved.child.grade, '초3');
+    assert.equal(saved.stage, 'booked');
+    assert.equal(saved.status, 'open');
+    assert.equal(saved.retestDue, '2028-04-10');
+    assert.equal(saved.followups.length, 0);
+    const { id, ...original } = h.context.fixture;
+    assert.deepEqual(JSON.parse(JSON.stringify(saved)), { ...original, customerGrade: grade });
+    assert.equal(h.host.hidden, true);
+    const reopened = h.run('leadFormHtml(writes[0].data)');
+    if (grade) assert.ok(reopened.includes('<option value="' + grade + '" selected>'));
+    else assert.ok(!reopened.includes('<option value="D" selected>'));
+  }
+});
+
+test('검사 종류·검사일과 상담일을 직접 바꾸면 재검사·빈 팔로업 일정을 계산한다', () => {
+  const h = harness();
+  h.context.fixture = { ...C.validateLead({ name: '가상 보호자', child: { name: '가상 학생' }, customerGrade: 'D', inspection: { type: '웩슬러', date: '2026-01-15' }, retestDue: '2028-04-10', consultedAt: '2026-10-01', followups: [] }, { today: '2026-10-30' }).data, id: 'qa_schedule' };
+  h.run("session={canApprove:false,staffId:'staff_test'}; state.leads=[fixture]; today=()=> '2026-10-30'; queueChange=(c,id,data)=>writes.push({c,id,data}); render=()=>{}; toast=()=>{};");
+  h.open([
+    { id: 'f-child', value: '가상 학생' }, { id: 'f-name', value: '가상 보호자' }, { id: 'f-customer-grade', value: 'D' },
+    { id: 'f-itype', value: '시선추적' }, { id: 'f-idate', value: '2026-10-20' }, { id: 'f-consulted', value: '2026-10-21' }
+  ]);
+  h.run("openLeadForm('qa_schedule'); saveLeadForm('qa_schedule')");
+  assert.equal(h.context.writes.length, 1);
+  const saved = h.context.writes[0].data;
+  assert.equal(saved.customerGrade, 'D');
+  assert.equal(saved.retestDue, C.retestDue('2026-10-20', '시선추적'));
+  assert.deepEqual(JSON.parse(JSON.stringify(saved.followups)), C.scheduleFollowups('2026-10-21'));
+});
+
+test('고객 등급이 있어도 학생 이름 필수·잘못된 등급 검증을 통과해야 저장한다', () => {
+  const h = harness();
+  h.run("session={canApprove:false,staffId:'staff_test'}; queueChange=(c,id,data)=>writes.push({c,id,data}); render=()=>{}; toast=()=>{}; go=()=>{};");
+  h.open([{ id: 'f-child', value: '' }, { id: 'f-customer-grade', value: 'D' }]);
+  h.run("saveLeadForm('')");
+  assert.equal(h.context.writes.length, 0);
+  assert.equal(h.host.hidden, false);
+  h.host.fields[0].value = '가상 학생';
+  h.host.fields[1].value = 'invalid';
+  h.run("saveLeadForm('')");
+  assert.equal(h.context.writes.length, 0);
+  assert.equal(h.host.hidden, false);
+  h.host.fields[1].value = 'D';
+  h.run("saveLeadForm('')");
+  assert.equal(h.context.writes.length, 1);
+  assert.equal(h.context.writes[0].data.customerGrade, 'D');
+  assert.equal(h.host.hidden, true);
+});
+
+test('충돌 재저장은 내가 바꾼 고객 등급만 적용하고 미분류의 빈 값 보강은 원격 등급을 지우지 않는다', () => {
+  for (const changedGrade of [true, false]) {
+    const h = harness();
+    h.context.base = { id: 'qa_conflict', name: '가상 보호자', child: { name: '가상 학생' }, memo: '기존 메모', ...(changedGrade ? { customerGrade: 'B' } : {}) };
+    h.run("queueChange=(c,id,data)=>writes.push({c,id,data}); render=()=>{}; toast=()=>{}; state.leads=[{...base,name:'가상 원격 보호자',customerGrade:'C'}]; state.meta[C.docKey('leads','qa_conflict')]=30;");
+    h.context.draft = { ...h.context.base, customerGrade: changedGrade ? 'D' : '', memo: '수정한 메모' };
+    h.run("ui.leadConflicts[C.docKey('leads','qa_conflict')]={base,draft}; openLeadConflict('qa_conflict');");
+    if (changedGrade) assert.ok(h.host.html.includes('고객 등급') && h.host.html.includes('D등급(블랙리스트)'));
+    else assert.ok(!h.host.html.includes('고객 등급'));
+    h.run("resolveLeadConflict('qa_conflict',true)");
+    assert.equal(h.context.writes.length, 1);
+    assert.equal(h.context.writes[0].data.customerGrade, changedGrade ? 'D' : 'C');
+    assert.equal(h.context.writes[0].data.name, '가상 원격 보호자');
+    assert.equal(h.context.writes[0].data.memo, '수정한 메모');
+  }
 });
 
 test('비밀번호 API 실패는 입력을 보존하고 성공 뒤에만 닫는다', async () => {

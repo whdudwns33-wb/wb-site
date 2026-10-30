@@ -22,7 +22,7 @@ let route = 'login';
 let leadId = '';                 // route === 'lead'
 const ui = {
   pipe: 'inspection', q: '', status: 'open', channel: '', owner: '', phoneShown: {}, ym: C.ymOf(C.ymdOf(new Date())),
-  listPipeline: '', listStage: '', listFollowup: '', listSort: 'newest', listView: 'open', listPage: 1, listPageSize: 25,
+  listPipeline: '', listStage: '', listFollowup: '', listCustomerGrade: '', listSort: 'newest', listView: 'open', listPage: 1, listPageSize: 25,
   hs: { status: null, pipelines: null, suggested: null, props: null, queue: [], counts: null, busy: '', err: '', filter: 'pending', map: null },
   leadQueue: {}, portal: {}, leadConflicts: {}, linkBusy: false, detect: null,
   relationships: { tab: 'friend', q: '', month: C.ymOf(C.ymdOf(new Date())), status: '' }
@@ -64,6 +64,10 @@ function initial(name) { const n = String(name || '').trim(); return n ? n.slice
 function guardianSummary(l, names, withPhone) {
   const relation = C.RELATION_HONORIFIC[l.relation];
   return ['보호자 ' + (names.guardian || '이름 미입력'), relation !== '보호자' && relation, withPhone && l.phone && C.maskPhone(l.phone)].filter(Boolean).join(' · ');
+}
+function customerGradePill(l) {
+  if (!C.CUSTOMER_GRADES.includes(l.customerGrade)) return '';
+  return '<span class="pill' + (l.customerGrade === 'D' ? ' bad' : '') + '">' + esc(C.CUSTOMER_GRADE_LABEL[l.customerGrade]) + '</span>';
 }
 function activitiesOf(id) { return state.activities.filter(a => a && a.leadId === id).sort((a, b) => String(b.at).localeCompare(String(a.at)) || (b.ts || 0) - (a.ts || 0)); }
 function creditsOf(id) { return state.credits.filter(c => c && c.leadId === id).sort((a, b) => String(b.at).localeCompare(String(a.at))); }
@@ -427,7 +431,7 @@ function leadRow(l, extraHtml, actsHtml) {
   const dis = C.daysInStage(l, today());
   const names = C.leadNames(l);
   return '<div class="lead" data-act="open-lead" data-id="' + esc(l.id) + '"><div class="avatar' + (l.hot && l.status === 'open' ? ' hot' : l.status === 'won' ? ' ok' : '') + '">' + esc(initial(names.student)) + '</div><div class="grow"><div class="lead-name">' + esc(names.student || '학생 이름 미입력') +
-    (l.hot && l.status === 'open' ? '<span class="pill hot">HOT</span>' : '') + statusPill(l) + '</div>' +
+    (l.hot && l.status === 'open' ? '<span class="pill hot">HOT</span>' : '') + statusPill(l) + customerGradePill(l) + '</div>' +
     '<div class="small muted">' + esc(guardianSummary(l, names, true)) + '</div>' +
     '<div class="lead-sub"><span class="tag">' + esc(l.channel || '기타') + (l.partnerId && partnerById(l.partnerId) ? ' · ' + esc(partnerById(l.partnerId).name) : '') + '</span><span>' + esc(C.PIPELINE_LABEL[l.pipeline] || '') + ' · ' + esc(C.stageLabel(l.pipeline, l.stage)) + (dis !== null ? ' ' + dis + '일' : '') + '</span>' +
     (l.owner ? '<span>· ' + esc(staffName(l.owner)) + '</span>' : '') + (extraHtml || '') + '</div></div>' + (actsHtml ? '<div class="acts">' + actsHtml + '</div>' : '') + '</div>';
@@ -499,7 +503,7 @@ function viewPipeline() {
         const d = C.daysInStage(l, t);
         const stale = !closed && d !== null && d >= 14;
         const names = C.leadNames(l);
-        return '<div class="kcard' + (l.hot && !closed ? ' hot' : '') + (stale ? ' stale' : '') + (closed ? ' closed' : '') + '" data-act="open-lead" data-id="' + esc(l.id) + '"><div class="kcard-name">' + esc(names.student || '학생 이름 미입력') + '</div><div class="small muted">' + esc(guardianSummary(l, names)) + '</div>' +
+        return '<div class="kcard' + (l.hot && !closed ? ' hot' : '') + (stale ? ' stale' : '') + (closed ? ' closed' : '') + '" data-act="open-lead" data-id="' + esc(l.id) + '"><div class="kcard-name">' + esc(names.student || '학생 이름 미입력') + '</div>' + customerGradePill(l) + '<div class="small muted">' + esc(guardianSummary(l, names)) + '</div>' +
           '<div class="kcard-sub"><span>' + esc(l.channel || '') + '</span>' + (d !== null ? '<span>' + d + '일</span>' : '') + (l.status === 'hold' ? '<span class="tag warn">보류</span>' : '') +
           (l.hubspot && l.hubspot.contactId ? '<span class="dot ok" title="HubSpot 연결됨"></span>' : '') + '</div></div>';
       }).join('') + (closed && cards.length > 5 ? '</details>' : '') + '</div>';
@@ -513,7 +517,7 @@ function viewPipeline() {
 /* ── 화면: 리드 명단 ──────────────────────────────── */
 function setLeadView(view) {
   clearTimeout(render._q);
-  Object.assign(ui, { q: '', status: 'all', channel: '', owner: '', listPipeline: '', listStage: '', listFollowup: '', listPage: 1, listView: view });
+  Object.assign(ui, { q: '', status: 'all', channel: '', owner: '', listPipeline: '', listStage: '', listFollowup: '', listCustomerGrade: '', listPage: 1, listView: view });
   if (view === 'open') ui.status = 'open';
   if (view === 'mine') ui.owner = session.staffId;
   if (view === 'today' || view === 'overdue') ui.listFollowup = view;
@@ -538,7 +542,7 @@ function changeLeadFilter(key, value, focus) {
 }
 function viewLeads() {
   const q = ui.q;
-  const list = C.queryLeads(state.leads, { q, status: ui.status, channel: ui.channel, owner: ui.owner, pipeline: ui.listPipeline, stage: ui.listStage, followup: ui.listFollowup, sort: ui.listSort }, today());
+  const list = C.queryLeads(state.leads, { q, status: ui.status, channel: ui.channel, owner: ui.owner, pipeline: ui.listPipeline, stage: ui.listStage, followup: ui.listFollowup, customerGrade: ui.listCustomerGrade, sort: ui.listSort }, today());
   const pages = Math.max(1, Math.ceil(list.length / ui.listPageSize));
   ui.listPage = Math.min(pages, Math.max(1, ui.listPage));
   const start = (ui.listPage - 1) * ui.listPageSize, end = Math.min(start + ui.listPageSize, list.length);
@@ -547,12 +551,14 @@ function viewLeads() {
   const active = [
     ['q', '검색', q], ['status', '상태', ui.status === 'all' ? '' : ui.status === 'open' ? '진행·보류' : ui.status === 'lost' && ui.listPipeline === 'academy' ? '미등록·이탈' : C.STATUS_LABEL[ui.status]],
     ['channel', '유입 채널', ui.channel], ['owner', '담당자', ui.owner ? staffName(ui.owner) : ''],
+    ['customerGrade', '고객 등급', ui.listCustomerGrade === 'unclassified' ? '미분류' : C.CUSTOMER_GRADE_LABEL[ui.listCustomerGrade]],
     ['pipeline', '파이프라인', C.PIPELINE_LABEL[ui.listPipeline]], ['stage', '단계', C.stageLabel(ui.listPipeline, ui.listStage)],
     ['followup', '팔로업', ui.listFollowup === 'today' ? '오늘' : ui.listFollowup === 'overdue' ? '지연' : '']
   ].filter(item => item[2]);
   let h = '<div class="between page-tools"><div><h1 class="page">고객 <small class="muted">' + list.length + '명</small></h1><p class="card-sub">상담 진행 상황과 다음 연락 일정을 확인하세요.</p></div><button class="btn btn-primary" data-act="new-lead">새 문의</button></div>';
   h += '<div class="card customer-list"><div class="customer-views" role="group" aria-label="고객 빠른 보기">' + [['all', '전체 고객'], ['open', '진행·보류'], ['mine', '내 담당'], ['today', '오늘 팔로업'], ['overdue', '지연 팔로업']].map(([key, label]) => '<button class="customer-view' + (ui.listView === key ? ' on' : '') + '" data-act="lead-view" data-view="' + key + '" aria-pressed="' + (ui.listView === key) + '">' + label + '</button>').join('') + '</div>';
   h += '<div class="customer-filters"><div class="customer-filter-grid"><div class="field customer-search"><label class="fl" for="f-q">고객 검색</label><div class="customer-search-control"><input class="in" id="f-q" type="search" placeholder="학생·보호자·학교·전화 검색" value="' + esc(q) + '"><button class="btn btn-primary" type="button" data-act="lead-search">검색</button></div></div>' +
+    '<div class="field"><label class="fl" for="f-list-customer-grade">고객 등급</label><select class="in" id="f-list-customer-grade"><option value="">등급 전체</option>' + opt(['unclassified'].concat(C.CUSTOMER_GRADES), ui.listCustomerGrade, grade => grade === 'unclassified' ? '미분류' : C.CUSTOMER_GRADE_LABEL[grade]) + '</select></div>' +
     '<div class="field"><label class="fl" for="f-channel">유입 채널</label><select class="in" id="f-channel"><option value="">채널 전체</option>' + opt(C.CHANNELS, ui.channel) + '</select></div>' +
     (session.canApprove ? '<div class="field"><label class="fl" for="f-owner">담당자</label><select class="in" id="f-owner"><option value="">담당 전체</option><option value="admin"' + (ui.owner === 'admin' ? ' selected' : '') + '>원장</option>' + liveStaff().map(s => '<option value="' + esc(s.id) + '"' + (ui.owner === String(s.id) ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></div>' : '') +
     '<div class="field"><label class="fl" for="f-list-pipeline">파이프라인</label><select class="in" id="f-list-pipeline"><option value="">파이프라인 전체</option>' + opt(C.PIPELINES, ui.listPipeline, p => C.PIPELINE_LABEL[p]) + '</select></div>' +
@@ -567,7 +573,7 @@ function viewLeads() {
     const late = next ? C.daysBetween(next.due, today()) : 0;
     const names = C.leadNames(l);
     return '<tr><td class="customer-name"><a class="student-name" href="#/lead/' + esc(l.id) + '">' + esc(names.student || '학생 이름 미입력') + '</a>' + (l.hot && l.status === 'open' ? ' <span class="pill hot">HOT</span>' : '') +
-      (l.child && l.child.grade ? '<div class="student-grade small muted">' + esc(l.child.grade) + '</div>' : '') + '<div class="guardian-info">' + esc(guardianSummary(l, names, true)) + '</div></td>' +
+      (l.child && l.child.grade ? '<div class="student-grade small muted">' + esc(l.child.grade) + '</div>' : '') + '<div class="guardian-info">' + esc(guardianSummary(l, names, true)) + '</div>' + customerGradePill(l) + '</td>' +
       '<td data-label="상담 단계"><span>' + esc(C.stageLabel(l.pipeline, l.stage)) + '</span> ' + statusPill(l) + '<div class="small muted">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</div></td>' +
       '<td data-label="유입 채널">' + esc(l.channel || '기타') + '</td><td data-label="담당자">' + esc(staffName(l.owner)) + '</td>' +
       '<td data-label="최근 기록">' + (recent ? esc(recent.at) + '<div class="small muted">' + esc(C.ACTIVITY_LABEL[recent.type] || recent.type) + '</div>' : '<span class="muted">기록 없음</span>') + '</td>' +
@@ -601,6 +607,7 @@ function viewLead(id) {
     (!legacy && l.status === 'hold' ? '<button class="btn btn-sm btn-ghost" data-act="unhold" data-id="' + esc(id) + '">보류 해제</button>' : '') + '</div>' +
     (legacy ? '<div class="hint mt8">이전 학원 상태입니다. 영업 단계를 확인해 선택한 뒤 보류·해제를 처리해 주세요.</div>' : '');
   h += '<dl class="kv mt14">' +
+    '<dt>고객 등급</dt><dd>' + (customerGradePill(l) || '<span class="muted">미분류</span>') + '</dd>' +
     '<dt>전화</dt><dd>' + (l.phone ? (ui.phoneShown[id] ? '<a class="tel" href="tel:' + esc(l.phone.replace(/-/g, '')) + '">' + esc(l.phone) + '</a>' : '<button class="btn btn-sm btn-ghost" data-act="show-phone" data-id="' + esc(id) + '">' + esc(C.maskPhone(l.phone)) + ' 보기</button>') : '<span class="muted">—</span>') + '</dd>' +
     (l.email ? '<dt>이메일</dt><dd>' + esc(l.email) + '</dd>' : '') +
     (l.child && (l.child.birth || l.child.school) ? '<dt>아이</dt><dd>' + esc([l.child.birth, l.child.school].filter(Boolean).join(' · ')) + '</dd>' : '') +
@@ -1345,6 +1352,7 @@ function leadFormHtml(l) {
     '<div class="grid2"><div class="field"><label class="fl" for="f-phone">전화</label><input class="in" id="f-phone" inputmode="tel" value="' + esc(L.phone || '') + '" placeholder="010-0000-0000"></div>' +
     '<div class="field"><label class="fl" for="f-email">이메일</label><input class="in" id="f-email" inputmode="email" value="' + esc(L.email || '') + '"></div></div>' +
     '<p class="hint">보호자 이름 없이 저장할 수 있습니다. HubSpot에 새 연락처를 만들 때는 보호자 이름 또는 이메일이 필요합니다.</p>' +
+    '<div class="field"><label class="fl" for="f-customer-grade">고객 등급</label><select class="in" id="f-customer-grade" aria-describedby="f-customer-grade-help"><option value="">미분류</option>' + opt(C.CUSTOMER_GRADES, L.customerGrade, grade => C.CUSTOMER_GRADE_LABEL[grade]) + '</select><div class="hint" id="f-customer-grade-help">원내 고객 관리용 등급입니다. 등급을 바꿔도 상담 단계와 연락 일정은 유지됩니다.</div></div>' +
     (isNew ? '<div class="field"><label class="fl" for="f-source">문의 원문(카톡·전화 메모를 그대로)</label><textarea class="in" id="f-source" rows="3" placeholder="예: 판교맘카페에서 보고 연락드려요. 초3 아이 웩슬러 검사 내일 가능한가요?"></textarea><div class="hint" id="f-detect"></div></div>' : '') +
     '<div class="grid2"><div class="field"><label class="fl" for="f-channel2">유입 채널</label><select class="in" id="f-channel2">' + opt(C.CHANNELS, L.channel) + '</select></div>' +
     '<div class="field"><label class="fl" for="f-chnote">채널 메모</label><input class="in" id="f-chnote" value="' + esc(L.channelNote || '') + '" placeholder="어느 카페 / 누구 소개" maxlength="120"></div></div>' +
@@ -1380,13 +1388,16 @@ const LEAD_EDIT_FIELDS = {
   name: '보호자 이름', relation: '관계', phone: '전화', email: '이메일',
   'child.name': '학생 이름', 'child.birth': '생년월일', 'child.grade': '학년', 'child.school': '학교',
   channel: '유입 채널', channelNote: '채널 메모', referrerLeadId: '소개자', partnerId: '파트너',
-  interests: '관심', hot: '핫 리드', memo: '메모', owner: '담당', source: '문의 원문',
+  interests: '관심', hot: '핫 리드', customerGrade: '고객 등급', memo: '메모', owner: '담당', source: '문의 원문',
   'inspection.type': '검사 종류', 'inspection.date': '검사일', consultedAt: '상담 완료일',
   strength: '강점', academyStatus: '등록 후 관리 상태', retestDue: '재검사 일정', followups: '다음 연락',
   pipeline: '파이프라인', stage: '단계', status: '상태', stageAt: '단계 변경일',
   'outcome.status': '판정', 'outcome.reason': '판정 사유', 'outcome.note': '판정 메모', 'outcome.at': '판정일'
 };
-function leadField(data, path) { return path.split('.').reduce((v, k) => v && v[k], data); }
+function leadField(data, path) {
+  const value = path.split('.').reduce((v, k) => v && v[k], data);
+  return path === 'customerGrade' ? value || '' : value;
+}
 function leadChanges(conflict) {
   return Object.keys(LEAD_EDIT_FIELDS).filter(path => JSON.stringify(leadField(conflict.base, path)) !== JSON.stringify(leadField(conflict.draft, path)));
 }
@@ -1394,6 +1405,7 @@ function leadFieldText(data, path) {
   const v = leadField(data, path);
   if (path === 'stage') return C.stageLabel(data && data.pipeline, v) || '—';
   if (path === 'pipeline') return C.PIPELINE_LABEL[v] || v || '—';
+  if (path === 'customerGrade') return C.CUSTOMER_GRADE_LABEL[v] || '미분류';
   if (path === 'owner') return staffName(v);
   if (path === 'referrerLeadId') { const l = leadById(v); return l ? C.leadLabel(l) : v || '—'; }
   if (path === 'partnerId') { const p = partnerById(v); return p ? p.name : v || '—'; }
@@ -1440,15 +1452,15 @@ function saveLeadForm(id) {
     name: val('f-name'), relation: val('f-rel'), phone: val('f-phone'), email: val('f-email'),
     child: { name: val('f-child'), birth: val('f-birth'), grade: val('f-grade'), school: val('f-school') },
     channel: val('f-channel2'), channelNote: val('f-chnote'), referrerLeadId: val('f-ref'), partnerId: val('f-partner'),
-    interests: Array.from(document.querySelectorAll('.f-interest:checked')).map(x => x.value), hot: checked('f-hot'), memo: val('f-memo')
+    interests: Array.from(document.querySelectorAll('.f-interest:checked')).map(x => x.value), hot: checked('f-hot'), customerGrade: val('f-customer-grade'), memo: val('f-memo')
   });
   if (session.canApprove) data.owner = val('f-owner2') || 'admin';
   if (!prev) data.source = val('f-source');
   else {
     data.inspection = { type: val('f-itype'), date: val('f-idate') };
     data.consultedAt = val('f-consulted'); data.strength = val('f-strength'); data.academyStatus = val('f-acad');
-    data.retestDue = C.retestDue(data.inspection.date, data.inspection.type);
-    if (data.consultedAt && !(Array.isArray(data.followups) && data.followups.length)) data.followups = C.scheduleFollowups(data.consultedAt, settings().followupOffsets);
+    if (data.inspection.date !== (prev.inspection && prev.inspection.date || '') || data.inspection.type !== (prev.inspection && prev.inspection.type || '')) data.retestDue = C.retestDue(data.inspection.date, data.inspection.type);
+    if (data.consultedAt && data.consultedAt !== (prev.consultedAt || '') && !(Array.isArray(data.followups) && data.followups.length)) data.followups = C.scheduleFollowups(data.consultedAt, settings().followupOffsets);
   }
   const v = C.validateLead(data, { today: today() });
   if (!v.ok) return toast(v.error);
@@ -1677,7 +1689,7 @@ document.addEventListener('click', async e => {
       setLeadView(view); return renderLeadList('[data-act="lead-view"][data-view="' + view + '"]');
     }
     case 'lead-filter-clear': {
-      const fields = { q: 'q', status: 'status', channel: 'channel', owner: 'owner', pipeline: 'listPipeline', stage: 'listStage', followup: 'listFollowup' };
+      const fields = { q: 'q', status: 'status', channel: 'channel', owner: 'owner', pipeline: 'listPipeline', stage: 'listStage', followup: 'listFollowup', customerGrade: 'listCustomerGrade' };
       const key = el.dataset.filter;
       if (!Object.prototype.hasOwnProperty.call(fields, key)) return;
       return changeLeadFilter(fields[key], key === 'status' ? 'all' : '');
@@ -1761,6 +1773,7 @@ document.addEventListener('change', e => {
   if (t.id === 'f-list-pipeline') return changeLeadFilter('listPipeline', t.value, '#f-list-pipeline');
   if (t.id === 'f-list-stage') return changeLeadFilter('listStage', t.value, '#f-list-stage');
   if (t.id === 'f-list-followup') return changeLeadFilter('listFollowup', t.value, '#f-list-followup');
+  if (t.id === 'f-list-customer-grade') return changeLeadFilter('listCustomerGrade', t.value, '#f-list-customer-grade');
   if (t.id === 'f-list-sort' && ['newest', 'oldest', 'name', 'next'].includes(t.value)) {
     clearTimeout(render._q); ui.listSort = t.value; ui.listPage = 1; return renderLeadList('#f-list-sort');
   }
