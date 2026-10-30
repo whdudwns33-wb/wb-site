@@ -5373,16 +5373,38 @@ function weekendVisitEditModal(visitId) {
     '<button class="btn btn-primary btn-block mt14" data-act="weekendsave">수정 저장</button>');
 }
 
-function openWeekendPlan(staffId) {
-  const tasks = weekendFlexibleLessonCandidates(staffId, cursor);
+function openAdminWeekendPlan(taskId) {
+  if (!session.isAdmin) return toast('관리자만 다른 선생님의 수업을 생성할 수 있습니다');
+  const task = state.tasks.find(t => !t.deleted && String(t.id) === String(taskId));
+  if (!task || task.weekendAttendanceMode !== 'flexible') return toast('비정기 수업 설정을 확인해 주세요');
+  modal('비정기 수업 생성·예약', '<div class="guide mb14"><b>' + esc(task.studentName || studentOf(task)) +
+    '</b> · ' + esc(task.subject || '') + '<br>담당: ' + esc((staffById(task.staffId) || {}).name || '담당 미지정') +
+    ' 선생님<br>등원 가능 요일: ' + esc(flexibleWeekendDayText(task)) +
+    '<br>선택한 날짜에만 수업을 만듭니다. 실제 출결은 당일에 기록합니다.</div>' +
+    '<label class="field"><span class="fl">수업 날짜</span><input class="in" type="date" id="adminWeekendPlanDate" min="' +
+    esc(today()) + '" value="' + esc(cursor >= today() ? cursor : today()) + '"></label>',
+    '<button class="btn btn-primary btn-block mt14" data-act="adminweekendplandate" data-id="' + esc(task.id) + '">날짜 선택 · 다음</button>');
+}
+
+function selectAdminWeekendPlanDate(taskId) {
+  if (!session.isAdmin) return toast('관리자 로그인을 확인해 주세요');
+  const task = state.tasks.find(t => !t.deleted && String(t.id) === String(taskId));
+  const date = document.getElementById('adminWeekendPlanDate').value;
+  if (!task || date < today() || !flexibleWeekendAllowedOn(task, date)) return toast('오늘 이후의 등원 가능한 토·일 날짜를 선택해 주세요');
+  openWeekendPlan(task.staffId, task.id, date);
+}
+
+function openWeekendPlan(staffId, taskId, selectedDate) {
+  const planDate = selectedDate || cursor;
+  const tasks = weekendFlexibleLessonCandidates(staffId, planDate).filter(task => !taskId || String(task.id) === String(taskId));
   if (!tasks.length) return toast('선택한 날짜에 예약할 수 있는 비정기 수업이 없습니다');
-  modal('비정기 수업 예약', '<div class="hint mb14">오늘 탭에서 선택한 ' + esc(label(cursor)) +
+  modal('비정기 수업 예약', '<div class="hint mb14">선택한 ' + esc(label(planDate)) +
     ' 수업을 미리 만듭니다. 실제 등원·출결은 당일에 따로 기록합니다.</div>' +
     tasks.map(task => {
-      const plan = flexibleWeekendPlan(task, cursor);
-      const slots = (task.scheduleSlots || []).filter(slot => (!slot.validFrom || slot.validFrom <= cursor) && (!slot.validTo || slot.validTo >= cursor));
-      const ref = plan || slots.find(slot => (slot.days || []).includes(dowOf(cursor))) || slots[0] || {};
-      return '<div class="card" data-weekend-plan-row data-task="' + esc(task.id) + '" data-date="' + esc(cursor) + '">' +
+      const plan = flexibleWeekendPlan(task, planDate);
+      const slots = (task.scheduleSlots || []).filter(slot => (!slot.validFrom || slot.validFrom <= planDate) && (!slot.validTo || slot.validTo >= planDate));
+      const ref = plan || slots.find(slot => (slot.days || []).includes(dowOf(planDate))) || slots[0] || {};
+      return '<div class="card" data-weekend-plan-row data-task="' + esc(task.id) + '" data-date="' + esc(planDate) + '">' +
         '<b>' + esc(task.studentName || studentOf(task)) + ' · ' + esc(task.subject || '') + '</b>' +
         (plan ? '<span class="pill">예약됨</span>' : '') +
         '<div class="grid2 mt8"><label>시작<input class="in" type="time" data-plan-start value="' + esc(ref.startTime || '') +
@@ -20513,6 +20535,8 @@ function rosterStudentLessonsHtml(student) {
       '<div class="student-info-field wide"><b>주말 등원 방식</b><span>' + esc(weekendFlexibleSettingsSummary(task)) + '</span></div></div>' +
       (canEditLessonTask(task) ? '<button class="btn btn-primary btn-block mt14" data-act="lessonedit" data-id="' + esc(task.id) + '">이 수업 정보 수정</button>' :
         (session.isAdmin ? '<div class="hint mt14">이 수업은 현재 형식으로 다시 등록한 뒤 수정할 수 있습니다.</div>' : '')) +
+      (session.isAdmin && task.weekendAttendanceMode === 'flexible'
+        ? '<button class="btn btn-primary btn-block mt8" data-act="adminweekendplanopen" data-id="' + esc(task.id) + '">비정기 수업 생성·예약</button>' : '') +
       (session.isAdmin && (taskHasWeekendSchedule(task) || isFlexibleWeekendLesson(task))
         ? '<button class="btn btn-ghost btn-block mt8" data-act="weekendflexsettings" data-id="' + esc(task.id) + '">비정기 수업 설정</button>'
         : session.isAdmin ? '<div class="hint mt8">비정기 주말 수업은 먼저 토·일 참고 시간표를 저장한 뒤 설정할 수 있습니다.</div>' : '') + '</section>';
@@ -24627,6 +24651,8 @@ document.addEventListener('click', async ev => {
     }
     case 'weekendflexsettings': openWeekendFlexibleSettings(String(id || '')); break;
     case 'weekendflexsave': saveWeekendFlexibleSettings(el); break;
+    case 'adminweekendplanopen': openAdminWeekendPlan(String(id || '')); break;
+    case 'adminweekendplandate': selectAdminWeekendPlanDate(String(id || '')); break;
     case 'weekendplanopen': openWeekendPlan(String(el.dataset.staff || '')); break;
     case 'weekendplansave': saveWeekendPlan(el, false); break;
     case 'weekendplancancel': saveWeekendPlan(el, true); break;
