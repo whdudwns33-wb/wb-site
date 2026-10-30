@@ -5853,7 +5853,8 @@ function lessonHandoffCardHtml(row, mode) {
 function lessonHandoffTeacherHtml(staffId, date) {
   const scope = ensureLessonHandoffDate(date);
   if (!scope) return '<div class="hint">날짜별 수업 인계를 확인하는 중입니다.</div>';
-  const rows = scope.rows.filter(row => String(row.recipientStaffId) === String(staffId));
+  // 취소 이력은 관리자 기록에 보존하고 오늘 진행할 수업에서는 제외한다.
+  const rows = scope.rows.filter(row => String(row.recipientStaffId) === String(staffId) && row.status !== 'cancelled');
   return (scope.error ? '<div class="card"><div class="hint" role="alert">인계 수업 조회 실패 — ' + esc(scope.error) + '</div>' +
     '<button class="btn btn-sm btn-ghost" data-act="lessonHandoffRefresh" data-date="' + esc(date) + '">인계 다시 확인</button></div>' : '') +
     rows.map(row => lessonHandoffCardHtml(row, 'recipient')).join('');
