@@ -791,3 +791,11 @@ test('reservation write rolls back if attendance arrives between validation and 
   assert.equal(task.weekendPlans,undefined);
   assert.equal(db.sqlite.prepare('SELECT count(*) AS n FROM student_schedule_revisions').get().n,0);
 });
+
+
+test('manager reserves another teacher flexible lesson without changing ownership', async () => {
+  const {db,body}=planDb();const result=await call(db,body,admin);
+  assert.equal(result.status,200,JSON.stringify(result.body));
+  assert.equal(result.body.task.staffId,'teacher-1');
+  assert.equal(db.sqlite.prepare("SELECT owner FROM tasks WHERE id='lesson-a'").get().owner,'teacher-1');
+});
