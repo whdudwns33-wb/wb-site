@@ -6,6 +6,9 @@
 node_modules/
 sync/dist/
 
+# 코덱스 로그 폴더(공식 문서의 -c log_dir=./.codex-log 예시) — 대화·경로를 담는다
+.codex-log/
+
 # reading-server 런타임 데이터·빌드 산출물 — 학생 기록(db.json)은 절대 커밋 금지, dist는 CI가 조립
 reading-server/data/
 reading-server/dist/
@@ -16,6 +19,8 @@ reading-server/dist/
 # 구형 배포 스크립트가 만들던 관리자 비밀키 결과 파일 — 커밋 금지
 sync/배포결과.txt
 workbench/src/private-seed.json
+# 워크벤치 입결 재정리본 평문 — 약관상 재배포 금지. 소스 브랜치에는 있던 줄이 main 계열에 빠져 있었다(복원하면 git add -A 에 걸린다)
+workbench/src/bulk-data.json
 
 # 교재 코칭 원문 — 공개 저장소에 두지 않는다(서버 KV로 이전, 2026-09). 로컬 사본은 개발용.
 reading/textbook.json
