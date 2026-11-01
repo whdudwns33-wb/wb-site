@@ -141,7 +141,7 @@ export async function createStaffServer(config) {
           let result;
           if (b.method === 'initialize') result = { protocolVersion: protocols.includes(b.params?.protocolVersion) ? b.params.protocolVersion : protocols[0], capabilities: { tools: {} }, serverInfo: { name: 'wb-haru', version: '1.0.0' } };
           else if (b.method === 'ping') result = {};
-          else if (b.method === 'tools/list') result = { tools: [{ name: 'haru_admin_request', description: '삼육중 및 영재원 대비 관리자 API. 조회·등록·자료·플랜·현황·내보내기·파기를 수행합니다. 파기는 사용자가 구체적으로 요청할 때만 실행하세요.', annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false }, inputSchema: { type: 'object', required: ['method', 'path'], additionalProperties: false, properties: { method: { type: 'string', enum: ['GET', 'POST', 'DELETE'] }, path: { type: 'string', description: '/api/haru/admin/로 시작하는 기존 관리자 경로' }, body: { type: 'object' } } } }] };
+          else if (b.method === 'tools/list') result = { tools: [{ name: 'haru_admin_request', description: '영재원 대비 삼육중 화산중 영선중 용정중 컨설팅 앱웹 관리자 API. 조회·등록·자료·플랜·현황·내보내기·파기를 수행합니다. 파기는 사용자가 구체적으로 요청할 때만 실행하세요.', annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: false }, inputSchema: { type: 'object', required: ['method', 'path'], additionalProperties: false, properties: { method: { type: 'string', enum: ['GET', 'POST', 'DELETE'] }, path: { type: 'string', description: '/api/haru/admin/로 시작하는 기존 관리자 경로' }, body: { type: 'object' } } } }] };
           else if (b.method === 'tools/call') {
             if (b.params?.name !== 'haru_admin_request') return send(200, { jsonrpc: '2.0', id: b.id, error: { code: -32602, message: '알 수 없는 도구입니다.' } });
             const a = b.params.arguments || {};
