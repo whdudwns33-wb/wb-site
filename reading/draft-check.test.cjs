@@ -181,6 +181,38 @@ function sample() {
   has(C.checkDraft(a).errors, '연속 공백', '조각 사이 연속 공백');
 }
 
+{   /* 정답이 혼자 가장 긴 선지인 문항이 절반을 넘으면 경고 ──
+       지문을 읽지 않고 최장 선지만 골라도 맞으면 문항이 재는 것이 없다 */
+  const a = sample();
+  a.levels.L2.questions.forEach((q) => { q.choices = ['가', '나', '다', '라']; q.choices[q.answer] = '아주 긴 정답 선지'; });
+  a.levels.L2.challenge.forEach((q) => { q.choices = ['가', '나', '다', '라']; q.choices[q.answer] = '아주 긴 정답 선지'; });
+  const r = C.checkDraft(a);
+  has(r.warns, '정답이 혼자 가장 긴 선지', '최장 선지 쏠림');
+  hasNot(r.errors, '최장', '쏠림은 경고일 뿐 오류가 아니다');
+  ok(r.stats.L2.lengthTell === r.stats.L2.qCount, '쏠림 집계 — ' + r.stats.L2.lengthTell + '/' + r.stats.L2.qCount);
+}
+{   /* 가장 긴 선지가 둘 이상이면(동률) 길이로 못 집으므로 세지 않는다 */
+  const a = sample();
+  a.levels.L3.questions.forEach((q) => { q.choices = ['같은 길이 하나', '같은 길이 가나', '같은 길이 다라', '같은 길이 마바']; });
+  a.levels.L3.challenge.forEach((q) => { q.choices = ['같은 길이 하나', '같은 길이 가나', '같은 길이 다라', '같은 길이 마바']; });
+  const r = C.checkDraft(a);
+  ok(r.stats.L3.lengthTell === 0, '동률은 세지 않는다 — ' + r.stats.L3.lengthTell);
+  hasNot(r.warns, 'L3: 정답이 혼자 가장 긴', '동률이면 경고 없음');
+}
+{   /* 정답이 최장이 아니면 세지 않는다 */
+  const a = sample();
+  a.levels.L4.questions.forEach((q) => {
+    q.choices = ['가', '나', '다', '라'];
+    q.choices[(q.answer + 1) % 4] = '오답이 가장 긴 선지가 되도록';
+  });
+  a.levels.L4.challenge.forEach((q) => {
+    q.choices = ['가', '나', '다', '라'];
+    q.choices[(q.answer + 1) % 4] = '오답이 가장 긴 선지가 되도록';
+  });
+  const r = C.checkDraft(a);
+  ok(r.stats.L4.lengthTell === 0, '정답이 최장이 아니면 0 — ' + r.stats.L4.lengthTell);
+}
+
 /* ── 정본 대조: content.test.cjs 와 수치가 같은가 ──
    한쪽만 고치면 병합 전과 병합 후가 다른 규격을 잰다. */
 {

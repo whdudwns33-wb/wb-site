@@ -53,7 +53,8 @@ for (const f of files) {
     const t = stats[lv];
     if (!t) continue;
     console.log(`  ${lv}  ${t.chars}자 · ${t.segs}조각 · 평균 ${t.mean.toFixed(2)} · 최대 ${t.max}`
-      + ` · 어휘 ${t.vocab} · 문항 ${t.q}+심화 ${t.challenge}`);
+      + ` · 어휘 ${t.vocab} · 문항 ${t.q}+심화 ${t.challenge}`
+      + (t.qCount ? ` · 최장=정답 ${t.lengthTell}/${t.qCount}` : ''));
   }
   warns.forEach((w) => console.log('  WARN:', w));
   errors.forEach((e) => console.log('  X', e));
