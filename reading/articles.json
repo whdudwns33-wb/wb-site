@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-26.1",
+  "version": "2026-11-02.1",
   "articles": [
     {
       "id": "nuri-space",
@@ -62669,6 +62669,4279 @@
               "so that the power grid can settle in ",
               "as a facility that thrives together with the region.”"
             ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "radiation-dose-30y",
+      "category": "science",
+      "careers": [
+        "med",
+        "nat"
+      ],
+      "publishedAt": "2026-11-02",
+      "status": "published",
+      "issue": false,
+      "sources": [
+        {
+          "title": "질병관리청 보도참고자료 — 의료기관 방사선관계종사자 피폭선량 30년 분석, 1인당 연평균 피폭선량 84.9% 감소 (2026.10.30)",
+          "url": "https://www.kdca.go.kr/bbs/kdca/42/313282/artclView.do"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "30년 동안 적어 둔 방사선 기록",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "병원이나 치과에는 몸속을 ",
+              "찍어 보는 방사선 기계가 있어요. ",
+              "그 기계가 있는 곳이 ",
+              "일터인 사람들이 있어요. ",
+              "방사선사, 의사, 치과의사 같은 분들이에요."
+            ],
+            [
+              "이분들이 방사선을 얼마나 받았는지 ",
+              "30년 동안 적어 두었어요. ",
+              "1996년부터 2025년까지예요. ",
+              "적는 일은 질병관리청이 해요. ",
+              "연보라는 책은 2004년부터 해마다 내요."
+            ],
+            [
+              "일하는 사람은 아주 많아졌어요. ",
+              "약 7.7배로 늘었어요. ",
+              "그런데 한 사람이 ",
+              "한 해에 받은 양을 ",
+              "고르게 따져 보니 ",
+              "약 84.9% 줄었어요. ",
+              "사람은 늘고 양은 줄었어요."
+            ],
+            [
+              "질병관리청은 이 기록을 ",
+              "다음 할 일을 정하는 ",
+              "바탕 자료로 쓰려고 해요. ",
+              "이 기록을 보면 30년 동안 ",
+              "무엇이 달라졌는지 알 수 있어요. ",
+              "재고 적어 두니 달라진 것이 보였어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "연보",
+              "easy": "한 해 동안 세어 모은 것을 해마다 내는 책이에요."
+            },
+            {
+              "word": "질병관리청",
+              "easy": "사람들의 건강을 지키는 나라 기관이에요."
+            },
+            {
+              "word": "기록",
+              "easy": "무엇이 어떠했는지 적어 둔 것이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "병원에 새 기계를 들여놓은 이야기",
+                "방사선 기계가 있는 곳에서 일하는 사람들의 30년 기록 이야기",
+                "병원에 가는 사람이 많아진 이야기",
+                "책을 예쁘게 만드는 방법 이야기"
+              ],
+              "answer": 1,
+              "explain": "방사선 기계가 있는 곳에서 일하는 사람들의 기록을 30년 동안 적어 두었다는 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "일하는 사람의 수와 한 사람이 받은 양은 어떻게 달라졌나요?",
+              "choices": [
+                "둘 다 늘었어요",
+                "둘 다 줄었어요",
+                "사람은 늘고 양은 줄었어요",
+                "사람은 줄고 양은 늘었어요"
+              ],
+              "answer": 2,
+              "explain": "일하는 사람은 약 7.7배로 늘었고, 한 사람이 한 해에 받은 양을 고르게 따진 값은 약 84.9% 줄었어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「연보」는 무엇인가요?",
+              "choices": [
+                "해마다 내는 책이에요",
+                "병원에서 쓰는 기계예요",
+                "방사선을 재는 자예요",
+                "학교에서 보는 시험이에요"
+              ],
+              "answer": 0,
+              "explain": "질병관리청이 해마다 연보라는 책으로 낸다고 했어요. 한 해 동안 세어 모은 것을 해마다 내는 책이에요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "질병관리청이 30년 동안 계속 적어 둔 까닭으로 알맞은 것은?",
+              "choices": [
+                "기계를 더 많이 팔고 싶어서예요",
+                "달라진 것을 보고 다음 할 일을 정하려고요",
+                "사람들을 놀라게 하려고요",
+                "책을 많이 만들고 싶어서예요"
+              ],
+              "answer": 1,
+              "explain": "질병관리청은 이 기록을 다음 할 일을 정하는 바탕 자료로 쓰려고 해요.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "우리 반에서 이 글처럼 해 볼 수 있는 일은?",
+              "choices": [
+                "하루에 몇 분 읽었는지 적기는 하지만 달라진 것은 살펴보지 않아요",
+                "숫자를 내가 좋아하는 대로 바꿔 적어요",
+                "하루에 몇 분 책을 읽었는지 적어 두고 달라진 것을 살펴보아요",
+                "아무것도 적지 않고 그냥 지나가요"
+              ],
+              "answer": 2,
+              "explain": "질병관리청도 방사선을 얼마나 받았는지 재서 적어 두고 30년 동안 달라진 것을 살펴보았어요.",
+              "evidencePara": 3
+            }
+          ]
+        },
+        "L2": {
+          "title": "사람은 늘고, 받은 양은 줄었다",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "질병관리청이 「2025년 의료기관 ",
+              "방사선관계종사자의 개인 피폭선량 연보」를 발간한다. ",
+              "방사선관계종사자는 진단용 방사선 발생장치를 설치한 곳을 ",
+              "주된 근무지로 하는 방사선사, ",
+              "의사, 치과의사 등이다. ",
+              "이번 연보에는 1996년부터 2025년까지 ",
+              "30년 기록이 처음 담겼다."
+            ],
+            [
+              "30년 동안 두 가지가 ",
+              "서로 반대로 움직였다. ",
+              "종사자 수는 1996년 15,187명에서 ",
+              "2025년 116,770명으로 약 7.7배 증가했다. ",
+              "반대로 1인당 연간 평균 피폭선량은 ",
+              "1996년 2.25mSv에서 2025년 0.34mSv로 ",
+              "약 84.9% 감소했다."
+            ],
+            [
+              "양을 구간으로 나누어 보면 ",
+              "변화가 더 잘 보인다. ",
+              "2025년에는 전체 종사자 중 ",
+              "70.4%가 개인 피폭선량이 연간 0.1mSv 이하였다. ",
+              "1996년에는 그 비율이 15.8%였다. ",
+              "자료는 구간별 피폭선량 분포가 ",
+              "낮은 선량 구간으로 ",
+              "크게 변화한 것으로 나타났다고 적었다."
+            ],
+            [
+              "자료에는 종사자 수가 ",
+              "지속적으로 증가했음에도 평균 피폭선량은 ",
+              "점진적으로 감소하는 추세를 보여 ",
+              "안전관리 정책의 효과를 ",
+              "확인할 수 있었다고 적혀 있다. ",
+              "질병관리청은 종사자의 건강을 보호하고 ",
+              "안전관리 정책을 세우는 ",
+              "기초자료를 주기 위해 ",
+              "피폭선량을 모으고 분석하며 ",
+              "2004년부터 매년 연보를 발간하고 있다. ",
+              "이번 기록은 피폭선량 저감 등 ",
+              "주요 정책을 세우는 ",
+              "기초자료로 활용될 것으로 기대된다."
+            ]
+          ],
+          "en": [
+            "질병관리청 (the disease control agency) is publishing a yearly report. It is about radiation workers at medical institutions. These workers are radiologic technologists, doctors, dentists and others. Their main workplace has a machine that makes radiation for medical tests. This report holds 30 years of records, from 1996 to 2025. That is the first time.",
+            "For 30 years, two numbers moved in opposite ways. The number of workers was 15,187 in 1996. It was 116,770 in 2025. That is about 7.7 times as many. But the average dose for one worker went down. It was 2.25 mSv a year in 1996. In 2025 it was 0.34 mSv. That is a drop of about 84.9%.",
+            "The report also sorts the doses into bands. In 2025, 70.4% of all workers got 0.1 mSv or less in a year. In 1996 that share was 15.8%. The report says the dose bands moved a lot to the low side.",
+            "The report says that, although the number of workers kept going up for 30 years, the average dose slowly went down, and so the effect of safety policy could be confirmed. 질병관리청 gathers the doses to keep workers healthy. It also wants base data for safety policy. It has published a yearly report every year since 2004. This record is expected to help make policy that lowers doses."
+          ],
+          "enseg": [
+            [
+              "질병관리청 (the disease control agency) is publishing a yearly report. ",
+              "It is about radiation workers ",
+              "at medical institutions. These workers are radiologic technologists, ",
+              "doctors, dentists and others. Their main workplace has a machine ",
+              "that makes radiation for medical tests. ",
+              "This report holds 30 years ",
+              "of records, from 1996 to 2025. ",
+              "That is the first time."
+            ],
+            [
+              "For 30 years, two numbers moved ",
+              "in opposite ways. The number ",
+              "of workers was 15,187 in 1996. ",
+              "It was 116,770 in 2025. ",
+              "That is about 7.7 times as many. But the average dose ",
+              "for one worker went down. ",
+              "It was 2.25 mSv a year ",
+              "in 1996. In 2025 it was 0.34 mSv. ",
+              "That is a drop of about 84.9%."
+            ],
+            [
+              "The report also sorts the doses ",
+              "into bands. In 2025, 70.4% ",
+              "of all workers got 0.1 mSv ",
+              "or less in a year. ",
+              "In 1996 that share was 15.8%. ",
+              "The report says the dose bands moved a lot ",
+              "to the low side."
+            ],
+            [
+              "The report says that, although the number ",
+              "of workers kept going up for 30 years, ",
+              "the average dose slowly went down, ",
+              "and so the effect of safety policy could be confirmed. ",
+              "질병관리청 gathers the doses ",
+              "to keep workers healthy. It also wants base data ",
+              "for safety policy. It has published a yearly report every year ",
+              "since 2004. This record is expected ",
+              "to help make policy that lowers doses."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "피폭선량",
+              "easy": "몸이 받은 방사선의 양",
+              "hanja": "被(입을 피)+曝(쬘 폭)+線(줄 선)+量(헤아릴 량)"
+            },
+            {
+              "word": "연보",
+              "easy": "한 해의 통계를 모아 해마다 내는 책",
+              "hanja": "年(해 년)+報(알릴 보)"
+            },
+            {
+              "word": "종사자",
+              "easy": "어떤 일에 몸담아 일하는 사람",
+              "hanja": "從(좇을 종)+事(일 사)+者(놈 자)"
+            },
+            {
+              "word": "기초자료",
+              "easy": "무엇을 정할 때 바탕으로 쓰는 자료",
+              "hanja": "基(터 기)+礎(주춧돌 초)+資(재물 자)+料(헤아릴 료)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "radiation",
+              "ko": "방사선 (명사)",
+              "base": "radiation [ˌreɪdiˈeɪʃn]"
+            },
+            {
+              "word": "dose",
+              "ko": "선량, 몸이 받은 양 (명사)",
+              "base": "dose [doʊs]"
+            },
+            {
+              "word": "average",
+              "ko": "평균의 (형용사)",
+              "base": "average [ˈævərɪdʒ]"
+            },
+            {
+              "word": "worker",
+              "ko": "종사자, 일하는 사람 (명사)",
+              "base": "worker [ˈwɜːrkər]"
+            },
+            {
+              "word": "record",
+              "ko": "기록 (명사)",
+              "base": "record [ˈrekərd]"
+            },
+            {
+              "word": "band",
+              "ko": "구간 (명사)",
+              "base": "band [bænd]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 전하는 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "의료기관에 방사선 기계를 새로 들여놓았다",
+                "30년 기록을 보니 종사자는 늘고 1인당 평균 피폭선량은 줄었다",
+                "종사자 수와 1인당 평균 피폭선량이 30년 동안 함께 늘었다",
+                "연보를 내는 일을 올해부터 그만둔다"
+              ],
+              "answer": 1,
+              "explain": "종사자 수는 약 7.7배 증가했고 1인당 연간 평균 피폭선량은 약 84.9% 감소했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "1996년과 2025년의 방사선관계종사자 수를 바르게 짝지은 것은?",
+              "choices": [
+                "15,187명과 116,770명",
+                "116,770명과 15,187명",
+                "15,187명과 70,400명",
+                "2,250명과 3,400명"
+              ],
+              "answer": 0,
+              "explain": "종사자 수는 1996년 15,187명에서 2025년 116,770명으로 약 7.7배 증가했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "2025년에 개인 피폭선량이 연간 0.1mSv 이하였던 종사자는 전체의 몇 %인가?",
+              "choices": [
+                "15.8%",
+                "70.4%",
+                "84.9%",
+                "7.7%"
+              ],
+              "answer": 1,
+              "explain": "2025년에는 전체 종사자 중 70.4%가 연간 0.1mSv 이하였고, 1996년에는 그 비율이 15.8%였다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「기초자료」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "한 해의 통계를 모아 해마다 내는 책",
+                "무엇을 정할 때 바탕으로 쓰는 자료",
+                "몸이 받은 방사선의 양",
+                "의료기관에서 쓰는 기계의 이름"
+              ],
+              "answer": 1,
+              "explain": "안전관리 정책을 세우는 바탕으로 쓰는 자료라는 뜻이다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "구간별 피폭선량 분포가 달라진 것이 뜻하는 것으로 가장 알맞은 것은?",
+              "choices": [
+                "2025년에는 0.1mSv를 넘는 종사자가 없어졌다",
+                "낮은 선량 구간에 속한 종사자의 비율이 크게 늘었다",
+                "종사자 수가 1996년보다 줄어들어 비율이 커졌다",
+                "1996년에는 피폭선량을 구간으로 나누지 않았다"
+              ],
+              "answer": 1,
+              "explain": "자료는 구간별 피폭선량 분포가 낮은 선량 구간으로 크게 변화한 것으로 나타났다고 적었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "반 전체 책 읽기 시간이 늘어난 해에 한 사람이 읽은 시간은 줄었는지 보려면 무엇을 함께 적어 두어야 하는가?",
+              "choices": [
+                "반 전체가 읽은 시간만 해마다 더해서 적어 둔다",
+                "읽은 사람 수와 한 사람이 읽은 시간을 함께 적어 둔다",
+                "가장 오래 읽은 학생의 시간만 골라서 적어 둔다",
+                "읽은 책의 제목과 쪽수를 사람마다 적어 둔다"
+              ],
+              "answer": 1,
+              "explain": "글은 종사자 수와 1인당 연간 평균 피폭선량을 함께 적어 두어, 사람이 약 7.7배로 늘어난 기간에도 한 사람이 받은 양은 줄었음을 보일 수 있었다.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L3": {
+          "title": "30년 기록이 보여 준 두 흐름",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "질병관리청이 「2025년 의료기관 ",
+              "방사선관계종사자의 개인 피폭선량 연보」를 발간한다. ",
+              "방사선관계종사자는 진단용 방사선 발생장치를 설치한 곳을 ",
+              "주된 근무지로 하는 방사선사, ",
+              "의사, 치과의사 등이다. ",
+              "이번 연보에는 2025년 종사자 현황과 ",
+              "피폭선량 통계, ",
+              "1996년부터 2025년까지 30년간의 ",
+              "변화 분석 결과를 담았다."
+            ],
+            [
+              "1996년에 개인 피폭선량 관리 기록을 ",
+              "처음 시작한 뒤 30주년이 되는 ",
+              "해를 맞아 30년 기록을 수록했다. ",
+              "긴 기록에서 두 흐름이 나란히 드러난다. ",
+              "종사자 수는 1996년 15,187명에서 ",
+              "2025년 116,770명으로 약 7.7배 증가했다. ",
+              "반대로 1인당 연간 평균 피폭선량은 ",
+              "1996년 2.25mSv에서 2025년 0.34mSv로 ",
+              "약 84.9% 감소했다. ",
+              "자료에는 종사자 수가 지속적으로 증가했음에도 ",
+              "평균 피폭선량은 점진적으로 감소하는 추세를 보여 ",
+              "안전관리 정책의 효과를 ",
+              "확인할 수 있었다고 적혀 있다."
+            ],
+            [
+              "분포를 구간으로 나누어 보면 ",
+              "변화가 더 뚜렷하다. ",
+              "2025년에는 전체 종사자 중 70.4%가 ",
+              "개인 피폭선량이 연간 0.1mSv 이하였다. ",
+              "1996년에는 그 비율이 15.8%였다. ",
+              "자료는 구간별 피폭선량 분포가 ",
+              "낮은 선량 구간으로 ",
+              "크게 변화한 것으로 나타났다고 적었다."
+            ],
+            [
+              "이번 연보는 종사자 현황과 피폭선량을 ",
+              "직종, 연령, 성별, ",
+              "지역 등으로 구분하여 발표했다. ",
+              "직종별 현황은 30년간 변함없이 ",
+              "방사선사, 의사, 치과의사 순이지만 ",
+              "의사와 치과의사, 치과위생사의 비율이 ",
+              "점차 증가하고 있다. ",
+              "2025년 연보 기준 비율은 ",
+              "방사선사 31.4%, 의사 25.2%, ",
+              "치과의사 17.8%로 세 직종이 ",
+              "전체의 74.5%를 차지했다. ",
+              "직종별 피폭선량은 방사선사가 0.67mSv로 가장 높았다."
+            ],
+            [
+              "질병관리청은 종사자의 건강을 ",
+              "방사선 위해로부터 보호하고 ",
+              "안전관리 정책 수립을 위한 ",
+              "기초자료를 제공하기 위해 ",
+              "개인 피폭선량을 수집하고 분석하며 ",
+              "2004년부터 매년 통계 연보를 발간하고 있다. ",
+              "이번 연보는 의료방사선 안전관리 중·장기 ",
+              "방향 설정과 피폭선량 저감 등 ",
+              "주요 정책 수립을 위한 ",
+              "기초자료로 활용될 것으로 기대된다."
+            ]
+          ],
+          "en": [
+            "질병관리청 (Korea's disease control agency) is publishing the 2025 annual report on the individual radiation doses of radiation-related workers at medical institutions. A radiation-related worker is a radiologic technologist, doctor, dentist or other professional whose main workplace has a diagnostic radiation device installed. The report contains the status of workers and dose statistics for 2025, together with an analysis of the changes over the thirty years from 1996 to 2025.",
+            "Individual dose records began in 1996, and because this is the thirtieth year, the report also carries the thirty-year record. Two trends run side by side in it. The number of workers rose from 15,187 in 1996 to 116,770 in 2025, about 7.7 times as many. The average annual dose per person, by contrast, fell from 2.25 mSv in 1996 to 0.34 mSv in 2025, a decrease of about 84.9%. The report states that, although the number of workers kept increasing, the average dose showed a gradual downward trend, so the effect of the safety management policy could be confirmed.",
+            "Splitting the figures into bands makes the change clearer. In 2025, 70.4% of all workers had an individual dose of 0.1 mSv or less per year. In 1996 that share was 15.8%. The report says the distribution of doses across the bands changed greatly toward the low-dose bands.",
+            "The report presents the status of workers and their doses by job type, age, sex and region. By job type the order has not changed in thirty years, radiologic technologists first, then doctors and dentists, but the shares of doctors, dentists and dental hygienists are gradually rising. In the 2025 report the shares are 31.4% for radiologic technologists, 25.2% for doctors and 17.8% for dentists, so the three job types make up 74.5% of the whole. By job type the dose was highest for radiologic technologists, at 0.67 mSv.",
+            "질병관리청 collects and analyses individual doses in order to protect workers' health from radiation harm and to provide base data for safety management policy, and it has published an annual statistical report every year since 2004. The report is expected to be used as base data for setting the mid- and long-term direction of medical radiation safety management and for major policies such as lowering doses."
+          ],
+          "enseg": [
+            [
+              "질병관리청 (Korea's disease control agency) is publishing the 2025 annual report ",
+              "on the individual radiation doses ",
+              "of radiation-related workers at medical institutions. ",
+              "A radiation-related worker is a radiologic technologist, ",
+              "doctor, dentist or other professional ",
+              "whose main workplace has a diagnostic radiation device installed. ",
+              "The report contains the status ",
+              "of workers and dose statistics ",
+              "for 2025, together with an analysis ",
+              "of the changes over the thirty years ",
+              "from 1996 to 2025."
+            ],
+            [
+              "Individual dose records began in 1996, ",
+              "and because this is the thirtieth year, ",
+              "the report also carries the thirty-year record. ",
+              "Two trends run side by side in it. ",
+              "The number of workers rose ",
+              "from 15,187 in 1996 to 116,770 ",
+              "in 2025, about 7.7 times as many. The average annual dose ",
+              "per person, by contrast, fell ",
+              "from 2.25 mSv in 1996 ",
+              "to 0.34 mSv in 2025, ",
+              "a decrease of about 84.9%. ",
+              "The report states that, although the number ",
+              "of workers kept increasing, the average dose showed a gradual downward trend, ",
+              "so the effect of the safety management policy could be confirmed."
+            ],
+            [
+              "Splitting the figures into bands makes the change clearer. ",
+              "In 2025, 70.4% of all workers had an individual dose ",
+              "of 0.1 mSv or less ",
+              "per year. In 1996 that share was 15.8%. ",
+              "The report says the distribution ",
+              "of doses across the bands changed greatly toward the low-dose bands."
+            ],
+            [
+              "The report presents the status ",
+              "of workers and their doses ",
+              "by job type, age, sex ",
+              "and region. By job type the order has not changed ",
+              "in thirty years, radiologic technologists first, ",
+              "then doctors and dentists, but the shares ",
+              "of doctors, dentists and dental hygienists are gradually rising. ",
+              "In the 2025 report the shares are 31.4% ",
+              "for radiologic technologists, 25.2% for doctors ",
+              "and 17.8% for dentists, so the three job types make up 74.5% ",
+              "of the whole. By job type the dose was highest ",
+              "for radiologic technologists, at 0.67 mSv."
+            ],
+            [
+              "질병관리청 collects and analyses individual doses ",
+              "in order to protect workers' health ",
+              "from radiation harm and to provide base data ",
+              "for safety management policy, and it has published an annual statistical report every year ",
+              "since 2004. The report is expected ",
+              "to be used as base data ",
+              "for setting the mid- and long-term direction ",
+              "of medical radiation safety management ",
+              "and for major policies such as lowering doses."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "피폭선량",
+              "easy": "몸이 받은 방사선의 양",
+              "hanja": "被(입을 피)+曝(쬘 폭)+線(줄 선)+量(헤아릴 량)"
+            },
+            {
+              "word": "종사자",
+              "easy": "어떤 일에 몸담아 일하는 사람",
+              "hanja": "從(좇을 종)+事(일 사)+者(놈 자)"
+            },
+            {
+              "word": "직종",
+              "easy": "일의 종류로 나눈 갈래",
+              "hanja": "職(직분 직)+種(씨 종)"
+            },
+            {
+              "word": "분포",
+              "easy": "어떤 값이 구간마다 얼마나 퍼져 있는지를 나타낸 것",
+              "hanja": "分(나눌 분)+布(베 포)"
+            },
+            {
+              "word": "기초자료",
+              "easy": "무엇을 정할 때 바탕으로 쓰는 자료",
+              "hanja": "基(터 기)+礎(주춧돌 초)+資(재물 자)+料(헤아릴 료)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "dose",
+              "ko": "선량, 몸이 받은 방사선의 양 (명사)",
+              "base": "dose [doʊs]"
+            },
+            {
+              "word": "annual",
+              "ko": "한 해의, 해마다의 (형용사)",
+              "base": "annual [ˈænjuəl]"
+            },
+            {
+              "word": "decrease",
+              "ko": "감소 (명사) / 감소하다 (동사)",
+              "base": "decrease [ˈdiːkriːs] / [dɪˈkriːs]"
+            },
+            {
+              "word": "trend",
+              "ko": "흐름, 추세 (명사)",
+              "base": "trend [trend]"
+            },
+            {
+              "word": "distribution",
+              "ko": "분포 (명사)",
+              "base": "distribution [ˌdɪstrɪˈbjuːʃn]"
+            },
+            {
+              "word": "confirm",
+              "ko": "확인하다 (동사)",
+              "base": "confirm [kənˈfɜːrm]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "30년 기록에서 종사자 수 증가와 1인당 평균 피폭선량 감소가 함께 나타났다",
+                "방사선관계종사자의 직종 순서가 30년 사이에 뒤바뀌었다",
+                "피폭선량 기록을 2025년에 처음 모으기 시작했다",
+                "의료기관에서 방사선 사용을 줄이기로 했다"
+              ],
+              "answer": 0,
+              "explain": "종사자 수는 약 7.7배 증가했고 1인당 연간 평균 피폭선량은 약 84.9% 감소했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "2025년 연보 기준 종사자 비율이 가장 높은 직종과 그 비율은?",
+              "choices": [
+                "의사 25.2%",
+                "치과의사 17.8%",
+                "방사선사 31.4%",
+                "치과위생사 74.5%"
+              ],
+              "answer": 2,
+              "explain": "방사선사 31.4%, 의사 25.2%, 치과의사 17.8%로 세 직종이 전체의 74.5%를 차지했다. 세 직종 합계 74.5%는 자료에 적힌 값이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "자료가 안전관리 정책에 대해 적은 내용으로 알맞은 것은?",
+              "choices": [
+                "정책이 피폭선량 감소의 원인임을 증명했다고 적었다",
+                "종사자 수가 증가했음에도 평균 피폭선량이 감소하는 추세를 보여 정책의 효과를 확인할 수 있었다고 적었다",
+                "정책의 효과는 아직 재어 보지 않았다고 적었다",
+                "정책을 2025년에 처음 만들었다고 적었다"
+              ],
+              "answer": 1,
+              "explain": "자료는 「효과를 확인할 수 있었다」고 적었다. 증명했다고는 적지 않았다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「분포」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "어떤 값이 구간마다 얼마나 퍼져 있는지를 나타낸 것",
+                "한 해 동안 받은 양을 모두 더해 하나로 나타낸 값",
+                "기록을 모으는 기관의 이름",
+                "일하는 사람을 직종으로 나눈 이름"
+              ],
+              "answer": 0,
+              "explain": "구간별 피폭선량 분포가 낮은 선량 구간으로 크게 변화했다는 서술에서 쓰임을 알 수 있다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "평균값만 보지 않고 구간별 분포를 따로 보여 주는 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "평균값 하나로는 낮은 선량 쪽으로 얼마나 몰렸는지 알 수 없기 때문이다",
+                "평균값을 잘못 계산했기 때문이다",
+                "구간을 나누면 종사자 수가 늘어나기 때문이다",
+                "구간을 나누는 일과 직종을 나누는 일이 같기 때문이다"
+              ],
+              "answer": 0,
+              "explain": "0.1mSv 이하 비율이 15.8%에서 70.4%로 바뀐 것은 평균값만으로는 보이지 않는다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "이 글에 적힌 내용만으로는 말할 수 없는 것은?",
+              "choices": [
+                "1996년과 2025년의 1인당 연간 평균 피폭선량",
+                "30년 동안 종사자 수가 늘어난 배수",
+                "평균 피폭선량이 줄어든 구체적인 까닭",
+                "개인 피폭선량 관리 기록을 처음 시작한 해"
+              ],
+              "answer": 2,
+              "explain": "자료는 감소 추세와 정책의 효과를 확인할 수 있었다고만 적었고, 줄어든 구체적인 까닭은 적지 않았다.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L4": {
+          "title": "7.7배와 84.9%, 30년 기록을 펼치다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "질병관리청이 「2025년 의료기관 ",
+              "방사선관계종사자의 개인 피폭선량 연보」를 발간한다. ",
+              "방사선관계종사자는 진단용 방사선 발생장치를 설치한 곳을 ",
+              "주된 근무지로 하는 방사선사, ",
+              "의사, 치과의사 등이다. ",
+              "이번 연보에는 2025년 종사자 현황과 ",
+              "피폭선량 통계, ",
+              "1996년부터 2025년까지 30년간의 ",
+              "변화 분석 결과를 담았다. ",
+              "1996년에 개인 피폭선량 관리 기록을 ",
+              "처음 시작한 이후 30주년이 되는 ",
+              "해를 맞이하게 됨에 따라 ",
+              "30년 기록을 수록했다."
+            ],
+            [
+              "30년 기록은 두 흐름을 나란히 보여 준다. ",
+              "종사자 수는 1996년 15,187명에서 ",
+              "2025년 116,770명으로 약 7.7배 증가했다. ",
+              "반대로 전체 방사선관계종사자의 ",
+              "1인당 연간 평균 피폭선량은 ",
+              "1996년 2.25mSv에서 2025년 0.34mSv로 ",
+              "약 84.9% 감소했다. ",
+              "자료에는 종사자 수가 지속적으로 증가했음에도 ",
+              "평균 피폭선량은 점진적으로 감소하는 추세를 보여 ",
+              "안전관리 정책의 효과를 ",
+              "확인할 수 있었다고 적혀 있다. ",
+              "왜 줄었는지의 구체적인 기전은 ",
+              "이 자료에 적혀 있지 않다."
+            ],
+            [
+              "분포를 구간으로 나누면 변화가 더 분명해진다. ",
+              "2025년 연보에 따르면 전체 종사자 중 70.4%가 ",
+              "개인 피폭선량이 연간 0.1mSv 이하였다. ",
+              "1996년에는 그 비율이 15.8%였다. ",
+              "자료는 지난 30년 동안 ",
+              "구간별 피폭선량 분포가 낮은 선량 구간으로 ",
+              "크게 변화한 것으로 나타났다고 적었다."
+            ],
+            [
+              "연보는 종사자 현황과 피폭선량을 ",
+              "직종, 연령, 성별, ",
+              "지역 등으로 구분하여 발표했다. ",
+              "직종별 현황은 30년간 변함없이 ",
+              "방사선사, 의사, 치과의사 순이지만 ",
+              "의사와 치과의사, 치과위생사의 비율이 ",
+              "점차 증가하고 있다. ",
+              "2025년 연보 기준 비율은 ",
+              "방사선사 31.4%, 의사 25.2%, ",
+              "치과의사 17.8%로 세 직종이 ",
+              "전체의 74.5%를 차지했다. ",
+              "직종별 피폭선량은 방사선사가 0.67mSv로 가장 높았고 ",
+              "기타 0.28mSv, 의사 0.25mSv 순이었다. ",
+              "연령별로는 20대에서 상대적으로 높은 피폭선량을 보이는 경향이 ",
+              "지속적으로 확인되었다. ",
+              "특히 방사선사에서 이 경향이 뚜렷했고, ",
+              "2025년에는 ",
+              "20대 남자 방사선사가 1.30mSv로 방사선사 가운데 가장 높았다."
+            ],
+            [
+              "질병관리청은 개인 피폭선량을 분기별로 누적 관리하며 ",
+              "고피폭 종사자의 집중 관리를 위해 ",
+              "분기 5mSv를 초과하면 ",
+              "주의통보를 실시하고 있다. ",
+              "2023년부터는 연간 2회 이상 주의통보 대상자가 ",
+              "발생한 의료기관에 특별교육을 시행했고 ",
+              "그 결과 주의통보 대상자가 ",
+              "감소한 것으로 확인되었다. ",
+              "2026년부터는 주의통보 처리 및 조치 기간을 ",
+              "3개월 이상에서 1개월로 단축한다."
+            ],
+            [
+              "질병관리청은 종사자의 건강을 ",
+              "방사선 위해로부터 보호하고 ",
+              "의료방사선 안전관리 정책 수립을 위한 ",
+              "기초자료를 제공하기 위해 ",
+              "개인 피폭선량을 수집하고 분석하며 ",
+              "2004년부터 매년 통계 연보를 발간하고 있다. ",
+              "이번 연보는 의료방사선 안전관리 중·장기 ",
+              "방향 설정과 피폭선량 저감 등 ",
+              "주요 정책 수립을 위한 ",
+              "기초자료로 활용될 것으로 기대된다."
+            ]
+          ],
+          "en": [
+            "질병관리청 (Korea's disease control agency) is publishing the 2025 annual report on the individual radiation doses of radiation-related workers at medical institutions. A radiation-related worker is a radiologic technologist, doctor, dentist or other professional whose main workplace has a diagnostic radiation device installed. The report contains the status of workers and dose statistics for 2025 and an analysis of the change over the thirty years from 1996 to 2025. Because this is the thirtieth year since individual dose record-keeping began in 1996, the thirty-year record is included as well.",
+            "In the thirty-year record, two trends run side by side. The number of workers rose from 15,187 in 1996 to 116,770 in 2025, about 7.7 times as many. The average annual dose per person across all radiation-related workers, by contrast, fell from 2.25 mSv in 1996 to 0.34 mSv in 2025, a decrease of about 84.9%. The report states that, although the number of workers kept increasing, the average dose showed a gradual downward trend, so the effect of the safety management policy could be confirmed. The specific mechanism behind the decrease is not written in this material.",
+            "Dividing the figures into bands makes the change plainer. According to the 2025 report, 70.4% of all workers had an individual dose of 0.1 mSv or less per year. In 1996 that share was 15.8%. The report says that over the past thirty years the distribution of doses across the bands changed greatly toward the low-dose bands.",
+            "The report presents the status of workers and their doses by job type, age, sex and region. By job type the order has not changed in thirty years, radiologic technologists first, then doctors and dentists, but the shares of doctors, dentists and dental hygienists are gradually rising. In the 2025 report the shares are 31.4% for radiologic technologists, 25.2% for doctors and 17.8% for dentists, so the three job types make up 74.5% of the whole. By job type the dose was highest for radiologic technologists at 0.67 mSv, followed by 0.28 mSv for others and 0.25 mSv for doctors. By age, a relatively high dose among workers in their twenties has been confirmed continuously, and in 2025 the highest among radiologic technologists was 1.30 mSv for men in their twenties.",
+            "질병관리청 manages individual doses cumulatively by quarter, and to concentrate management on highly exposed workers it issues a caution notice when a quarterly dose exceeds 5 mSv. Since 2023 it has run special training at medical institutions where two or more caution notices arose in one year, and as a result the number of workers receiving a caution notice was confirmed to have fallen. From 2026 the handling and action period for a caution notice is shortened from three months or more to one month.",
+            "질병관리청 collects and analyses individual doses in order to protect workers' health from radiation harm and to provide base data for medical radiation safety management policy, and it has published an annual statistical report every year since 2004. The report is expected to be used as base data for setting the mid- and long-term direction of medical radiation safety management and for major policies such as lowering doses."
+          ],
+          "enseg": [
+            [
+              "질병관리청 (Korea's disease control agency) is publishing the 2025 annual report ",
+              "on the individual radiation doses ",
+              "of radiation-related workers at medical institutions. ",
+              "A radiation-related worker is a radiologic technologist, ",
+              "doctor, dentist or other professional ",
+              "whose main workplace has a diagnostic radiation device installed. ",
+              "The report contains the status ",
+              "of workers and dose statistics ",
+              "for 2025 and an analysis ",
+              "of the change over the thirty years ",
+              "from 1996 to 2025. Because this is the thirtieth year ",
+              "since individual dose record-keeping began ",
+              "in 1996, the thirty-year record is included ",
+              "as well."
+            ],
+            [
+              "In the thirty-year record, two trends run side by side. The number ",
+              "of workers rose from 15,187 ",
+              "in 1996 to 116,770 in 2025, ",
+              "about 7.7 times as many. The average annual dose ",
+              "per person across all radiation-related workers, ",
+              "by contrast, fell from 2.25 mSv ",
+              "in 1996 to 0.34 mSv ",
+              "in 2025, a decrease of about 84.9%. ",
+              "The report states that, although the number ",
+              "of workers kept increasing, the average dose showed a gradual downward trend, ",
+              "so the effect of the safety management policy could be confirmed. ",
+              "The specific mechanism behind the decrease is not written ",
+              "in this material."
+            ],
+            [
+              "Dividing the figures into bands makes the change plainer. ",
+              "According to the 2025 report, ",
+              "70.4% of all workers had an individual dose ",
+              "of 0.1 mSv or less ",
+              "per year. In 1996 that share was 15.8%. ",
+              "The report says that over the past thirty years the distribution ",
+              "of doses across the bands changed greatly toward the low-dose bands."
+            ],
+            [
+              "The report presents the status ",
+              "of workers and their doses ",
+              "by job type, age, sex ",
+              "and region. By job type the order has not changed ",
+              "in thirty years, radiologic technologists first, ",
+              "then doctors and dentists, but the shares ",
+              "of doctors, dentists and dental hygienists are gradually rising. ",
+              "In the 2025 report the shares are 31.4% ",
+              "for radiologic technologists, 25.2% for doctors ",
+              "and 17.8% for dentists, so the three job types make up 74.5% ",
+              "of the whole. By job type the dose was highest ",
+              "for radiologic technologists at 0.67 mSv, ",
+              "followed by 0.28 mSv for others ",
+              "and 0.25 mSv for doctors. ",
+              "By age, a relatively high dose among workers ",
+              "in their twenties has been confirmed continuously, ",
+              "and in 2025 the highest among radiologic technologists ",
+              "was 1.30 mSv for men in their twenties."
+            ],
+            [
+              "질병관리청 manages individual doses cumulatively ",
+              "by quarter, and to concentrate management ",
+              "on highly exposed workers it issues a caution notice ",
+              "when a quarterly dose exceeds 5 mSv. ",
+              "Since 2023 it has run special training ",
+              "at medical institutions where two ",
+              "or more caution notices arose ",
+              "in one year, and as a result the number ",
+              "of workers receiving a caution notice was confirmed ",
+              "to have fallen. From 2026 the handling ",
+              "and action period for a caution notice is shortened ",
+              "from three months or more to one month."
+            ],
+            [
+              "질병관리청 collects and analyses individual doses ",
+              "in order to protect workers' health ",
+              "from radiation harm and to provide base data ",
+              "for medical radiation safety management policy, ",
+              "and it has published an annual statistical report every year ",
+              "since 2004. The report is expected ",
+              "to be used as base data ",
+              "for setting the mid- and long-term direction ",
+              "of medical radiation safety management ",
+              "and for major policies such as lowering doses."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "피폭선량",
+              "easy": "몸이 받은 방사선의 양",
+              "hanja": "被(입을 피)+曝(쬘 폭)+線(줄 선)+量(헤아릴 량)"
+            },
+            {
+              "word": "직종",
+              "easy": "일의 종류로 나눈 갈래",
+              "hanja": "職(직분 직)+種(씨 종)"
+            },
+            {
+              "word": "분포",
+              "easy": "어떤 값이 구간마다 얼마나 퍼져 있는지를 나타낸 것",
+              "hanja": "分(나눌 분)+布(베 포)"
+            },
+            {
+              "word": "주의통보",
+              "easy": "분기 피폭선량이 5mSv를 초과한 경우에 하는 통보",
+              "hanja": "注(물댈 주)+意(뜻 의)+通(통할 통)+報(알릴 보)"
+            },
+            {
+              "word": "저감",
+              "easy": "덜어서 낮추는 일",
+              "hanja": "低(낮을 저)+減(덜 감)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "dose",
+              "ko": "선량, 몸이 받은 방사선의 양 (명사)",
+              "base": "dose [doʊs]"
+            },
+            {
+              "word": "distribution",
+              "ko": "분포 (명사)",
+              "base": "distribution [ˌdɪstrɪˈbjuːʃn]"
+            },
+            {
+              "word": "quarter",
+              "ko": "분기 (명사)",
+              "base": "quarter [ˈkwɔːrtər]"
+            },
+            {
+              "word": "exceed",
+              "ko": "초과하다 (동사)",
+              "base": "exceed [ɪkˈsiːd]"
+            },
+            {
+              "word": "notice",
+              "ko": "통보, 알림 (명사)",
+              "base": "notice [ˈnoʊtɪs]"
+            },
+            {
+              "word": "shorten",
+              "ko": "단축하다 (동사)",
+              "base": "shorten [ˈʃɔːrtn]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "30년 기록에서 종사자 수 증가와 1인당 평균 피폭선량 감소라는 두 흐름이 나란히 확인되었다",
+                "방사선관계종사자의 직종 순서가 30년 사이에 뒤바뀌었다",
+                "주의통보 제도를 2026년에 처음 만들었다",
+                "의료기관의 방사선 사용이 30년 동안 줄어들었다"
+              ],
+              "answer": 0,
+              "explain": "종사자 수는 약 7.7배 증가했고 1인당 연간 평균 피폭선량은 약 84.9% 감소했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "2025년 직종별 평균 피폭선량을 높은 순으로 바르게 나열한 것은?",
+              "choices": [
+                "방사선사 0.67mSv — 기타 0.28mSv — 의사 0.25mSv",
+                "의사 0.67mSv — 방사선사 0.28mSv — 기타 0.25mSv",
+                "기타 0.67mSv — 의사 0.28mSv — 방사선사 0.25mSv",
+                "방사선사 0.25mSv — 기타 0.28mSv — 의사 0.67mSv"
+              ],
+              "answer": 0,
+              "explain": "직종별 피폭선량은 방사선사가 0.67mSv로 가장 높았고 기타 0.28mSv, 의사 0.25mSv 순이었다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "2026년부터 달라지는 것으로 알맞은 것은?",
+              "choices": [
+                "주의통보 기준이 분기 5mSv에서 1mSv로 낮아진다",
+                "주의통보 처리 및 조치 기간이 3개월 이상에서 1개월로 단축된다",
+                "통계 연보를 2년에 한 번만 발간한다",
+                "특별교육을 더 이상 하지 않는다"
+              ],
+              "answer": 1,
+              "explain": "2026년부터는 주의통보 처리 및 조치 기간을 3개월 이상에서 1개월로 단축한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "「주의통보」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "분기 피폭선량이 5mSv를 초과한 경우에 하는 통보다",
+                "연간 피폭선량이 0.1mSv 이하인 경우에 하는 통보다",
+                "통계 연보를 발간할 때 모든 종사자에게 보내는 안내다",
+                "직종을 바꿀 때 받아야 하는 허가다"
+              ],
+              "answer": 0,
+              "explain": "고피폭 종사자의 집중 관리를 위해 분기 5mSv를 초과하면 주의통보를 실시한다고 했다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "critical",
+              "q": "이 자료의 서술이 뒷받침하지 않는 주장은?",
+              "choices": [
+                "종사자 수가 7.7배로 늘어난 30년 동안 1인당 연간 평균 피폭선량은 줄었다",
+                "자료는 안전관리 정책의 효과를 확인할 수 있었다고 적었다",
+                "평균 피폭선량이 줄어든 것은 개인 보호장비의 성능이 좋아졌기 때문이다",
+                "2025년 종사자의 70.4%는 개인 피폭선량이 연간 0.1mSv 이하였다"
+              ],
+              "answer": 2,
+              "explain": "자료는 감소 추세에서 정책의 효과를 확인할 수 있었다고만 적었고, 왜 줄었는지의 구체적인 기전은 적혀 있지 않다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "종사자 수가 7.7배로 늘어난 기간에 전체 1인당 평균 피폭선량이 줄었다는 사실과 구간별 분포를 함께 보면 알 수 있는 것은?",
+              "choices": [
+                "새로 늘어난 종사자의 수가 해마다 줄어들었다",
+                "늘어난 종사자 가운데 상당수가 낮은 선량 구간에 들어 있다",
+                "방사선을 쓰는 검사 자체가 사라졌다",
+                "1인당 평균을 계산하는 방법이 2025년에 바뀌었다"
+              ],
+              "answer": 1,
+              "explain": "연간 0.1mSv 이하인 종사자 비율이 15.8%에서 70.4%로 커졌으므로, 늘어난 종사자 상당수가 낮은 구간에 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 주의통보 방식을 우리 반 과제 점검에 옮긴다면 가장 가까운 것은?",
+              "choices": [
+                "학기가 끝난 뒤에 미제출 평균만 내어 반 전체에 알린다",
+                "미제출을 달마다 세어 기준을 넘기면 알리고 되풀이되면 가르친다",
+                "기준을 따로 정하지 않고 그때그때 느낌으로 판단한다",
+                "기준을 넘긴 학생 수만 세어 두고 당사자에게는 학기말에 알린다"
+              ],
+              "answer": 1,
+              "explain": "분기별 누적 관리 → 기준 초과 시 주의통보 → 되풀이된 의료기관 특별교육의 순서를 옮긴 것이다.",
+              "evidencePara": 4
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "industrial-heat-pump",
+      "category": "science",
+      "careers": [
+        "eng",
+        "env"
+      ],
+      "issue": false,
+      "publishedAt": "2026-11-02",
+      "status": "published",
+      "sources": [
+        {
+          "title": "기후에너지환경부 보도자료 — 산업용 히트펌프 기술개발 및 실증 확대… 산업부문 탄소중립 앞당긴다 (2026.10.29)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1902850"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "낮은 열을 끌어올리는 기계",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "히트펌프라는 기계가 있어요. ",
+              "열을 바꾸어 주는 기계예요. ",
+              "공기나 물처럼 ",
+              "온도가 낮은 곳에서 열을 모아요. ",
+              "그 열을 뜨거운 열로 바꿔요. ",
+              "전기는 조금만 써요. ",
+              "그런데 열은 많이 줄 수 있어요."
+            ],
+            [
+              "히트펌프는 쓰는 곳에 따라 ",
+              "크기도 하는 일도 달라요. ",
+              "집에서 쓰는 것은 작아요. ",
+              "방을 따뜻하게 하거나 ",
+              "시원하게 해요. ",
+              "공장에서 쓰는 것은 아주 커요. ",
+              "공장에서 물건을 만들다가 ",
+              "쓰고 버리는 열을 다시 모아요. ",
+              "이렇게 버려지는 열을 ",
+              "폐열이라고 해요. ",
+              "그 열로 ",
+              "물건을 만들 때 쓸 열을 만들어요."
+            ],
+            [
+              "기후에너지환경부는 10월 29일에 ",
+              "토론회를 연다고 알렸어요. ",
+              "공장에서 히트펌프를 더 많이 ",
+              "쓰게 하는 길을 ",
+              "함께 찾는 자리예요. ",
+              "우리 집에도 히트펌프가 있는지 찾아보아요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "히트펌프",
+              "easy": "온도가 낮은 곳에 있는 열을 모아 뜨거운 열로 바꾸어 주는 기계예요."
+            },
+            {
+              "word": "폐열",
+              "easy": "공장에서 물건을 만들다가 쓰고 버리게 되는 열이에요."
+            },
+            {
+              "word": "토론회",
+              "easy": "여러 사람이 모여 생각을 나누는 모임이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "낮은 곳에 있는 열을 모아 뜨거운 열로 바꾸는 기계 이야기",
+                "바람으로 전기를 만드는 이야기",
+                "공장에서 물건을 싸게 파는 이야기",
+                "겨울에 옷을 많이 입는 이야기"
+              ],
+              "answer": 0,
+              "explain": "히트펌프는 온도가 낮은 곳에서 열을 모아 뜨거운 열로 바꾸는 기계라고 했어요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "공장에서 쓰는 히트펌프는 어떤 열을 다시 모으나요?",
+              "choices": [
+                "땅속에서 새로 캐낸 열",
+                "공장에서 물건을 만들다가 쓰고 버리는 열",
+                "사람 몸에서 나오는 열",
+                "전기를 많이 써서 불을 새로 피워 만든 열"
+              ],
+              "answer": 1,
+              "explain": "공장에서 쓰는 히트펌프는 물건을 만들다가 쓰고 버리는 열을 다시 모아요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「토론회」는 무엇인가요?",
+              "choices": [
+                "여러 사람이 모여 함께 노래를 부르는 모임",
+                "여러 사람이 모여 생각을 나누는 모임",
+                "한 사람이 글을 써서 보내는 편지",
+                "기계가 스스로 열을 모으는 일"
+              ],
+              "answer": 1,
+              "explain": "글에서 토론회는 여러 사람이 함께 모여 길을 찾는 자리라고 했어요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "집에서 쓰는 히트펌프와 공장에서 쓰는 히트펌프에 대해 알 수 있는 것은?",
+              "choices": [
+                "둘이 하는 일은 똑같아요",
+                "열을 바꾸는 점은 같지만 크기도 하는 일도 달라요",
+                "공장에서 쓰는 것이 집에서 쓰는 것보다 훨씬 더 작아요",
+                "집에서 쓰는 것은 열을 모으지 않아요"
+              ],
+              "answer": 1,
+              "explain": "집에서 쓰는 것은 작고 방을 다뤄요. 공장에서 쓰는 것은 아주 크고 물건을 만들 때 쓰는 열을 만들어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "히트펌프가 열을 모으기에 알맞은 곳은 어디인가요?",
+              "choices": [
+                "전기를 하나도 쓰지 않는 곳",
+                "온도가 낮아도 열이 있는 공기나 물",
+                "열도 공기도 없는 곳",
+                "이미 아주 뜨거워서 더 올릴 열이 없는 곳"
+              ],
+              "answer": 1,
+              "explain": "히트펌프는 공기나 물처럼 온도가 낮은 곳에서도 열을 모은다고 했어요.",
+              "evidencePara": 0
+            }
+          ]
+        },
+        "L2": {
+          "title": "낮은 온도의 열을 끌어올리는 히트펌프",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "기후에너지환경부가 10월 29일 ",
+              "산업용 히트펌프 토론회를 개최한다고 밝혔다. ",
+              "히트펌프는 공기열, 수열 등 ",
+              "저온의 열원에서 열을 흡수하여 ",
+              "고온의 열을 생산하는 기기다. ",
+              "자료는 이 기기를 ",
+              "열변환 장치라고 적었다. ",
+              "적은 구동 에너지로 ",
+              "보다 많은 에너지를 ",
+              "열의 형태로 공급한다는 뜻이다. ",
+              "자료는 이번 토론회가 ",
+              "국내 산업 현장으로의 ",
+              "보급 확산과 정책적 지원 방안을 ",
+              "모색하기 위해 마련됐다고 적었다."
+            ],
+            [
+              "가정용과 산업용은 용량도 맡는 일도 다르다. ",
+              "가정용 히트펌프는 8~20kW의 소용량이고 냉난방용이다. ",
+              "산업용 히트펌프는 용량이 대규모인 MW급이다. ",
+              "산업공정에서 발생하는 폐열과 ",
+              "미활용 열원을 이용하여 ",
+              "산업공정열을 생산한다. ",
+              "산업공정열은 건조, 화학반응, 가공 등 ",
+              "공정에 필요한 열에너지로 ",
+              "보통 100℃ 이상의 증기다."
+            ],
+            [
+              "2024년 기준으로 산업부문이 ",
+              "국가 온실가스 배출량의 ",
+              "약 38%를 차지하고 있다. ",
+              "산업부문 에너지소비량 중 70% 이상은 ",
+              "열에너지 생산에 사용된다. ",
+              "그래서 화석연료 보일러를 ",
+              "산업용 히트펌프 등으로 교체하는 ",
+              "산업공정의 전기화가 반드시 필요하다고 ",
+              "자료는 적었다. ",
+              "국제에너지기구는 400℃ 이하 산업 공정열의 ",
+              "탈탄소화 전환에서 히트펌프가 ",
+              "핵심적인 역할을 할 것으로 전망했다."
+            ],
+            [
+              "기후에너지환경부와 한국에너지기술평가원은 ",
+              "제지산업의 폐열인 약 38℃를 활용해 ",
+              "100℃ 이상의 고온수를 생산하는 ",
+              "3.5MW급 히트펌프의 ",
+              "기술 개발과 실증을 지원하고 있다. ",
+              "토론회에서 제시된 의견을 바탕으로 ",
+              "연구개발 이행안을 보강할 예정이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "열원",
+              "easy": "열을 내주는 쪽. 히트펌프는 공기나 물처럼 온도가 낮은 열원에서 열을 가져온다.",
+              "hanja": "熱(더울 열)+源(근원 원)"
+            },
+            {
+              "word": "폐열",
+              "easy": "공정에서 쓰고 난 뒤 버려지는 열",
+              "hanja": "廢(폐할 폐)+熱(더울 열)"
+            },
+            {
+              "word": "산업공정열",
+              "easy": "물건을 만드는 공정에 필요한 열. 보통 100℃ 이상의 증기다.",
+              "hanja": "産(낳을 산)+業(업 업)+工(장인 공)+程(한도 정)+熱(더울 열)"
+            },
+            {
+              "word": "전기화",
+              "easy": "연료를 태워 얻던 것을 전기로 움직이는 쪽으로 바꾸는 일",
+              "hanja": "電(번개 전)+氣(기운 기)+化(될 화)"
+            }
+          ],
+          "en": [
+            "The Ministry of Climate, Energy and Environment made an announcement. It will hold a meeting about industrial heat pumps on October 29. A heat pump takes heat from cool air or water. Then it makes hot heat from that low heat. The paper calls this machine a heat conversion device. It uses only a little electric power. But it gives back more energy as heat. The paper says the meeting was arranged to spread the machines in Korea and to support them through policy.",
+            "A home heat pump and an industrial heat pump differ in capacity and in job. A home heat pump is small. Its size is 8 to 20 kilowatts. People use it to warm and cool rooms. An industrial heat pump is much bigger. Its size is in megawatts. It uses waste heat from factory work. It also uses heat that nobody uses yet. With this heat it makes industrial process heat. That heat is usually steam of 100 degrees Celsius or more.",
+            "In 2024 industry made about 38 percent of the country’s greenhouse gases. More than 70 percent of its energy went to making heat. So the paper says that to cut greenhouse gases from industry, the electrification of industrial processes is essential, replacing fossil fuel boilers with industrial heat pumps and the like. The International Energy Agency gave a forecast. It said heat pumps will be a key part. That is for process heat of 400 degrees Celsius or less.",
+            "The ministry and 한국에너지기술평가원 support a test project. The project uses waste heat from the paper industry. That waste heat is about 38 degrees Celsius. The machine makes hot water of 100 degrees Celsius or more. Its size is in the 3.5-megawatt class. The ministry will use the opinions raised at the meeting to make its research plan stronger."
+          ],
+          "envocab": [
+            {
+              "word": "heat pump",
+              "ko": "히트펌프 (명사구)",
+              "base": "heat [hiːt] + pump [pʌmp]"
+            },
+            {
+              "word": "waste heat",
+              "ko": "폐열 (명사구)",
+              "base": "waste [weɪst] + heat [hiːt]"
+            },
+            {
+              "word": "steam",
+              "ko": "증기 (명사)",
+              "base": "steam [stiːm]"
+            },
+            {
+              "word": "megawatts",
+              "ko": "메가와트 (명사)",
+              "base": "megawatt [ˈmeɡəwɑːt]"
+            },
+            {
+              "word": "greenhouse gases",
+              "ko": "온실가스 (명사구)",
+              "base": "greenhouse [ˈɡriːnhaʊs] + gas [ɡæs]"
+            },
+            {
+              "word": "forecast",
+              "ko": "전망, 예측 (명사)",
+              "base": "forecast [ˈfɔːrkæst]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "히트펌프는 전기를 만들어 내는 장치다",
+                "낮은 온도의 열을 끌어올려 쓰는 히트펌프를 산업 현장에 넓히는 길을 찾고 있다",
+                "공장이 열을 쓰지 않도록 생산을 멈추기로 했다",
+                "가정용 히트펌프를 공장에서 그대로 쓰기로 했다"
+              ],
+              "answer": 1,
+              "explain": "히트펌프는 저온의 열원에서 열을 흡수해 고온의 열을 만드는 기기이고, 기후에너지환경부는 산업용 히트펌프 토론회를 개최한다고 밝혔다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "가정용 히트펌프와 산업용 히트펌프의 차이로 알맞은 것은?",
+              "choices": [
+                "가정용은 8~20kW의 소용량 냉난방용이고, 산업용은 용량이 대규모인 MW급이다",
+                "가정용만 전기를 쓰고 산업용은 전기를 쓰지 않는다",
+                "가정용이 폐열을 쓰고 산업용은 공기열만 쓴다",
+                "둘 다 100℃ 이상의 증기를 만든다"
+              ],
+              "answer": 0,
+              "explain": "가정용은 8~20kW의 소용량이고 냉난방용이며, 산업용은 용량이 대규모인 MW급이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「산업공정열」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "가정용 히트펌프가 방을 냉난방할 때 쓰는 8~20kW의 소용량 열을 가리킨다",
+                "건조, 화학반응, 가공 등 공정에 필요한 열로 보통 100℃ 이상의 증기다",
+                "공장에서 버려지는 열만 가리킨다",
+                "전기를 만들 때 생기는 열이다"
+              ],
+              "answer": 1,
+              "explain": "산업공정열은 건조, 화학반응, 가공 등 공정에 필요한 열에너지로 보통 100℃ 이상의 증기다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "글에 적힌 수치를 바르게 옮긴 것은?",
+              "choices": [
+                "2024년 기준으로 산업부문이 국가 온실가스 배출량의 약 38%를 차지한다",
+                "2024년 기준으로 산업부문 에너지소비량의 약 38%가 열에너지 생산에 쓰인다",
+                "산업부문이 국가 온실가스 배출량의 70%를 차지한다",
+                "제지산업의 폐열은 약 100℃다"
+              ],
+              "answer": 0,
+              "explain": "2024년 기준 산업부문은 국가 온실가스 배출량의 약 38%를 차지하고, 산업부문 에너지소비량 중 70% 이상이 열에너지 생산에 쓰인다. 제지산업의 폐열은 약 38℃다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "자료가 히트펌프를 「열변환 장치」라고 적은 까닭으로 알맞은 것은?",
+              "choices": [
+                "공기열과 수열을 쓰지 않고 열을 처음부터 새로 만들어 내기 때문이다",
+                "저온의 열원에서 열을 흡수해 고온의 열로 바꾸어 공급하기 때문이다",
+                "전기를 열로 바꾸어 땅속에 저장하기 때문이다",
+                "열을 식혀서 전기로 바꾸기 때문이다"
+              ],
+              "answer": 1,
+              "explain": "히트펌프는 저온의 열원에서 열을 흡수하여 고온의 열을 생산하고, 적은 구동 에너지로 보다 많은 에너지를 열의 형태로 공급한다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "apply",
+              "q": "폐열이 많이 나오는 공장에 산업용 히트펌프를 놓는다면 기대할 수 있는 일은?",
+              "choices": [
+                "공장이 열을 아예 쓰지 않게 된다",
+                "버려지던 열을 끌어올려 공정에 쓰는 열을 만들 수 있다",
+                "구동 에너지를 전혀 쓰지 않고도 100℃ 이상의 증기를 얻을 수 있다",
+                "공장의 온실가스가 저절로 모두 사라진다"
+              ],
+              "answer": 1,
+              "explain": "산업용 히트펌프는 산업공정에서 발생하는 폐열과 미활용 열원을 이용하여 산업공정열을 생산한다. 다만 구동 에너지는 든다.",
+              "evidencePara": 1
+            }
+          ],
+          "enseg": [
+            [
+              "The Ministry of Climate, ",
+              "Energy and Environment made an announcement. ",
+              "It will hold a meeting ",
+              "about industrial heat pumps ",
+              "on October 29. ",
+              "A heat pump takes heat ",
+              "from cool air ",
+              "or water. ",
+              "Then it makes hot heat ",
+              "from that low heat. ",
+              "The paper calls this machine ",
+              "a heat conversion device. ",
+              "It uses only a little electric power. ",
+              "But it gives back more energy as heat. ",
+              "The paper says the meeting ",
+              "was arranged to spread the machines ",
+              "in Korea ",
+              "and to support them ",
+              "through policy."
+            ],
+            [
+              "A home heat pump ",
+              "and an industrial heat pump differ ",
+              "in capacity and in job. ",
+              "A home heat pump is small. ",
+              "Its size is 8 to 20 kilowatts. ",
+              "People use it ",
+              "to warm and cool rooms. ",
+              "An industrial heat pump is much bigger. ",
+              "Its size is ",
+              "in megawatts. ",
+              "It uses waste heat ",
+              "from factory work. ",
+              "It also uses heat ",
+              "that nobody uses yet. ",
+              "With this heat it makes industrial process heat. ",
+              "That heat is usually steam ",
+              "of 100 degrees Celsius ",
+              "or more."
+            ],
+            [
+              "In 2024 industry made ",
+              "about 38 percent ",
+              "of the country’s greenhouse gases. ",
+              "More than 70 percent ",
+              "of its energy went ",
+              "to making heat. ",
+              "So the paper says ",
+              "that to cut greenhouse gases ",
+              "from industry, ",
+              "the electrification ",
+              "of industrial processes is essential, ",
+              "replacing fossil fuel boilers ",
+              "with industrial heat pumps ",
+              "and the like. ",
+              "The International Energy Agency gave ",
+              "a forecast. ",
+              "It said heat pumps will be ",
+              "a key part. ",
+              "That is for process heat ",
+              "of 400 degrees Celsius ",
+              "or less."
+            ],
+            [
+              "The ministry and 한국에너지기술평가원 support a test project. ",
+              "The project uses waste heat ",
+              "from the paper industry. ",
+              "That waste heat is ",
+              "about 38 degrees Celsius. ",
+              "The machine makes hot water ",
+              "of 100 degrees Celsius ",
+              "or more. ",
+              "Its size is ",
+              "in the 3.5-megawatt class. ",
+              "The ministry will use the opinions ",
+              "raised at the meeting ",
+              "to make its research plan stronger."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "버려지던 열을 공정의 열로",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "기후에너지환경부는 10월 29일 오전 ",
+              "한강홍수통제소에서 산업계와 연구기관, ",
+              "에너지 전문가들과 함께 ",
+              "산업용 히트펌프 기술개발 및 활용 토론회를 ",
+              "개최한다고 밝혔다. ",
+              "자료에는 이번 토론회가 ",
+              "산업용 히트펌프의 국내외 기술 동향을 살펴보고, ",
+              "국내 보급 확산과 정책적 지원 방안을 ",
+              "모색하기 위해 마련됐다고 적혀 있다."
+            ],
+            [
+              "히트펌프는 공기열, 수열 등 ",
+              "저온의 열원에서 열을 흡수하여 ",
+              "고온의 열을 생산하는 기기다. ",
+              "자료는 적은 구동 에너지를 이용하여 ",
+              "보다 많은 에너지를 ",
+              "열의 형태로 공급하는 열변환 장치라고 설명했다. ",
+              "이미 저온으로 있는 열을 끌어올려, ",
+              "들인 구동 에너지보다 ",
+              "더 많은 에너지를 ",
+              "열의 형태로 내준다는 뜻이다."
+            ],
+            [
+              "가정용과 산업용은 용량도 맡는 일도 다르다. ",
+              "가정용 히트펌프는 8~20kW의 소용량이고 용도는 냉난방이다. ",
+              "산업용 히트펌프는 용량이 대규모인 MW급이며, ",
+              "산업공정에서 발생하는 폐열과 미활용 열원을 이용하여 ",
+              "산업공정열을 생산한다. ",
+              "산업공정열은 제품제조를 위한 ",
+              "건조, 화학반응, 가공 등 ",
+              "공정에 필요한 열에너지로 ",
+              "보통 100℃ 이상의 증기다."
+            ],
+            [
+              "2024년 기준으로 산업부문이 ",
+              "국가 온실가스 배출량의 ",
+              "약 38%를 차지하고 있으며, ",
+              "산업부문 에너지소비량 중 70% 이상은 ",
+              "열에너지 생산에 사용된다. ",
+              "자료는 산업부문 온실가스 감축을 위해서는 ",
+              "화석연료 보일러를 산업용 히트펌프 등으로 교체하는 ",
+              "산업공정의 전기화가 반드시 필요하다고 적었다. ",
+              "국제에너지기구는 400℃ 이하 산업 공정열의 ",
+              "탈탄소화 전환에 있어 히트펌프가 ",
+              "핵심적인 역할을 할 것으로 전망했고, ",
+              "국제재생에너지기구는 산업 부문 히트펌프 보급 동력이 ",
+              "2050년 8,000만 대 수준으로 ",
+              "성장할 것으로 내다봤다."
+            ],
+            [
+              "기후에너지환경부와 한국에너지기술평가원은 ",
+              "제지산업의 폐열인 약 38℃를 활용해 ",
+              "100℃ 이상의 고온수를 생산하는 ",
+              "3.5MW급의 대용량·대온도차 히트펌프 ",
+              "핵심기술 개발과 실증을 지원하고 있다. ",
+              "또한 180℃ 이상 고온의 증기를 생산하는 ",
+              "요소기술 및 시스템 개발 등 ",
+              "기술 고도화에 중점을 두고 ",
+              "연구개발을 추진 중이다. ",
+              "토론회에서 제시된 의견을 바탕으로 ",
+              "연구개발 이행안을 보강할 예정이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "열변환",
+              "easy": "열을 다른 온도의 열로 바꾸어 내주는 일",
+              "hanja": "熱(더울 열)+變(변할 변)+換(바꿀 환)"
+            },
+            {
+              "word": "저온",
+              "easy": "온도가 낮은 상태",
+              "hanja": "低(낮을 저)+溫(따뜻할 온)"
+            },
+            {
+              "word": "미활용",
+              "easy": "있는데도 아직 쓰이지 않고 있는 것",
+              "hanja": "未(아닐 미)+活(살 활)+用(쓸 용)"
+            },
+            {
+              "word": "산업공정열",
+              "easy": "제품을 만드는 공정에 필요한 열에너지. 보통 100℃ 이상의 증기다.",
+              "hanja": "産(낳을 산)+業(업 업)+工(장인 공)+程(한도 정)+熱(더울 열)"
+            },
+            {
+              "word": "전기화",
+              "easy": "연료를 태워 얻던 일을 전기로 움직이는 쪽으로 바꾸는 일",
+              "hanja": "電(번개 전)+氣(기운 기)+化(될 화)"
+            }
+          ],
+          "en": [
+            "On the morning of October 29 the Ministry of Climate, Energy and Environment said it would hold a discussion meeting on the technology development and use of industrial heat pumps, at 한강홍수통제소 (the Han River Flood Control Office), together with industry, research institutes and energy experts. The ministry paper says the meeting was arranged to look at technology trends at home and abroad, and to look for ways to spread the machines in Korea and to support them through policy.",
+            "A heat pump absorbs heat from a low-temperature heat source such as air heat or water heat, and produces high-temperature heat. The paper describes it as a heat conversion device that uses a small amount of driving energy and supplies a larger amount of energy in the form of heat. In other words, it supplies more energy as heat than the driving energy it uses, by lifting heat that is already there at a low temperature.",
+            "A household heat pump and an industrial heat pump differ in capacity and in job. A household heat pump is a small-capacity machine of 8 to 20 kilowatts, used for heating and cooling. An industrial heat pump has a large capacity in the megawatt class, and it uses waste heat and unused heat sources from industrial processes to produce industrial process heat. Industrial process heat is the heat energy needed for processes such as drying, chemical reaction and machining, and it is usually steam of 100 degrees Celsius or more.",
+            "As of 2024, industry accounts for about 38 percent of the greenhouse gas emissions of the country, and more than 70 percent of the energy that industry consumes is used to produce heat energy. The paper says that cutting greenhouse gases from industry makes the electrification of industrial processes essential, by replacing fossil fuel boilers with industrial heat pumps and the like. The International Energy Agency forecast that heat pumps would play a key role in the decarbonization of industrial process heat of 400 degrees Celsius or less, and the International Renewable Energy Agency expected the drive to deploy heat pumps in industry to grow to a level of 80 million units by 2050.",
+            "The ministry and 한국에너지기술평가원 are supporting the development and demonstration of core technology for a 3.5-megawatt-class heat pump with a large capacity and a large temperature difference, which uses waste heat of about 38 degrees Celsius from the paper industry to produce hot water of 100 degrees Celsius or more. Research also focuses on raising the level of element technology and systems that produce steam of 180 degrees Celsius or more. The ministry plans to strengthen its research and development road map with the opinions raised at the meeting."
+          ],
+          "envocab": [
+            {
+              "word": "heat source",
+              "ko": "열원 (명사구)",
+              "base": "heat [hiːt] + source [sɔːrs]"
+            },
+            {
+              "word": "waste heat",
+              "ko": "폐열 (명사구)",
+              "base": "waste [weɪst] + heat [hiːt]"
+            },
+            {
+              "word": "capacity",
+              "ko": "용량 (명사)",
+              "base": "capacity [kəˈpæsəti]"
+            },
+            {
+              "word": "emissions",
+              "ko": "배출량 (명사)",
+              "base": "emission [ɪˈmɪʃn]"
+            },
+            {
+              "word": "demonstration",
+              "ko": "실증 (명사)",
+              "base": "demonstration [ˌdemənˈstreɪʃn]"
+            },
+            {
+              "word": "road map",
+              "ko": "이행안, 로드맵 (명사구)",
+              "base": "road [roʊd] + map [mæp]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "히트펌프는 화석연료를 태워 고온의 증기를 만드는 기기다",
+                "산업용 히트펌프의 보급 확산과 정책적 지원 방안을 모색하는 논의가 열린다",
+                "산업부문의 온실가스 배출량이 2024년에 처음으로 줄었다",
+                "가정용 히트펌프의 용량을 MW급으로 키우기로 했다"
+              ],
+              "answer": 1,
+              "explain": "자료는 산업용 히트펌프의 기술 동향을 살펴보고 국내 보급 확산과 정책적 지원 방안을 모색하기 위해 토론회가 마련됐다고 적었다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "가정용과 산업용 히트펌프에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "가정용은 8~20kW의 소용량 냉난방용이고, 산업용은 MW급으로 산업공정열을 생산한다",
+                "가정용과 산업용이 모두 8~20kW의 소용량이고, 용도는 둘 다 산업공정열 생산으로 같다",
+                "산업용은 공기열만 쓰고 폐열은 쓰지 않는다",
+                "가정용도 보통 100℃ 이상의 증기를 만든다"
+              ],
+              "answer": 0,
+              "explain": "가정용과 산업용은 용량도 맡는 일도 다르다. 가정용은 8~20kW 소용량 냉난방용, 산업용은 MW급으로 폐열과 미활용 열원을 써서 산업공정열을 생산한다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "이 글에서 「전기화」가 가리키는 것은?",
+              "choices": [
+                "화석연료 보일러를 그대로 두고 공장에 전깃줄만 새로 놓아 전기를 더 많이 끌어오는 일",
+                "화석연료 보일러를 산업용 히트펌프 등으로 교체해 공정의 열을 얻는 방식을 바꾸는 일",
+                "전기를 아껴 쓰도록 요금을 올리는 일",
+                "공장의 열에너지를 전기로 바꾸어 되파는 일"
+              ],
+              "answer": 1,
+              "explain": "자료는 화석연료 보일러를 산업용 히트펌프 등으로 교체하는 산업공정의 전기화가 반드시 필요하다고 적었다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "국제기구의 전망을 바르게 옮긴 것은?",
+              "choices": [
+                "국제에너지기구는 2050년에 히트펌프가 8,000만 대로 늘어난다고 확정했다",
+                "국제재생에너지기구는 400℃ 이하 공정열에서 히트펌프가 핵심 역할을 한다고 전망했다",
+                "국제에너지기구는 400℃ 이하 산업 공정열의 탈탄소화 전환에서 히트펌프가 핵심적인 역할을 할 것으로 전망했다",
+                "두 기구 모두 산업부문 배출량이 약 38%까지 줄어든다고 내다봤다"
+              ],
+              "answer": 2,
+              "explain": "400℃ 이하 공정열의 전망은 국제에너지기구, 2050년 8,000만 대 수준은 국제재생에너지기구가 내놓은 것이다. 둘 다 전망이지 확정된 수치가 아니다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "히트펌프가 열원이 저온인 곳에서도 쓰일 수 있다고 볼 수 있는 까닭은?",
+              "choices": [
+                "구동 에너지를 전혀 쓰지 않기 때문이다",
+                "이미 저온으로 있는 열원에서 열을 흡수해 고온의 열로 바꾸어 공급하기 때문이다",
+                "열을 만들지 않고 공기만 식히기 때문이다",
+                "공기열도 수열도 없는 곳에서 구동 에너지만으로 열을 처음부터 새로 만들어 내기 때문이다"
+              ],
+              "answer": 1,
+              "explain": "히트펌프는 공기열, 수열 등 저온의 열원에서 열을 흡수하여 고온의 열을 생산하는 기기다. 그래서 열원의 온도가 낮아도 그 열을 받아 쓸 수 있다. 다만 적은 구동 에너지는 쓴다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "글을 근거로 산업용 히트펌프를 들이기에 알맞은 곳을 고르면?",
+              "choices": [
+                "건조도 화학반응도 없이 전기만 쓰고 폐열이 전혀 나오지 않는 작은 사무실",
+                "건조와 화학반응에 100℃ 이상의 증기를 쓰면서 폐열이 나오는 공장",
+                "냉난방만 필요한 작은 주택",
+                "공기열도 수열도 전혀 없는 곳"
+              ],
+              "answer": 1,
+              "explain": "산업용 히트펌프는 산업공정에서 발생하는 폐열과 미활용 열원으로 보통 100℃ 이상의 증기인 산업공정열을 생산한다.",
+              "evidencePara": 2
+            }
+          ],
+          "enseg": [
+            [
+              "On the morning ",
+              "of October 29 the Ministry ",
+              "of Climate, Energy ",
+              "and Environment said it would hold ",
+              "a discussion meeting ",
+              "on the technology development ",
+              "and use of industrial heat pumps, ",
+              "at 한강홍수통제소 ",
+              "(the Han River Flood Control Office), ",
+              "together with industry, ",
+              "research institutes and energy experts. ",
+              "The ministry paper ",
+              "says the meeting was arranged ",
+              "to look at technology trends ",
+              "at home and abroad, ",
+              "and to look ",
+              "for ways to spread the machines ",
+              "in Korea ",
+              "and to support them ",
+              "through policy."
+            ],
+            [
+              "A heat pump ",
+              "absorbs heat from a low-temperature heat source ",
+              "such as air heat ",
+              "or water heat, ",
+              "and produces high-temperature heat. ",
+              "The paper describes it as a heat conversion ",
+              "device that uses a small amount ",
+              "of driving energy ",
+              "and supplies a larger amount ",
+              "of energy in the form ",
+              "of heat. ",
+              "In other words, ",
+              "it supplies more energy as heat ",
+              "than the driving energy it uses, ",
+              "by lifting heat ",
+              "that is already there ",
+              "at a low temperature."
+            ],
+            [
+              "A household heat pump ",
+              "and an industrial heat pump differ ",
+              "in capacity ",
+              "and in job. ",
+              "A household heat pump is ",
+              "a small-capacity machine ",
+              "of 8 to 20 kilowatts, used ",
+              "for heating and cooling. ",
+              "An industrial heat pump has ",
+              "a large capacity in the megawatt class, ",
+              "and it uses waste heat ",
+              "and unused heat sources ",
+              "from industrial processes ",
+              "to produce industrial process heat. ",
+              "Industrial process heat is ",
+              "the heat energy needed for processes ",
+              "such as drying, ",
+              "chemical reaction and machining, ",
+              "and it is usually steam ",
+              "of 100 degrees Celsius ",
+              "or more."
+            ],
+            [
+              "As of 2024, ",
+              "industry accounts ",
+              "for about 38 percent ",
+              "of the greenhouse gas emissions ",
+              "of the country, ",
+              "and more than 70 percent ",
+              "of the energy that industry consumes ",
+              "is used to produce heat energy. ",
+              "The paper says ",
+              "that cutting greenhouse gases ",
+              "from industry makes the electrification ",
+              "of industrial processes essential, ",
+              "by replacing fossil fuel boilers ",
+              "with industrial heat pumps ",
+              "and the like. ",
+              "The International Energy Agency ",
+              "forecast that heat pumps would play ",
+              "a key role ",
+              "in the decarbonization ",
+              "of industrial process heat ",
+              "of 400 degrees Celsius ",
+              "or less, and the International Renewable Energy Agency ",
+              "expected the drive ",
+              "to deploy heat pumps ",
+              "in industry to grow ",
+              "to a level ",
+              "of 80 million units ",
+              "by 2050."
+            ],
+            [
+              "The ministry and 한국에너지기술평가원 are supporting ",
+              "the development and demonstration ",
+              "of core technology ",
+              "for a 3.5-megawatt-class heat pump ",
+              "with a large capacity ",
+              "and a large temperature difference, ",
+              "which uses waste heat ",
+              "of about 38 degrees Celsius ",
+              "from the paper industry ",
+              "to produce hot water ",
+              "of 100 degrees Celsius ",
+              "or more. ",
+              "Research also focuses ",
+              "on raising the level ",
+              "of element technology ",
+              "and systems that produce steam ",
+              "of 180 degrees Celsius ",
+              "or more. ",
+              "The ministry plans ",
+              "to strengthen its research ",
+              "and development road map ",
+              "with the opinions raised ",
+              "at the meeting."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "저온의 열을 끌어올리는 장치",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "기후에너지환경부는 10월 29일 오전 한강홍수통제소에서 ",
+              "산업계, 연구기관 및 에너지 전문가들과 함께 ",
+              "산업계 열에너지 탈탄소 전환을 위한 ",
+              "산업용 히트펌프 기술개발 및 활용 토론회를 ",
+              "개최한다고 밝혔다. ",
+              "자료에는 이번 토론회가 ",
+              "산업부문 탈탄소화의 핵심 수단으로 주목받고 있는 ",
+              "산업용 히트펌프의 국내외 기술 동향을 살펴보고, ",
+              "국내 보급 확산과 정책적 지원 방안을 ",
+              "모색하기 위해 마련됐다고 적혀 있다."
+            ],
+            [
+              "자료는 이 장치의 작동을 ",
+              "한 문장으로 풀어 두었다. ",
+              "공기열, 수열 등 저온의 열원에서 ",
+              "열을 흡수하여 고온의 열을 생산하는 기기로, ",
+              "적은 구동 에너지를 이용하여 ",
+              "보다 많은 에너지를 열의 형태로 공급하는 ",
+              "열변환 장치다. ",
+              "이미 저온으로 있는 열을 끌어올려, ",
+              "들인 구동 에너지보다 ",
+              "더 많은 에너지를 ",
+              "열의 형태로 내준다는 뜻이다."
+            ],
+            [
+              "가정용과 산업용은 용량도 맡는 일도 다르다. ",
+              "가정용 히트펌프는 8~20kW의 소용량이고 용도는 냉난방이다. ",
+              "산업용 히트펌프는 용량이 대규모인 MW급이며, ",
+              "산업공정에서 발생하는 폐열과 미활용 열원을 이용하여 ",
+              "산업공정열을 생산한다. ",
+              "산업공정열은 제품제조를 위한 ",
+              "건조, 화학반응, 가공 등 ",
+              "공정에 필요한 열에너지로 ",
+              "보통 100℃ 이상의 증기를 가리킨다. ",
+              "제지공장에서 종이를 성형해서 건조할 때 쓰는 ",
+              "고온·고압의 증기가 그 예로 적혀 있다. ",
+              "집에서는 방의 온도를 다루던 장치가 ",
+              "공장에서는 제품을 만드는 공정의 열을 맡는 셈이다."
+            ],
+            [
+              "공장의 열이 문제로 꼽히는 까닭은 ",
+              "두 수치에 있다. ",
+              "2024년 기준으로 산업부문이 ",
+              "국가 온실가스 배출량의 약 38%를 차지하고 있으며, ",
+              "산업부문 에너지소비량 중 70% 이상은 ",
+              "열에너지 생산에 사용된다. ",
+              "자료는 산업부문 온실가스 감축을 위해서는 ",
+              "화석연료 보일러를 산업용 히트펌프 등으로 교체하는 ",
+              "산업공정의 전기화가 반드시 필요하다고 적었다."
+            ],
+            [
+              "국제기구의 전망도 함께 실렸다. ",
+              "국제에너지기구는 400℃ 이하 산업 공정열의 ",
+              "탈탄소화 전환에 있어 히트펌프가 ",
+              "핵심적인 역할을 할 것으로 전망했다. ",
+              "국제재생에너지기구는 산업 부문 히트펌프 보급 동력이 ",
+              "2050년 8,000만 대 수준으로 ",
+              "성장할 것으로 내다봤다."
+            ],
+            [
+              "기후에너지환경부와 한국에너지기술평가원은 ",
+              "제지산업의 폐열인 약 38℃를 활용해 ",
+              "100℃ 이상의 고온수를 생산하는 ",
+              "3.5MW급의 대용량·대온도차 히트펌프 핵심기술 개발 및 ",
+              "실증을 통한 운영기술 개발을 지원하고 있다. ",
+              "또한 180℃ 이상 고온의 증기를 생산하는 ",
+              "요소기술 및 시스템 개발 등 ",
+              "기술 고도화에 중점을 두고 ",
+              "연구개발을 추진 중이다. ",
+              "김성환 기후에너지환경부 장관은 ",
+              "산업 부문의 탄소중립과 에너지 절감을 ",
+              "동시에 달성하기 위해서는 ",
+              "고온 히트펌프의 기술개발이 필수적이라고 밝혔다. ",
+              "기후에너지환경부는 이번 토론회에서 제시된 의견을 바탕으로 ",
+              "연구개발 이행안을 보강하고, ",
+              "산업공정의 탄소 감축 경로와 ",
+              "열에너지 전환 지원방안을 구체화해 나갈 예정이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "열변환",
+              "easy": "열을 다른 온도의 열로 바꾸어 내주는 일",
+              "hanja": "熱(더울 열)+變(변할 변)+換(바꿀 환)"
+            },
+            {
+              "word": "구동 에너지",
+              "easy": "장치를 움직이게 하는 데 들어가는 에너지. 히트펌프에서는 전기 등이다.",
+              "hanja": "驅(몰 구)+動(움직일 동)"
+            },
+            {
+              "word": "미활용 열원",
+              "easy": "있는데도 아직 쓰이지 않고 있는 열의 출처",
+              "hanja": "未(아닐 미)+活(살 활)+用(쓸 용)+熱(더울 열)+源(근원 원)"
+            },
+            {
+              "word": "탈탄소화",
+              "easy": "쓰던 화석연료를 줄여 탄소 배출에서 벗어나는 쪽으로 바꾸는 일",
+              "hanja": "脫(벗을 탈)+炭(숯 탄)+素(본디 소)+化(될 화)"
+            },
+            {
+              "word": "고도화",
+              "easy": "수준을 한 단계 더 높이는 일",
+              "hanja": "高(높을 고)+度(법도 도)+化(될 화)"
+            }
+          ],
+          "en": [
+            "On the morning of October 29 the Ministry of Climate, Energy and Environment said it would hold 산업계 열에너지 탈탄소 전환을 위한 산업용 히트펌프 기술개발 및 활용 토론회 (a discussion meeting on developing and using industrial heat pumps for the decarbonization of heat energy in industry) at 한강홍수통제소 (the Han River Flood Control Office), together with industry, research institutes and energy experts. The ministry paper states that the meeting was arranged to review technology trends at home and abroad for industrial heat pumps, which are drawing attention as a core means of decarbonizing the industrial sector, and to look for ways to spread them in Korea and to support them through policy.",
+            "The paper sets out how the device works in a single sentence. It is a machine that absorbs heat from a low-temperature heat source such as air heat or water heat and produces high-temperature heat. It is a heat conversion device that uses a small amount of driving energy and supplies a larger amount of energy in the form of heat. In other words, it supplies more energy as heat than the driving energy it uses, by lifting heat that is already there at a low temperature.",
+            "A household heat pump and an industrial heat pump differ in capacity and in job. A household heat pump has a small capacity of 8 to 20 kilowatts and is used for heating and cooling. An industrial heat pump has a large capacity in the megawatt class, and it produces industrial process heat using waste heat and unused heat sources that arise in industrial processes. Industrial process heat means the heat energy needed for processes such as drying, chemical reaction and machining in making products, and it usually means steam of 100 degrees Celsius or more. The paper gives as an example the high-temperature, high-pressure steam used in a paper mill when paper is formed and dried. In effect, the machine that handles the temperature of a room at home takes charge of process heat in a factory.",
+            "The reason factory heat is singled out lies in these two figures. As of 2024, industry accounts for about 38 percent of the greenhouse gas emissions of the country, and more than 70 percent of the energy that industry consumes is used to produce heat energy. The paper states that cutting greenhouse gases from industry makes the electrification of industrial processes essential, by replacing fossil fuel boilers with industrial heat pumps and the like.",
+            "Forecasts by international organizations are included as well. The International Energy Agency forecast that heat pumps would play a key role in the decarbonization of industrial process heat of 400 degrees Celsius or less. The International Renewable Energy Agency expected the drive to deploy heat pumps in the industrial sector to grow to a level of 80 million units by 2050.",
+            "The ministry and 한국에너지기술평가원 are supporting the development of core technology for a 3.5-megawatt-class heat pump with a large capacity and a large temperature difference, which uses waste heat of about 38 degrees Celsius from the paper industry to produce hot water of 100 degrees Celsius or more, and the development of operating technology through demonstration. Research and development also focuses on advancing element technology and systems that produce steam of 180 degrees Celsius or more. Minister 김성환 said that developing high-temperature heat pump technology is essential if the industrial sector is to achieve carbon neutrality and energy saving at the same time. The ministry plans to strengthen its research and development road map with the opinions raised at the meeting, and to work out carbon reduction paths for industrial processes and ways to support the transition of heat energy."
+          ],
+          "envocab": [
+            {
+              "word": "driving energy",
+              "ko": "구동 에너지 (명사구)",
+              "base": "drive [draɪv] + energy [ˈenərdʒi]"
+            },
+            {
+              "word": "heat conversion device",
+              "ko": "열변환 장치 (명사구)",
+              "base": "conversion [kənˈvɜːrʒn] + device [dɪˈvaɪs]"
+            },
+            {
+              "word": "electrification",
+              "ko": "전기화 (명사)",
+              "base": "electrify [ɪˈlektrɪfaɪ]"
+            },
+            {
+              "word": "carbon neutrality",
+              "ko": "탄소중립 (명사구)",
+              "base": "carbon [ˈkɑːrbən] + neutrality [nuːˈtræləti]"
+            },
+            {
+              "word": "decarbonization",
+              "ko": "탈탄소화 (명사)",
+              "base": "decarbonize [diːˈkɑːrbənaɪz]"
+            },
+            {
+              "word": "demonstration",
+              "ko": "실증 (명사)",
+              "base": "demonstration [ˌdemənˈstreɪʃn]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "산업공정의 전기화 대신 화석연료 보일러를 더 늘리는 방안을 모색한다",
+                "산업용 히트펌프를 가정용과 같은 용량으로 맞추기로 했다",
+                "산업용 히트펌프의 보급 확산과 정책적 지원 방안을 모색한다",
+                "산업부문의 열 수요가 2024년부터 사라지고 있다"
+              ],
+              "answer": 2,
+              "explain": "자료에는 이번 토론회가 산업용 히트펌프의 국내외 기술 동향을 살펴보고, 국내 보급 확산과 정책적 지원 방안을 모색하기 위해 마련됐다고 적혀 있다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "가정용과 산업용 히트펌프의 차이에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "가정용은 소용량 냉난방용, 산업용은 MW급 산업공정열용이다",
+                "가정용은 MW급 소용량이고 산업용은 8~20kW로 산업공정열을 생산한다",
+                "가정용도 산업용과 같은 MW급 용량으로 산업공정열을 만든다",
+                "가정용도 180℃ 이상의 증기를 생산한다"
+              ],
+              "answer": 0,
+              "explain": "가정용과 산업용은 용량도 맡는 일도 다르다. 가정용은 8~20kW 소용량 냉난방용, 산업용은 MW급으로 폐열·미활용 열원을 써서 산업공정열을 만든다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "자료가 히트펌프를 「열변환 장치」라고 적은 뜻에 가장 가까운 것은?",
+              "choices": [
+                "열을 전기로 바꾸어 저장하는 장치다",
+                "적은 구동 에너지로 저온의 열을 흡수해 더 많은 에너지를 열의 형태로 공급하는 장치다",
+                "열을 식혀 공기를 차게 만드는 일만 하는 장치다",
+                "연료를 태워 열을 처음부터 만들어 내는 장치다"
+              ],
+              "answer": 1,
+              "explain": "자료는 적은 구동 에너지를 이용하여 보다 많은 에너지를 열의 형태로 공급하는 열변환 장치라고 적었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "산업부문의 열에 대해 자료가 적은 수치는?",
+              "choices": [
+                "2024년을 기준으로 산업부문은 국가 온실가스 배출량의 약 70%를 차지하고, 에너지소비량 중 38% 이상이 열에너지 생산에 사용된다",
+                "산업부문 에너지소비량 중 70% 이상이 전기 생산에 사용된다",
+                "2024년 기준 산업부문은 국가 온실가스 배출량의 약 38%를 차지하고, 에너지소비량 중 70% 이상이 열에너지 생산에 사용된다",
+                "산업부문 에너지소비량의 전부가 열에너지 생산에 사용된다"
+              ],
+              "answer": 2,
+              "explain": "2024년 기준으로 산업부문이 국가 온실가스 배출량의 약 38%를 차지하고, 산업부문 에너지소비량 중 70% 이상은 열에너지 생산에 사용된다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "이 글을 읽고 할 수 있는 판단으로 가장 알맞은 것은?",
+              "choices": [
+                "산업용 히트펌프를 들이면 산업부문 배출량이 약 38%만큼 줄어든다",
+                "2050년에 산업 부문 히트펌프가 8,000만 대로 늘어난 것이 이미 확인됐다",
+                "400℃를 넘는 공정열까지 히트펌프가 대신한다고 글은 말하고 있다",
+                "두 기구가 내놓은 것은 모두 전망이므로 이미 이루어진 결과로 읽을 수 없다"
+              ],
+              "answer": 3,
+              "explain": "국제에너지기구는 400℃ 이하 공정열에서 히트펌프의 역할을 전망했고, 국제재생에너지기구는 2050년 8,000만 대 수준을 내다봤다. 둘 다 전망이며, 약 38%는 배출 비중이지 감축량이 아니다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "자료는 이 실증 설비를 「대온도차」 히트펌프라고만 적었다. 자료에 적힌 온도로 그 이름을 짐작한 것으로 가장 알맞은 것은?",
+              "choices": [
+                "3.5MW급의 큰 용량으로 제지산업의 폐열을 여러 공장에 100℃ 이상의 고온수로 한꺼번에 나누어 보내기 때문이다",
+                "약 38℃의 폐열을 받아 100℃ 이상의 고온수로 내보내듯 들어오는 열과 나가는 열의 온도 차가 크기 때문이다",
+                "기온이 크게 변하는 계절에만 쓰기 때문이다",
+                "열을 식혀 온도를 크게 낮추는 장치이기 때문이다"
+              ],
+              "answer": 1,
+              "explain": "실증 설비는 제지산업의 폐열인 약 38℃를 활용해 100℃ 이상의 고온수를 생산한다. 자료는 「대온도차」라는 말의 뜻을 따로 풀지 않았으므로, 적힌 온도로 짐작한 것이다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "critical",
+              "q": "이 발표만으로는 아직 알 수 없어 더 확인해야 할 것으로 가장 알맞은 것은?",
+              "choices": [
+                "2024년 기준으로 산업부문이 국가 온실가스 배출량의 약 38%를 차지한다고 자료가 적어 두었는지",
+                "제지공장이 종이를 만드는 곳인지",
+                "180℃ 이상 증기 기술이 어느 단계까지 올라왔는지와, 토론회 뒤 이행안이 어떻게 보강되는지",
+                "히트펌프가 저온의 열원에서 열을 흡수하는지"
+              ],
+              "answer": 2,
+              "explain": "180℃ 이상 증기 기술은 고도화에 중점을 두고 추진 중이고, 이행안 보강과 지원방안 구체화는 토론회 뒤의 예정 사항이다.",
+              "evidencePara": 5
+            }
+          ],
+          "enseg": [
+            [
+              "On the morning ",
+              "of October 29 the Ministry ",
+              "of Climate, Energy ",
+              "and Environment said it would hold 산업계 열에너지 ",
+              "탈탄소 전환을 위한 산업용 히트펌프 기술개발 및 활용 ",
+              "토론회 (a discussion meeting ",
+              "on developing ",
+              "and using industrial heat pumps ",
+              "for the decarbonization ",
+              "of heat energy ",
+              "in industry) at 한강홍수통제소 ",
+              "(the Han River Flood Control Office), ",
+              "together with industry, ",
+              "research institutes and energy experts. ",
+              "The ministry paper ",
+              "states that the meeting was arranged ",
+              "to review technology trends ",
+              "at home and abroad ",
+              "for industrial heat pumps, ",
+              "which are drawing attention as a core ",
+              "means of decarbonizing the industrial sector, ",
+              "and to look ",
+              "for ways to spread them ",
+              "in Korea ",
+              "and to support them ",
+              "through policy."
+            ],
+            [
+              "The paper sets out how ",
+              "the device works in a single sentence. ",
+              "It is a machine ",
+              "that absorbs heat ",
+              "from a low-temperature heat source ",
+              "such as air heat ",
+              "or water heat ",
+              "and produces high-temperature heat. ",
+              "It is a heat conversion device ",
+              "that uses a small amount ",
+              "of driving energy ",
+              "and supplies a larger amount ",
+              "of energy in the form ",
+              "of heat. ",
+              "In other words, ",
+              "it supplies more energy as heat ",
+              "than the driving energy it uses, ",
+              "by lifting heat ",
+              "that is already there ",
+              "at a low temperature."
+            ],
+            [
+              "A household heat pump ",
+              "and an industrial heat pump differ ",
+              "in capacity ",
+              "and in job. ",
+              "A household heat pump has ",
+              "a small capacity ",
+              "of 8 to 20 kilowatts and is ",
+              "used for heating ",
+              "and cooling. ",
+              "An industrial heat pump has ",
+              "a large capacity in the megawatt class, ",
+              "and it produces industrial process heat ",
+              "using waste heat ",
+              "and unused heat sources ",
+              "that arise in industrial processes. ",
+              "Industrial process heat ",
+              "means the heat energy needed ",
+              "for processes such as drying, ",
+              "chemical reaction and machining ",
+              "in making products, ",
+              "and it usually ",
+              "means steam of 100 degrees Celsius ",
+              "or more. ",
+              "The paper gives as an example ",
+              "the high-temperature, high-pressure steam ",
+              "used in a paper mill ",
+              "when paper is formed ",
+              "and dried. ",
+              "In effect, the machine ",
+              "that handles the temperature ",
+              "of a room ",
+              "at home takes charge ",
+              "of process heat ",
+              "in a factory."
+            ],
+            [
+              "The reason factory heat is singled out lies ",
+              "in these two figures. ",
+              "As of 2024, ",
+              "industry accounts ",
+              "for about 38 percent ",
+              "of the greenhouse gas emissions ",
+              "of the country, ",
+              "and more than 70 percent ",
+              "of the energy that industry consumes ",
+              "is used to produce heat energy. ",
+              "The paper states ",
+              "that cutting greenhouse gases ",
+              "from industry makes the electrification ",
+              "of industrial processes essential, ",
+              "by replacing fossil fuel boilers ",
+              "with industrial heat pumps ",
+              "and the like."
+            ],
+            [
+              "Forecasts by international organizations are included as well. ",
+              "The International Energy Agency ",
+              "forecast that heat pumps would play ",
+              "a key role ",
+              "in the decarbonization ",
+              "of industrial process heat ",
+              "of 400 degrees Celsius ",
+              "or less. ",
+              "The International Renewable Energy Agency ",
+              "expected the drive ",
+              "to deploy heat pumps ",
+              "in the industrial sector ",
+              "to grow to a level ",
+              "of 80 million units ",
+              "by 2050."
+            ],
+            [
+              "The ministry and 한국에너지기술평가원 are supporting ",
+              "the development of core technology ",
+              "for a 3.5-megawatt-class heat pump ",
+              "with a large capacity ",
+              "and a large temperature difference, ",
+              "which uses waste heat ",
+              "of about 38 degrees Celsius ",
+              "from the paper industry ",
+              "to produce hot water ",
+              "of 100 degrees Celsius ",
+              "or more, and the development ",
+              "of operating technology ",
+              "through demonstration. ",
+              "Research and development also ",
+              "focuses on advancing element technology ",
+              "and systems that produce steam ",
+              "of 180 degrees Celsius ",
+              "or more. ",
+              "Minister 김성환 ",
+              "said that developing high-temperature heat pump technology is ",
+              "essential if the industrial sector is ",
+              "to achieve carbon neutrality ",
+              "and energy saving ",
+              "at the same time. ",
+              "The ministry plans ",
+              "to strengthen its research ",
+              "and development road map ",
+              "with the opinions raised ",
+              "at the meeting, ",
+              "and to work out carbon reduction paths ",
+              "for industrial processes ",
+              "and ways to support the transition ",
+              "of heat energy."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "welfare-fund-audit",
+      "category": "society",
+      "careers": [
+        "law",
+        "biz"
+      ],
+      "publishedAt": "2026-11-02",
+      "status": "published",
+      "issue": true,
+      "sources": [
+        {
+          "title": "고용노동부 보도자료 — 사내·공동근로복지기금 유용 근절 위한 5,308개 기금법인 ‘전수 점검’ 결과 발표 (2026.10.29)",
+          "url": "https://www.moel.go.kr/news/enews/report/enewsView.do?news_seq=20163"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "모아 둔 돈을 다 살펴보았어요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "회사에는 돈을 모아 두는 ",
+              "제도가 있어요. ",
+              "그 돈은 일하는 사람들을 위해 써요. ",
+              "모아 둔 이 돈을 기금이라고 해요. ",
+              "일하는 사람이 잘 지내도록 ",
+              "돕는 일이에요. ",
+              "그런 일을 복지라고 해요."
+            ],
+            [
+              "나라는 이 기금을 ",
+              "잘 쓰는지 살펴봐요. ",
+              "이렇게 살펴보는 일을 점검이라고 해요. ",
+              "올해 4월부터 9월까지 점검했어요. ",
+              "5,308곳을 하나도 빼지 않고 ",
+              "다 봤어요."
+            ],
+            [
+              "점검에서는 두 가지를 보았어요. ",
+              "먼저 규칙을 적은 종이를 보았어요. ",
+              "다음으로 돈을 어디에 썼는지 보았어요. ",
+              "82곳에서 잘못된 일 90건을 찾았어요."
+            ],
+            [
+              "잘못된 일 90건 가운데 89건은 ",
+              "바로 고치라고 하기로 했어요. ",
+              "앞으로 더 잘 살펴보도록 ",
+              "규칙도 고쳤어요. ",
+              "모아 둔 돈은 ",
+              "일하는 사람을 위해 써야 하니까요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "기금",
+              "easy": "쓸 곳을 정해 두고 따로 모아 둔 돈이에요.",
+              "hanja": null
+            },
+            {
+              "word": "복지",
+              "easy": "사람들이 잘 지내도록 돕는 일이에요.",
+              "hanja": null
+            },
+            {
+              "word": "점검",
+              "easy": "잘 되고 있는지 살펴보는 일이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 알려 주는 것은 무엇인가요?",
+              "choices": [
+                "일하는 사람이 쉬는 날을 정하는 방법",
+                "회사에서 돈을 많이 버는 방법",
+                "회사마다 규칙을 적은 종이를 더 예쁘게 꾸미는 방법을 나라가 알려 준 일",
+                "회사가 모아 둔 돈을 일하는 사람을 위해 잘 썼는지 나라가 살펴본 일"
+              ],
+              "answer": 3,
+              "explain": "나라가 5,308곳을 하나도 빼지 않고 살펴본 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "나라는 몇 곳을 살펴보았나요?",
+              "choices": [
+                "82곳",
+                "90곳",
+                "5,308곳",
+                "9곳"
+              ],
+              "answer": 2,
+              "explain": "5,308곳을 하나도 빼지 않고 다 봤다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「기금」은 무엇인가요?",
+              "choices": [
+                "일하는 사람",
+                "모아 둔 돈",
+                "회사 이름",
+                "규칙을 적은 종이"
+              ],
+              "answer": 1,
+              "explain": "모아 둔 이 돈을 기금이라고 한다고 했어요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "점검에서 돈을 어디에 썼는지까지 살펴본 까닭은 무엇일까요?",
+              "choices": [
+                "모아 둔 돈을 일하는 사람을 위해 썼는지 알아보려고",
+                "모아 둔 돈이 얼마나 늘었는지 세어 보고 나라가 자랑하려고",
+                "규칙을 적은 종이를 새로 만들려고",
+                "회사 이름을 바꾸려고"
+              ],
+              "answer": 0,
+              "explain": "모아 둔 돈은 일하는 사람을 위해 써야 한다고 했어요. 그래서 어디에 썼는지도 보는 거예요.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "우리 반이 모은 돈을 잘 썼는지 알아보려면 무엇을 함께 보면 좋을까요?",
+              "choices": [
+                "돈을 모은 사람 수만 세어 보기",
+                "돈을 담아 둔 통의 색깔만 보기",
+                "무엇에 쓰기로 적어 둔 것과 실제로 쓴 곳을 함께 보기",
+                "통을 둔 자리만 바꾸어 보기"
+              ],
+              "answer": 2,
+              "explain": "점검에서도 규칙을 적은 종이와 돈을 쓴 곳을 함께 보았어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "5,308곳을 하나도 빼지 않고",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "회사가 돈을 모아 두고 ",
+              "그 돈을 일하는 사람들의 복지에 ",
+              "쓰는 제도가 있다. ",
+              "이 제도에는 사내근로복지기금과 ",
+              "공동근로복지기금이 있다. ",
+              "이 기금을 맡아 운영하는 곳을 ",
+              "기금법인이라고 한다."
+            ],
+            [
+              "고용노동부는 이런 기금법인 5,308개소를 ",
+              "대상으로 전수 점검을 실시하고 ",
+              "그 결과를 발표했다. ",
+              "점검 기간은 2026년 4월 1일부터 ",
+              "9월 30일까지였다. ",
+              "대상은 2025년 말 기준으로 ",
+              "설립 인가를 받고 ",
+              "운영 중인 기금법인이고, ",
+              "공공부문 158개소와 ",
+              "민간부문 5,150개소다."
+            ],
+            [
+              "점검은 두 갈래를 보았다. ",
+              "하나는 정관의 적정성, ",
+              "다른 하나는 기금 운용의 적정성이다. ",
+              "이 두 갈래를 중심으로 ",
+              "근로복지기본법을 어겼는지 보았다. ",
+              "정관에서는 인가를 받았는지와 ",
+              "사업의 대상·내용·방법 등을 보았다. ",
+              "기금 운용에서는 ",
+              "법정 한도를 넘겨 썼는지, ",
+              "목적 외에 썼는지, ",
+              "복지 혜택이 소수에게 몰렸는지 등을 보았다."
+            ],
+            [
+              "이번 전수 점검은 ",
+              "매년 실시하고 있는 결산 상황 점검과는 별개로, ",
+              "기금법인의 사업이 노동자 복지를 위해 ",
+              "적정하게 운영되고 있는지 ",
+              "확인하기 위해 실시되었다. ",
+              "점검 결과 82개소에서 ",
+              "부적정 운용 90건이 적발되었다. ",
+              "그 가운데 전 사업주 기금 유용 1건은 ",
+              "근로복지기본법 위반 혐의로 ",
+              "검찰에 송치되었고, ",
+              "그 외 89건에는 ",
+              "즉시 시정을 명령하고 ",
+              "연말까지 조치를 완료할 계획이다."
+            ],
+            [
+              "점검 체계를 강화하려고 제도도 고쳤다. ",
+              "2026년 10월에는 ",
+              "점검 대상 서류를 넓히고 ",
+              "사업 적정성 점검을 강화했다. ",
+              "2026년 8월에는 ",
+              "공동근로복지기금에서 탈퇴한 사실을 보고할 의무도 ",
+              "새로 만들었다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "기금법인",
+              "easy": "기금을 맡아 운영하도록 따로 세운 조직",
+              "hanja": "基(터 기)+金(쇠 금)+法(법 법)+人(사람 인)"
+            },
+            {
+              "word": "전수 점검",
+              "easy": "일부를 뽑지 않고 대상 전부를 하나도 빼지 않고 살펴보는 일",
+              "hanja": "全(온전 전)+數(셈 수)+點(점 점)+檢(검사할 검)"
+            },
+            {
+              "word": "정관",
+              "easy": "그 조직이 무엇을 어떻게 할지 적어 둔 기본 규칙",
+              "hanja": "定(정할 정)+款(항목 관)"
+            },
+            {
+              "word": "적정성",
+              "easy": "정해진 기준에 알맞은 정도",
+              "hanja": "適(맞을 적)+正(바를 정)+性(성품 성)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용은 무엇인가?",
+              "choices": [
+                "기금법인 전수 점검이 무엇을 기준으로 무엇을 보았고 무엇이 적발되어 어떤 조치가 뒤따랐는가",
+                "사내근로복지기금과 공동근로복지기금 가운데 어느 것이 더 이익인가",
+                "회사가 기금을 더 많이 모으게 하려면 어떤 세금을 줄여야 하는가",
+                "노동자가 기금에서 돈을 직접 받아 쓰는 절차는 어떻게 되는가"
+              ],
+              "answer": 0,
+              "explain": "글은 점검의 대상과 기간, 정관과 기금 운용이라는 두 갈래 기준, 결과와 제도 변경을 차례로 다룬다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "점검 대상 5,308개소는 어떻게 나뉘는가?",
+              "choices": [
+                "공공부문 82개소와 민간부문 90개소",
+                "공공부문 5,150개소와 민간부문 158개소",
+                "공공부문 158개소와 민간부문 5,150개소",
+                "공공부문 90개소와 민간부문 82개소"
+              ],
+              "answer": 2,
+              "explain": "공공부문 158개소와 민간부문 5,150개소라고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「정관」은 무엇을 가리키는가?",
+              "choices": [
+                "한 해 동안 들어오고 나간 돈을 마감해 셈해 둔 장부",
+                "그 조직이 무엇을 어떻게 할지 적어 둔 기본 규칙",
+                "노동자에게 나누어 준 복지 혜택의 목록",
+                "사업주가 기금에 더 내놓은 돈의 액수"
+              ],
+              "answer": 1,
+              "explain": "점검은 정관에서 인가를 받았는지와 사업의 대상·내용·방법 등을 보았다. 정관은 그런 것을 적어 둔 규칙이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "매년 하는 결산 상황 점검이 있는데도 이번 전수 점검을 따로 한 까닭은 무엇인가?",
+              "choices": [
+                "공공부문과 민간부문을 하나로 합치기로 했기 때문",
+                "결산 상황 점검을 올해부터 하지 않기로 했기 때문",
+                "기금법인의 수가 5,308개소로 줄었기 때문",
+                "기금법인의 사업이 노동자 복지를 위해 적정하게 운영되고 있는지 확인해야 했기 때문"
+              ],
+              "answer": 3,
+              "explain": "이번 점검은 결산 상황 점검과는 별개로, 사업이 노동자 복지를 위해 적정하게 운영되고 있는지 확인하기 위해 실시되었다고 했다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "어느 기금법인이 기금으로 임원 세 사람에게만 해외 연수를 보냈다면 점검의 어느 기준에 걸리겠는가?",
+              "choices": [
+                "사업의 대상·내용·방법",
+                "인가를 받았는지",
+                "복지 혜택이 소수에게 몰렸는지",
+                "설립 인가를 받은 때가 언제인지"
+              ],
+              "answer": 2,
+              "explain": "기금 운용 쪽 기준에는 복지 혜택이 소수에게 몰렸는지가 들어 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "정관 쪽 점검과 기금 운용 쪽 점검을 함께 해야 하는 까닭으로 알맞은 것은?",
+              "choices": [
+                "적어 둔 규칙이 옳아도 그대로 쓰지 않을 수 있고, 규칙 자체가 인가를 받지 않았을 수도 있기 때문",
+                "두 점검의 결과를 더하면 적발 건수가 커지기 때문",
+                "정관을 보면 기금을 얼마나 모았는지 바로 알 수 있기 때문",
+                "기금 운용만 보면 공공부문과 민간부문을 구별할 수 없기 때문"
+              ],
+              "answer": 0,
+              "explain": "점검은 인가를 받았는지와, 한도·목적·쏠림을 따로 보았다. 한쪽이 다른 쪽을 대신하지 못한다.",
+              "evidencePara": 2
+            }
+          ],
+          "enseg": [
+            [
+              "Some companies save money ",
+              "in a special fund. ",
+              "The money is used ",
+              "for the people who work there. ",
+              "These funds are called ",
+              "in-house and joint employee welfare funds. ",
+              "The body that runs the fund ",
+              "is called a fund corporation."
+            ],
+            [
+              "The Ministry of Employment and Labor ",
+              "checked 5,308 of these fund corporations. ",
+              "It then published the result. ",
+              "The check ran from 1 April 2026 ",
+              "to 30 September 2026. ",
+              "It covered every fund corporation ",
+              "with a licence from the Ministry. ",
+              "They were still running ",
+              "at the end of 2025. ",
+              "158 were public ",
+              "and 5,150 were private."
+            ],
+            [
+              "The check looked at two things. ",
+              "One was the rules of the fund. ",
+              "The other was the way ",
+              "the money was used. ",
+              "Both were checked ",
+              "against the Framework Act on Labor Welfare. ",
+              "For the rules, ",
+              "officials asked if the rules had a licence. ",
+              "They also looked at the work ",
+              "the fund planned to do. ",
+              "For the money, ",
+              "they asked about spending ",
+              "over the legal limit. ",
+              "They asked about spending ",
+              "outside the purpose. ",
+              "They also asked ",
+              "if benefits went to only a few people."
+            ],
+            [
+              "This check was separate ",
+              "from the yearly check of the accounts. ",
+              "Its purpose was to see something else. ",
+              "It asked whether the funds ",
+              "were run properly for workers' welfare. ",
+              "In the end, 90 improper cases ",
+              "were found at 82 fund corporations. ",
+              "One of them was a former owner's misuse of a fund. ",
+              "That one case was sent to the prosecution. ",
+              "It was sent on suspicion of breaking the Act. ",
+              "For the other 89 cases an order to correct them at once is to be issued, ",
+              "and the measures are to be completed by the end of the year."
+            ],
+            [
+              "The rules for checking were changed too. ",
+              "In October 2026 ",
+              "more papers were added to the check. ",
+              "The check on whether the work is proper ",
+              "became stronger. ",
+              "In August 2026 ",
+              "a new duty was made: ",
+              "leaving a joint employee welfare fund ",
+              "must now be reported."
+            ]
+          ],
+          "en": [
+            "Some companies save money in a special fund. The money is used for the people who work there. These funds are called in-house and joint employee welfare funds. The body that runs the fund is called a fund corporation.",
+            "The Ministry of Employment and Labor checked 5,308 of these fund corporations. It then published the result. The check ran from 1 April 2026 to 30 September 2026. It covered every fund corporation with a licence from the Ministry. They were still running at the end of 2025. 158 were public and 5,150 were private.",
+            "The check looked at two things. One was the rules of the fund. The other was the way the money was used. Both were checked against the Framework Act on Labor Welfare. For the rules, officials asked if the rules had a licence. They also looked at the work the fund planned to do. For the money, they asked about spending over the legal limit. They asked about spending outside the purpose. They also asked if benefits went to only a few people.",
+            "This check was separate from the yearly check of the accounts. Its purpose was to see something else. It asked whether the funds were run properly for workers' welfare. In the end, 90 improper cases were found at 82 fund corporations. One of them was a former owner's misuse of a fund. That one case was sent to the prosecution. It was sent on suspicion of breaking the Act. For the other 89 cases an order to correct them at once is to be issued, and the measures are to be completed by the end of the year.",
+            "The rules for checking were changed too. In October 2026 more papers were added to the check. The check on whether the work is proper became stronger. In August 2026 a new duty was made: leaving a joint employee welfare fund must now be reported."
+          ],
+          "envocab": [
+            {
+              "word": "fund",
+              "ko": "기금 (명사)",
+              "base": "fund [fʌnd]"
+            },
+            {
+              "word": "welfare",
+              "ko": "복지 (명사)",
+              "base": "welfare [ˈwelfer]"
+            },
+            {
+              "word": "licence",
+              "ko": "인가, 허가 (명사)",
+              "base": "licence [ˈlaɪsns]"
+            },
+            {
+              "word": "limit",
+              "ko": "한도, 한계 (명사)",
+              "base": "limit [ˈlɪmɪt]"
+            },
+            {
+              "word": "purpose",
+              "ko": "목적 (명사)",
+              "base": "purpose [ˈpɜːrpəs]"
+            },
+            {
+              "word": "improper",
+              "ko": "부적정한, 부적절한 (형용사)",
+              "base": "improper [ɪmˈprɑːpər]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "전수 점검은 무엇을 보는 일인가",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "회사가 돈을 모아 두고 ",
+              "그 돈을 노동자의 복지에 쓰는 제도가 있다. ",
+              "이 기금에는 사내근로복지기금과 공동근로복지기금이 있고, ",
+              "그 기금을 맡아 운영하는 법인을 ",
+              "기금법인이라고 한다. ",
+              "고용노동부는 이 기금법인 5,308개소를 대상으로 ",
+              "전수 점검을 실시하고 ",
+              "그 결과를 발표했다."
+            ],
+            [
+              "먼저 점검의 범위다. ",
+              "점검 기간은 2026년 4월 1일부터 ",
+              "9월 30일까지였다. ",
+              "대상은 2025년 말 기준으로 ",
+              "노동부 설립인가를 받고 ",
+              "운영 중인 근로복지기금법인 5,308개소다. ",
+              "그중 공공기관과 공공기관 자회사, ",
+              "지방공기업을 포함한 공공부문이 158개소이고 ",
+              "민간부문이 5,150개소다."
+            ],
+            [
+              "무엇을 기준으로 보았는지는 ",
+              "두 갈래로 나뉜다. ",
+              "점검은 정관의 적정성 및 기금 운용 적정성을 중심으로 ",
+              "근로복지기본법 위반 여부를 보았다. ",
+              "정관 쪽에서는 인가 여부와 ",
+              "사업 대상·내용·방법 등을 보았다. ",
+              "기금 운용 쪽에서는 ",
+              "법정 한도 초과 사용, ",
+              "목적 외 사용, ",
+              "복지 혜택의 소수 집중 등을 보았다. ",
+              "정관은 무엇을 하기로 적어 두었는지를 묻고, ",
+              "기금 운용은 법이 정한 한도와 ",
+              "적어 둔 목적대로 썼는지를 묻는다."
+            ],
+            [
+              "그런 점검이 따로 필요한 까닭도 ",
+              "자료에 적혀 있다. ",
+              "이번 전수 점검은 ",
+              "매년 실시하고 있는 결산 상황 점검과는 별개로 ",
+              "기금법인의 사업이 노동자 복지를 위해 ",
+              "적정하게 운영되고 있는지 ",
+              "확인하기 위해 실시되었다. ",
+              "자료는 결산 상황 점검이 무엇을 보는지는 ",
+              "적지 않았다. ",
+              "다만 이번 점검은 그와 별개로 실시되었다고 적었다."
+            ],
+            [
+              "점검 결과 기금법인 82개소에서 ",
+              "정관 미인가, 법정 사용한도 초과 등 ",
+              "부적정 운용 90건이 적발되었다. ",
+              "이 가운데 전 사업주 기금 유용 1건은 ",
+              "근로복지기본법 위반 혐의로 ",
+              "검찰에 송치되었다. ",
+              "그 외 89건에 대해서는 ",
+              "즉시 시정을 명령하고 ",
+              "연말까지 정관 변경 인가 신청 요구, ",
+              "사업주 추가 출연 지시 등 ",
+              "조치를 완료할 계획이다."
+            ],
+            [
+              "점검 체계를 강화하는 제도도 ",
+              "함께 정비되었다. ",
+              "2026년 10월에는 ",
+              "운영상황 점검 대상 서류를 정관까지 확대하고 ",
+              "기금법인 사업 적정성 점검을 강화했다. ",
+              "2026년 8월에는 ",
+              "공동근로복지기금 탈퇴 사실 보고 의무를 신설하고, ",
+              "근로복지사업 중단 방지를 함께 개정 사항으로 적었다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "전수 점검",
+              "easy": "표본을 뽑지 않고 대상 전부를 하나도 빼지 않고 점검하는 일",
+              "hanja": "全(온전 전)+數(셈 수)+點(점 점)+檢(검사할 검)"
+            },
+            {
+              "word": "정관",
+              "easy": "법인이 무엇을 어떤 방법으로 할지 적어 둔 기본 규칙",
+              "hanja": "定(정할 정)+款(항목 관)"
+            },
+            {
+              "word": "적정성",
+              "easy": "정해진 기준에 알맞은 정도",
+              "hanja": "適(맞을 적)+正(바를 정)+性(성품 성)"
+            },
+            {
+              "word": "결산",
+              "easy": "일정한 기간에 들어온 돈과 나간 돈을 마감해 셈하는 일",
+              "hanja": "決(결단할 결)+算(셈 산)"
+            },
+            {
+              "word": "출연",
+              "easy": "기금이나 사업에 돈이나 재산을 내놓는 일",
+              "hanja": "出(날 출)+捐(버릴 연)"
+            },
+            {
+              "word": "미인가",
+              "easy": "관청의 인가를 받지 않은 상태",
+              "hanja": "未(아닐 미)+認(알 인)+可(옳을 가)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 힘주어 설명하는 것은 무엇인가?",
+              "choices": [
+                "기금법인을 새로 세우려면 어떤 서류를 내야 하는가",
+                "전수 점검이 어떤 두 갈래 기준으로 보는 일인가",
+                "공공부문과 민간부문 가운데 어디가 기금을 더 많이 모았는가",
+                "결산 상황 점검을 없애고 전수 점검으로 바꾼 과정"
+              ],
+              "answer": 1,
+              "explain": "글은 정관의 적정성·기금 운용 적정성이라는 두 갈래 기준을 중심에 둔다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "점검 대상에 대한 설명으로 맞는 것은?",
+              "choices": [
+                "부적정 운용이 적발된 82개소를 뺀 민간부문 5,150개소",
+                "2026년 4월 1일부터 9월 30일까지 설립 인가를 새로 신청한 기금법인 5,308개소",
+                "2025년 말 기준으로 노동부 설립인가를 받고 운영 중인 근로복지기금법인 5,308개소",
+                "공공기관과 지방공기업만 모은 공공부문 158개소"
+              ],
+              "answer": 2,
+              "explain": "대상은 2025년 말 기준으로 노동부 설립인가를 받고 운영 중인 근로복지기금법인 5,308개소다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「결산」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "일정한 기간에 들어온 돈과 나간 돈을 마감해 셈하는 일",
+                "관청이 그 일을 해도 된다고 공식으로 허락하는 일",
+                "기금이나 사업에 돈이나 재산을 내놓는 일",
+                "복지 혜택을 받을 사람을 미리 정해 두는 일"
+              ],
+              "answer": 0,
+              "explain": "「결산」은 일정한 기간에 들어온 돈과 나간 돈을 마감해 셈하는 일이다. 자료에는 매년 실시하고 있는 「결산 상황 점검」이라는 말만 나온다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "글이 이번 전수 점검을 결산 상황 점검과 나누어 적은 까닭으로 알맞은 것은?",
+              "choices": [
+                "기금법인이 장부를 만들 의무가 없기 때문",
+                "결산 상황 점검이 올해부터 없어졌기 때문",
+                "두 점검을 같은 기관이 맡을 수 없기 때문",
+                "기금을 한도 밖이나 목적 밖에 쓴 일은 따로 보아야 드러나기 때문"
+              ],
+              "answer": 3,
+              "explain": "기금 운용 쪽 기준은 법정 한도 초과 사용, 목적 외 사용, 복지 혜택의 소수 집중 등이다. 이런 일은 따로 보아야 드러난다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "이번 점검 결과의 숫자를 바르게 읽은 것은?",
+              "choices": [
+                "적발된 곳은 82개소이고 적발된 건수는 90건이므로, 90건이 모두 다른 곳에서 나온 것은 아니다",
+                "5,308개소 가운데 90개소가 기금을 목적 밖에 썼다",
+                "적발된 건수가 82건이고 적발된 기금법인이 90개소다",
+                "공공부문 158개소는 점검 대상에서 빠졌다"
+              ],
+              "answer": 0,
+              "explain": "82개소에서 90건이 적발되었다. 82는 곳의 수, 90은 건수이므로 90건이 모두 다른 곳에서 나온 것은 아니다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "점검 체계를 강화하려고 고친 제도를 바르게 적용한 것은?",
+              "choices": [
+                "2026년 8월부터는 공동근로복지기금에 새로 들어온 사실만 보고하고 탈퇴한 사실은 보고하지 않는다",
+                "2026년 10월부터는 결산 상황 점검을 해마다 두 번 한다",
+                "2026년 10월부터는 운영상황 점검에서 정관까지 서류로 받아 사업 적정성을 본다",
+                "2026년 8월부터는 사업주의 추가 출연이 금지된다"
+              ],
+              "answer": 2,
+              "explain": "2026년 10월에는 운영상황 점검 대상 서류를 정관까지 확대하고 기금법인 사업 적정성 점검을 강화했다.",
+              "evidencePara": 5
+            }
+          ],
+          "enseg": [
+            [
+              "Some companies set aside part of their money in a fund ",
+              "and spend it on the welfare ",
+              "of the people who work for them. ",
+              "These funds are called ",
+              "in-house and joint employee welfare funds. ",
+              "The corporation that runs one ",
+              "is called a fund corporation. ",
+              "The Ministry of Employment and Labor ",
+              "carried out a full check ",
+              "of 5,308 of these fund corporations ",
+              "and published the result."
+            ],
+            [
+              "First, the scope. ",
+              "The check ran from 1 April ",
+              "to 30 September 2026. ",
+              "It covered the 5,308 employee welfare fund corporations ",
+              "that held a ministry licence ",
+              "and were still operating at the end of 2025. ",
+              "Of these, 158 were in the public sector, ",
+              "which takes in public institutions, ",
+              "their subsidiaries and local public enterprises, ",
+              "and 5,150 were in the private sector."
+            ],
+            [
+              "What the check measured ",
+              "falls into two strands. ",
+              "It examined whether the fund corporations ",
+              "had broken the Framework Act on Labor Welfare, ",
+              "centred on whether their articles of association were proper ",
+              "and whether the operation of the fund was proper. ",
+              "On the articles side ",
+              "it looked at whether they were licensed ",
+              "and at the object, content and method ",
+              "of the fund's work. ",
+              "On the operation side ",
+              "it looked at spending above the legal limit, ",
+              "spending outside the stated purpose ",
+              "and welfare benefits concentrated on a few people. ",
+              "The articles ask what a fund corporation has written down that it will do; ",
+              "the operation asks whether the money stayed within the legal limit and the stated purpose."
+            ],
+            [
+              "The release also states ",
+              "why such a check was needed on its own. ",
+              "This full check was carried out ",
+              "separately from the annual check of settlement accounts, ",
+              "in order to confirm whether the work of the fund corporations ",
+              "was being run properly for the welfare of workers. ",
+              "What the annual settlement check looks at ",
+              "is not set down in the release; ",
+              "it states only that this check was separate from it."
+            ],
+            [
+              "The check found 90 cases of improper operation ",
+              "at 82 fund corporations, ",
+              "including articles without a licence ",
+              "and spending above the legal limit. ",
+              "One of these, a former employer's misuse of a fund, ",
+              "was sent to the prosecution ",
+              "on suspicion of breaking the Framework Act on Labor Welfare. ",
+              "For the other 89 cases ",
+              "an order to correct them at once is to be issued, ",
+              "and measures such as demanding an application ",
+              "to license changes to the articles ",
+              "and directing employers to contribute more ",
+              "are to be completed by the end of the year."
+            ],
+            [
+              "The rules that make such checking stronger ",
+              "were put in order at the same time. ",
+              "In October 2026 the papers covered by the operating check ",
+              "were widened to include the articles of association, ",
+              "and the check on whether a fund corporation's work is proper ",
+              "was strengthened. ",
+              "In August 2026 a duty to report leaving ",
+              "a joint employee welfare fund was newly created, ",
+              "and preventing welfare work from stopping was listed alongside it."
+            ]
+          ],
+          "en": [
+            "Some companies set aside part of their money in a fund and spend it on the welfare of the people who work for them. These funds are called in-house and joint employee welfare funds. The corporation that runs one is called a fund corporation. The Ministry of Employment and Labor carried out a full check of 5,308 of these fund corporations and published the result.",
+            "First, the scope. The check ran from 1 April to 30 September 2026. It covered the 5,308 employee welfare fund corporations that held a ministry licence and were still operating at the end of 2025. Of these, 158 were in the public sector, which takes in public institutions, their subsidiaries and local public enterprises, and 5,150 were in the private sector.",
+            "What the check measured falls into two strands. It examined whether the fund corporations had broken the Framework Act on Labor Welfare, centred on whether their articles of association were proper and whether the operation of the fund was proper. On the articles side it looked at whether they were licensed and at the object, content and method of the fund's work. On the operation side it looked at spending above the legal limit, spending outside the stated purpose and welfare benefits concentrated on a few people. The articles ask what a fund corporation has written down that it will do; the operation asks whether the money stayed within the legal limit and the stated purpose.",
+            "The release also states why such a check was needed on its own. This full check was carried out separately from the annual check of settlement accounts, in order to confirm whether the work of the fund corporations was being run properly for the welfare of workers. What the annual settlement check looks at is not set down in the release; it states only that this check was separate from it.",
+            "The check found 90 cases of improper operation at 82 fund corporations, including articles without a licence and spending above the legal limit. One of these, a former employer's misuse of a fund, was sent to the prosecution on suspicion of breaking the Framework Act on Labor Welfare. For the other 89 cases an order to correct them at once is to be issued, and measures such as demanding an application to license changes to the articles and directing employers to contribute more are to be completed by the end of the year.",
+            "The rules that make such checking stronger were put in order at the same time. In October 2026 the papers covered by the operating check were widened to include the articles of association, and the check on whether a fund corporation's work is proper was strengthened. In August 2026 a duty to report leaving a joint employee welfare fund was newly created, and preventing welfare work from stopping was listed alongside it."
+          ],
+          "envocab": [
+            {
+              "word": "welfare",
+              "ko": "복지 (명사)",
+              "base": "welfare [ˈwelfer]"
+            },
+            {
+              "word": "articles",
+              "ko": "정관 (명사, articles of association)",
+              "base": "article [ˈɑːrtɪkl]"
+            },
+            {
+              "word": "licence",
+              "ko": "인가, 허가 (명사)",
+              "base": "licence [ˈlaɪsns]"
+            },
+            {
+              "word": "concentrated",
+              "ko": "집중된, 쏠린 (형용사)",
+              "base": "concentrate [ˈkɑːnsntreɪt]"
+            },
+            {
+              "word": "settlement",
+              "ko": "결산, 정산 (명사)",
+              "base": "settlement [ˈsetlmənt]"
+            },
+            {
+              "word": "suspicion",
+              "ko": "혐의, 의심 (명사)",
+              "base": "suspicion [səˈspɪʃn]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "두 갈래로 보는 전수 점검",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "회사가 돈을 따로 모아 두고, ",
+              "그 돈을 노동자의 복지에 쓰는 제도가 있다. ",
+              "이 기금에는 사내근로복지기금과 공동근로복지기금이 있으며, ",
+              "그 기금을 맡아 운영하는 법인을 ",
+              "기금법인이라고 한다. ",
+              "고용노동부는 사내·공동근로복지기금법인 5,308개소를 대상으로 ",
+              "전수 점검을 실시하고 ",
+              "그 결과를 발표했다. ",
+              "2026년 10월 29일 등록된 보도자료에는 ",
+              "기금 운용의 점검 체계 강화를 위한 ",
+              "제도적 기반도 정비가 완료되었다고 적혀 있다."
+            ],
+            [
+              "전수 점검은 표본을 뽑지 않고 ",
+              "대상을 하나도 빼지 않는다는 뜻이다. ",
+              "점검 기간은 2026년 4월 1일부터 ",
+              "9월 30일까지였다. ",
+              "대상은 2025년 말 기준으로 ",
+              "노동부 설립인가를 받고 운영 중인 ",
+              "근로복지기금법인 5,308개소이며, ",
+              "공공기관과 공공기관 자회사, ",
+              "지방공기업으로 이루어진 공공부문이 158개소, ",
+              "민간부문이 5,150개소다."
+            ],
+            [
+              "무엇을 기준으로 보았는가는 ",
+              "두 갈래다. ",
+              "점검 내용은 ",
+              "정관의 적정성 및 기금 운용 적정성을 중심으로 ",
+              "근로복지기본법 위반 여부를 확인하는 것이었다. ",
+              "정관 쪽에서는 인가 여부와 ",
+              "사업 대상·내용·방법 등을 보았다. ",
+              "기금 운용 쪽에서는 ",
+              "법정 한도 초과 사용, ",
+              "목적 외 사용, ",
+              "복지 혜택의 소수 집중 등을 보았다. ",
+              "앞의 갈래는 ",
+              "기금법인이 무엇을 하기로 적어 두었는지를 묻고, ",
+              "뒤의 갈래는 ",
+              "법이 정한 한도와 ",
+              "적어 둔 목적대로 돈을 썼는지를 묻는다."
+            ],
+            [
+              "이 점검이 ",
+              "매년 하는 점검과 따로 필요한 까닭은 ",
+              "한 문장으로 적혀 있다. ",
+              "이번 전수 점검은 ",
+              "매년 실시하고 있는 결산 상황 점검과는 별개로 ",
+              "기금법인의 사업이 노동자 복지를 위해 ",
+              "적정하게 운영되고 있는지 확인하기 위해 실시되었다. ",
+              "결산 상황 점검이 무엇을 보는지는 ",
+              "자료에 적혀 있지 않다."
+            ],
+            [
+              "점검 결과 기금법인 82개소에서 ",
+              "정관 미인가, 법정 사용한도 초과 등 ",
+              "부적정 운용 90건이 적발되었다. ",
+              "이 가운데 전 사업주 기금 유용 1건은 ",
+              "근로복지기본법 위반 혐의로 ",
+              "검찰에 송치되었다. ",
+              "그 외 89건에 대해서는 ",
+              "즉시 시정을 명령하고 ",
+              "연말까지 정관 변경 인가 신청 요구, ",
+              "사업주 추가 출연 지시 등 ",
+              "조치를 완료할 계획이다. ",
+              "정관 변경 인가 신청 요구가 ",
+              "서류를 바로잡는 조치라면, ",
+              "추가 출연 지시는 ",
+              "사업주가 기금에 돈을 더 넣게 하는 조치다."
+            ],
+            [
+              "점검 체계를 세우는 제도 개선도 ",
+              "함께 끝났다. ",
+              "2026년 10월에는 ",
+              "운영상황 점검 대상 서류를 정관까지 확대하고 ",
+              "기금법인 사업 적정성 점검을 강화했다. ",
+              "2026년 8월에는 ",
+              "공동근로복지기금 탈퇴 사실 보고 의무를 신설하고, ",
+              "근로복지사업 중단 방지를 함께 개정 사항으로 적었다. ",
+              "김영훈 고용노동부장관은 ",
+              "사내·공동근로복지기금의 부적정 운용은 ",
+              "특히 영세·소규모 사업장 근로자의 근로복지에 ",
+              "직접 영향을 미치는 중대한 사안이라면서, ",
+              "점검 체계화를 위한 제도개선이 완료된 만큼 ",
+              "근로복지기금 유용 사례가 재발하지 않도록 ",
+              "철저하게 관리·감독할 것이라고 밝혔다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "전수 점검",
+              "easy": "표본을 뽑지 않고 대상 전부를 하나도 빼지 않고 점검하는 일",
+              "hanja": "全(온전 전)+數(셈 수)+點(점 점)+檢(검사할 검)"
+            },
+            {
+              "word": "정관",
+              "easy": "법인이 무엇을 어떤 방법으로 할지 적어 둔 기본 규칙",
+              "hanja": "定(정할 정)+款(항목 관)"
+            },
+            {
+              "word": "적정성",
+              "easy": "정해진 기준에 알맞은 정도",
+              "hanja": "適(맞을 적)+正(바를 정)+性(성품 성)"
+            },
+            {
+              "word": "결산",
+              "easy": "일정한 기간에 들어온 돈과 나간 돈을 마감해 셈하는 일",
+              "hanja": "決(결단할 결)+算(셈 산)"
+            },
+            {
+              "word": "출연",
+              "easy": "기금이나 사업에 돈이나 재산을 내놓는 일",
+              "hanja": "出(날 출)+捐(버릴 연)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 화제는 무엇인가?",
+              "choices": [
+                "공공부문과 민간부문의 기금 규모를 비교한 결과",
+                "기금법인의 수를 줄이기 위한 정부의 구조조정 계획",
+                "영세·소규모 사업장의 임금 수준을 올리기 위한 대책",
+                "전수 점검이 어떤 두 갈래 기준을 보는 제도인가"
+              ],
+              "answer": 3,
+              "explain": "글은 정관의 적정성과 기금 운용 적정성이라는 두 갈래 기준을 중심에 둔다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "점검의 기간과 대상에 대한 설명으로 맞는 것은?",
+              "choices": [
+                "2025년 말부터 2026년 9월 30일까지, 공공부문 158개소를 먼저 보았다",
+                "2026년 4월 1일부터 10월 29일까지, 민간부문 5,150개소만 보았다",
+                "2026년 4월 1일부터 9월 30일까지, 2025년 말 기준으로 설립인가를 받고 운영 중인 5,308개소를 보았다",
+                "2026년 8월부터 10월까지, 적발된 82개소를 다시 보았다"
+              ],
+              "answer": 2,
+              "explain": "점검 기간은 2026년 4월 1일부터 9월 30일까지이고, 대상은 2025년 말 기준으로 노동부 설립인가를 받고 운영 중인 근로복지기금법인 5,308개소다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「출연」이 이 글에서 뜻하는 것은?",
+              "choices": [
+                "기금에서 돈을 꺼내 쓰는 일",
+                "기금에 돈이나 재산을 내놓는 일",
+                "기금법인의 정관을 고치는 일",
+                "기금 운용 실적을 외부에 공개하는 일"
+              ],
+              "answer": 1,
+              "explain": "추가 출연 지시는 사업주가 기금에 돈을 더 넣게 하는 조치라고 했다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "infer",
+              "q": "글이 두 갈래를 「적어 두었는지」와 「법이 정한 한도와 적어 둔 목적대로 썼는지」로 나눈 것에서 알 수 있는 것은?",
+              "choices": [
+                "정관이 인가를 받았더라도 기금을 한도나 목적 밖에 쓸 수 있다",
+                "정관이 인가를 받으면 기금 운용은 따로 볼 필요가 없다",
+                "기금 운용이 적정하면 정관은 없어도 된다",
+                "두 갈래는 서류 한 장으로 함께 확인된다"
+              ],
+              "answer": 0,
+              "explain": "앞의 갈래는 무엇을 하기로 적었는지를, 뒤의 갈래는 법이 정한 한도와 적어 둔 목적대로 썼는지를 묻는다. 한쪽이 다른 쪽을 대신하지 못한다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "점검 결과의 수치를 정확히 읽은 것은?",
+              "choices": [
+                "적발된 82건은 90개소에서 나왔으므로 한 곳에서 두 건 이상 적발된 곳이 있다",
+                "5,308개소 가운데 90개소가 법정 사용한도를 넘겨 적발되었다",
+                "적발된 90건은 82개소에서 나왔으므로 한 곳에서 두 건 이상 적발된 곳이 있다",
+                "공공부문 158개소에서 부적정 운용 90건이 모두 나왔다"
+              ],
+              "answer": 2,
+              "explain": "82개소에서 90건이 적발되었다. 82는 기금법인의 수, 90은 건수이므로 한 곳에서 두 건 이상 적발된 곳이 있다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "다음 가운데 점검의 「기금 운용」 쪽 기준에 걸리는 것만 모은 것은?",
+              "choices": [
+                "설립인가를 2025년 말 이후에 받은 경우, 공동근로복지기금에서 탈퇴한 경우",
+                "인가를 받지 않은 경우, 사업 대상을 적지 않은 경우, 사업 방법을 적지 않은 경우",
+                "법정 한도를 넘겨 쓴 경우, 목적 외에 쓴 경우, 복지 혜택이 소수에게 몰린 경우",
+                "결산 장부의 숫자가 맞지 않는 경우, 결산 보고가 늦은 경우"
+              ],
+              "answer": 2,
+              "explain": "기금 운용 쪽 기준은 법정 한도 초과 사용, 목적 외 사용, 복지 혜택의 소수 집중 등이다. 인가 여부와 사업 대상·내용·방법은 정관 쪽 기준이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "장관의 말과 제도 개선을 함께 읽을 때, 이 글에서 더 나아가면 안 되는 지점을 짚은 것은?",
+              "choices": [
+                "완료된 것은 점검 체계를 강화하는 제도이므로, 재발을 막았는지는 다음 점검이 보여 주어야 한다",
+                "제도 개선이 완료되었으므로 부적정 운용은 이미 사라졌다",
+                "전수로 점검했으므로 앞으로는 점검이 필요하지 않다",
+                "영세·소규모 사업장에는 기금법인이 없으므로 관리·감독이 필요하지 않다"
+              ],
+              "answer": 0,
+              "explain": "자료는 제도적 기반의 정비가 완료되었다고 적었고, 장관은 재발하지 않도록 관리·감독할 것이라고 밝혔다. 완료된 것은 점검 체계이고, 재발 여부는 앞으로 확인할 일이다.",
+              "evidencePara": 5
+            }
+          ],
+          "enseg": [
+            [
+              "A company can set money aside in a fund ",
+              "that is used for the welfare ",
+              "of the people who work for it. ",
+              "These funds are called ",
+              "in-house and joint employee welfare funds. ",
+              "The corporation that holds and runs one ",
+              "is a fund corporation. ",
+              "The Ministry of Employment and Labor ",
+              "carried out a full check of 5,308 ",
+              "in-house and joint employee welfare fund corporations ",
+              "and published the result. ",
+              "The release registered on 29 October 2026 ",
+              "also records that the legal ground ",
+              "for a stronger checking system for fund operation ",
+              "has been put in order."
+            ],
+            [
+              "A full check means that no sample is drawn ",
+              "and that no case is left out. ",
+              "The check ran from 1 April ",
+              "to 30 September 2026. ",
+              "Its subjects were the 5,308 employee welfare fund corporations ",
+              "that held a ministry licence ",
+              "and were still operating as of the end of 2025: ",
+              "158 in the public sector, ",
+              "made up of public institutions, their subsidiaries ",
+              "and local public enterprises, ",
+              "and 5,150 in the private sector."
+            ],
+            [
+              "What the check measured ",
+              "falls into two strands. ",
+              "Its content was to confirm ",
+              "whether the Framework Act on Labor Welfare had been broken, ",
+              "centred on whether the articles of association were proper ",
+              "and whether the operation of the fund was proper. ",
+              "On the articles side ",
+              "it looked at whether a licence had been granted ",
+              "and at the object, content and method of the work. ",
+              "On the operation side ",
+              "it looked at spending above the legal limit, ",
+              "spending outside the purpose ",
+              "and welfare benefits concentrated on a few people. ",
+              "The first strand asks ",
+              "what a fund corporation has written down that it will do; ",
+              "the second asks ",
+              "whether the money stayed within the legal limit and the stated purpose."
+            ],
+            [
+              "Why this check was needed ",
+              "apart from the one carried out every year ",
+              "is set down in a single sentence. ",
+              "This full check was carried out ",
+              "separately from the annual check of settlement accounts, ",
+              "in order to confirm whether the work of the fund corporations ",
+              "was being run properly for the welfare of workers. ",
+              "What a settlement check looks at ",
+              "is not set down in the release."
+            ],
+            [
+              "The check found 90 cases of improper operation ",
+              "at 82 fund corporations, ",
+              "including articles without a licence ",
+              "and spending above the legal limit. ",
+              "One of these, a former employer's misuse of a fund, ",
+              "was sent to the prosecution ",
+              "on suspicion of breaking the Framework Act on Labor Welfare. ",
+              "For the other 89 cases ",
+              "an order to correct them at once is to be issued, ",
+              "and measures such as demanding an application ",
+              "to license changes to the articles ",
+              "and directing employers to make further contributions ",
+              "are to be completed by the end of the year. ",
+              "A demand to apply for a licence ",
+              "puts the papers right; ",
+              "a direction to contribute more ",
+              "makes the employer put more money into the fund."
+            ],
+            [
+              "The changes that build the checking system ",
+              "were finished at the same time. ",
+              "In October 2026 the papers covered by the operating check ",
+              "were widened to include the articles of association, ",
+              "and the check on whether a fund corporation's work is proper ",
+              "was strengthened. ",
+              "In August 2026 a duty to report leaving ",
+              "a joint employee welfare fund was newly created, ",
+              "and preventing welfare work from stopping was listed alongside it. ",
+              "Kim Young-hoon, Minister of Employment and Labor, said ",
+              "that improper operation of in-house and joint employee welfare funds ",
+              "is a serious matter ",
+              "that directly affects the welfare of workers ",
+              "especially at small and very small workplaces, ",
+              "and that, now that the improvements ",
+              "for systematising the checks are complete, ",
+              "the ministry will manage and supervise thoroughly ",
+              "so that cases of misuse of employee welfare funds ",
+              "do not happen again."
+            ]
+          ],
+          "en": [
+            "A company can set money aside in a fund that is used for the welfare of the people who work for it. These funds are called in-house and joint employee welfare funds. The corporation that holds and runs one is a fund corporation. The Ministry of Employment and Labor carried out a full check of 5,308 in-house and joint employee welfare fund corporations and published the result. The release registered on 29 October 2026 also records that the legal ground for a stronger checking system for fund operation has been put in order.",
+            "A full check means that no sample is drawn and that no case is left out. The check ran from 1 April to 30 September 2026. Its subjects were the 5,308 employee welfare fund corporations that held a ministry licence and were still operating as of the end of 2025: 158 in the public sector, made up of public institutions, their subsidiaries and local public enterprises, and 5,150 in the private sector.",
+            "What the check measured falls into two strands. Its content was to confirm whether the Framework Act on Labor Welfare had been broken, centred on whether the articles of association were proper and whether the operation of the fund was proper. On the articles side it looked at whether a licence had been granted and at the object, content and method of the work. On the operation side it looked at spending above the legal limit, spending outside the purpose and welfare benefits concentrated on a few people. The first strand asks what a fund corporation has written down that it will do; the second asks whether the money stayed within the legal limit and the stated purpose.",
+            "Why this check was needed apart from the one carried out every year is set down in a single sentence. This full check was carried out separately from the annual check of settlement accounts, in order to confirm whether the work of the fund corporations was being run properly for the welfare of workers. What a settlement check looks at is not set down in the release.",
+            "The check found 90 cases of improper operation at 82 fund corporations, including articles without a licence and spending above the legal limit. One of these, a former employer's misuse of a fund, was sent to the prosecution on suspicion of breaking the Framework Act on Labor Welfare. For the other 89 cases an order to correct them at once is to be issued, and measures such as demanding an application to license changes to the articles and directing employers to make further contributions are to be completed by the end of the year. A demand to apply for a licence puts the papers right; a direction to contribute more makes the employer put more money into the fund.",
+            "The changes that build the checking system were finished at the same time. In October 2026 the papers covered by the operating check were widened to include the articles of association, and the check on whether a fund corporation's work is proper was strengthened. In August 2026 a duty to report leaving a joint employee welfare fund was newly created, and preventing welfare work from stopping was listed alongside it. Kim Young-hoon, Minister of Employment and Labor, said that improper operation of in-house and joint employee welfare funds is a serious matter that directly affects the welfare of workers especially at small and very small workplaces, and that, now that the improvements for systematising the checks are complete, the ministry will manage and supervise thoroughly so that cases of misuse of employee welfare funds do not happen again."
+          ],
+          "envocab": [
+            {
+              "word": "articles",
+              "ko": "정관 (명사, articles of association)",
+              "base": "article [ˈɑːrtɪkl]"
+            },
+            {
+              "word": "suspicion",
+              "ko": "혐의, 의심 (명사)",
+              "base": "suspicion [səˈspɪʃn]"
+            },
+            {
+              "word": "concentrated",
+              "ko": "집중된, 쏠린 (형용사)",
+              "base": "concentrate [ˈkɑːnsntreɪt]"
+            },
+            {
+              "word": "settlement",
+              "ko": "결산, 정산 (명사)",
+              "base": "settlement [ˈsetlmənt]"
+            },
+            {
+              "word": "subsidiaries",
+              "ko": "자회사들 (명사)",
+              "base": "subsidiary [səbˈsɪdieri]"
+            },
+            {
+              "word": "supervise",
+              "ko": "감독하다 (동사)",
+              "base": "supervise [ˈsuːpərvaɪz]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "sewer-flood-zones",
+      "category": "environment",
+      "careers": [
+        "env",
+        "law"
+      ],
+      "publishedAt": "2026-11-02",
+      "status": "published",
+      "issue": true,
+      "sources": [
+        {
+          "title": "기후에너지환경부 보도자료 — 집중호우에도 안전한 도시 만든다… 하수도정비 중점관리지역 11곳 추가지정 (2026.10.29)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1902920"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "물에 잠기는 곳을 고쳐요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "비가 아주 많이 오는 ",
+              "날이 있어요. ",
+              "그럴 때 하수도가 ",
+              "물을 다 받지 못할 수 있어요. ",
+              "그러면 동네가 물에 잠겨요. ",
+              "이런 일이 자주 있는 ",
+              "곳도 있어요."
+            ],
+            [
+              "나라는 그런 곳을 골라서 ",
+              "이름을 붙여요. ",
+              "올해는 열한 곳을 골랐어요. ",
+              "「하수도정비 중점관리지역」이라는 이름이에요. ",
+              "10월 30일에 이것을 알린다고 ",
+              "자료에 적혀 있어요. ",
+              "이렇게 지정하면 ",
+              "나라가 공사에 쓸 돈을 도와줘요."
+            ],
+            [
+              "자료에는 할 공사가 ",
+              "여러 가지 적혀 있어요. ",
+              "하수관경 확대, ",
+              "하수저류시설 설치, ",
+              "빗물펌프장 설치 같은 것이에요. ",
+              "이름을 하나씩 ",
+              "천천히 읽어 보아요. ",
+              "물이 넘치지 않게 ",
+              "이런 것을 고치는 거예요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "하수도",
+              "easy": "집에서 쓴 물과 빗물이 흘러가는 길이에요."
+            },
+            {
+              "word": "지정",
+              "easy": "여럿 가운데 골라서 정하는 일이에요."
+            },
+            {
+              "word": "공사",
+              "easy": "무엇을 만들거나 고치는 일이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "비 오는 날 우산을 고르는 일",
+                "물에 잠기는 곳을 골라 지정하고 고치는 일",
+                "하수도에서 물고기를 기르는 일",
+                "열한 곳에 새 길을 내는 일"
+              ],
+              "answer": 1,
+              "explain": "나라가 물에 잠기는 곳을 골라 이름을 붙이고, 물이 넘치지 않게 고친다는 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "올해 나라가 고른 곳은 몇 곳인가요?",
+              "choices": [
+                "한 곳",
+                "세 곳",
+                "열한 곳",
+                "서른 곳"
+              ],
+              "answer": 2,
+              "explain": "올해는 열한 곳을 골랐다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「지정」은 무슨 뜻인가요?",
+              "choices": [
+                "여럿 가운데 골라서 정하는 일",
+                "물을 퍼내는 일",
+                "비가 많이 오는 날",
+                "돈을 세는 일"
+              ],
+              "answer": 0,
+              "explain": "나라가 그런 곳을 골라서 이름을 붙이는 일을 지정이라고 해요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "이렇게 지정하면 무엇이 따라오나요?",
+              "choices": [
+                "비가 아주 많이 오는 날이 없어져요",
+                "나라가 공사에 쓸 돈을 도와줘요",
+                "이름이 없어져요",
+                "학교가 새로 생겨요"
+              ],
+              "answer": 1,
+              "explain": "이렇게 지정하면 나라가 공사에 쓸 돈을 도와준다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "우리 동네가 비 올 때 물에 잠긴다면, 이 글에 따라 할 수 있는 일은?",
+              "choices": [
+                "아무것도 고치지 않고 비가 그치기만 기다려요",
+                "하수도를 고쳐서 물이 넘치지 않게 해요",
+                "길을 모두 없애요",
+                "물을 집 안에 담아 두어요"
+              ],
+              "answer": 1,
+              "explain": "글은 물이 넘치지 않게 하수관경 확대 같은 공사를 한다고 했어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "지정이 데려오는 것",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "기후에너지환경부가 상습침수지역 11곳을 ",
+              "「2026년도 하수도정비 중점관리지역」으로 ",
+              "새로 지정한다. ",
+              "자료는 10월 30일 이를 ",
+              "공고한다고 적었다. ",
+              "인천광역시 작정동과 ",
+              "서산시 읍내동 일원 등이 들어갔다. ",
+              "집중강우 때 ",
+              "하수도 용량이 부족해 생기는 ",
+              "도시침수 피해를 예방하기 위한 것이다."
+            ],
+            [
+              "이 제도는 하수도법 제4조의3에 따라 ",
+              "2013년에 도입됐다. ",
+              "하수 범람으로 인한 침수 피해가 ",
+              "상습적으로 발생하거나 ",
+              "발생될 우려가 있는 지역을 지정한다. ",
+              "지정되면 지방정부가 ",
+              "침수 원인 해소를 위한 ",
+              "하수도 확충 사업을 ",
+              "조속히 추진할 수 있도록 국비를 지원한다. ",
+              "국비 보조율은 ",
+              "광역지자체 30%, 기초지자체 60%다."
+            ],
+            [
+              "자료는 할 공사를 ",
+              "하수관경 확대, 하수저류시설 및 ",
+              "빗물펌프장 설치 등으로 적었다. ",
+              "올해 지정된 11곳에는 ",
+              "5,500여억 원을 투입할 계획이다. ",
+              "하수관로 68㎞ 개량과 ",
+              "펌프장 12개 신·증설, ",
+              "빗물받이 설치 등이다. ",
+              "다만 총사업비와 사업 물량은 ",
+              "실시 설계 결과에 따라 ",
+              "변동 가능하다고 적혀 있다."
+            ],
+            [
+              "2013년부터 2026년까지는 ",
+              "침수가 발생했던 지역을 중심으로 ",
+              "매년 10~37곳, 모두 228곳이 지정됐다. ",
+              "지금까지 지원된 국고는 ",
+              "2조 2,151억 원이다. ",
+              "지정은 이름을 붙이는 일에서 끝나지 않고 ",
+              "국비와 공사로 이어진다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "하수도",
+              "easy": "집에서 쓴 물과 빗물이 흘러가는 시설",
+              "hanja": "下(아래 하)+水(물 수)+道(길 도)"
+            },
+            {
+              "word": "침수",
+              "easy": "물에 잠기는 일",
+              "hanja": "浸(잠길 침)+水(물 수)"
+            },
+            {
+              "word": "지정",
+              "easy": "여럿 가운데 골라서 정하는 일",
+              "hanja": "指(가리킬 지)+定(정할 정)"
+            },
+            {
+              "word": "국비",
+              "easy": "나라가 내는 돈",
+              "hanja": "國(나라 국)+費(쓸 비)"
+            }
+          ],
+          "en": [
+            "The Ministry of Climate, Energy and Environment chose 11 places that flood repeatedly. The list includes Jakjeong-dong in Incheon and the area around Eupnae-dong in Seosan, among others. These places are being named 2026 priority management areas for sewer improvement, and the ministry will announce this on October 30. The aim is to prevent urban flood damage that happens when sewers do not have enough capacity during heavy rain.",
+            "The system began in 2013. It comes from the Sewerage Act (하수도법), article 4-3. A place can be chosen when sewer water floods it again and again. It can also be chosen when there is a worry about such floods. After a place is chosen, the state helps pay for the work. The local government can then build bigger sewers quickly. The state pays 30 percent for a metropolitan local government. It pays 60 percent for a basic local government.",
+            "The paper lists the work as wider sewer pipes, sewer storage facilities and rainwater pump stations, among others. This year the plan is to put a little over 550 billion won into the 11 places. The plan is 68 kilometers of sewer pipe repair. It also adds 12 pump stations, new or bigger, and rainwater inlets. But the total cost and the amounts may still change. They depend on the detailed design.",
+            "From 2013 to 2026, mainly in areas where flooding had occurred, 10 to 37 places were chosen each year. In total, 228 places were chosen. The state has given 2.2151 trillion won so far. So a name is not the end. Money and building work follow the name."
+          ],
+          "enseg": [
+            [
+              "The Ministry of Climate, Energy and Environment ",
+              "chose 11 places that flood repeatedly. ",
+              "The list includes Jakjeong-dong in Incheon ",
+              "and the area around Eupnae-dong in Seosan, ",
+              "among others. ",
+              "These places are being named ",
+              "2026 priority management areas ",
+              "for sewer improvement, ",
+              "and the ministry will announce this ",
+              "on October 30. ",
+              "The aim is to prevent urban flood damage ",
+              "that happens when sewers ",
+              "do not have enough capacity ",
+              "during heavy rain."
+            ],
+            [
+              "The system began in 2013. ",
+              "It comes from the Sewerage Act (하수도법), ",
+              "article 4-3. ",
+              "A place can be chosen ",
+              "when sewer water floods it ",
+              "again and again. ",
+              "It can also be chosen ",
+              "when there is a worry ",
+              "about such floods. ",
+              "After a place is chosen, ",
+              "the state helps pay for the work. ",
+              "The local government can then ",
+              "build bigger sewers quickly. ",
+              "The state pays 30 percent ",
+              "for a metropolitan local government. ",
+              "It pays 60 percent ",
+              "for a basic local government."
+            ],
+            [
+              "The paper lists the work ",
+              "as wider sewer pipes, ",
+              "sewer storage facilities ",
+              "and rainwater pump stations, ",
+              "among others. ",
+              "This year the plan is to put ",
+              "a little over 550 billion won ",
+              "into the 11 places. ",
+              "The plan is 68 kilometers ",
+              "of sewer pipe repair. ",
+              "It also adds 12 pump stations, ",
+              "new or bigger, ",
+              "and rainwater inlets. ",
+              "But the total cost and the amounts ",
+              "may still change. ",
+              "They depend on the detailed design."
+            ],
+            [
+              "From 2013 to 2026, ",
+              "mainly in areas where flooding had occurred, ",
+              "10 to 37 places were chosen each year. ",
+              "In total, 228 places were chosen. ",
+              "The state has given ",
+              "2.2151 trillion won so far. ",
+              "So a name is not the end. ",
+              "Money and building work follow the name."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "sewer",
+              "ko": "하수도, 하수관 (명사)",
+              "base": "sewer [ˈsuːər]"
+            },
+            {
+              "word": "flood",
+              "ko": "물에 잠기게 하다, 침수 (동사·명사)",
+              "base": "flood [flʌd]"
+            },
+            {
+              "word": "local government",
+              "ko": "지방정부 (명사구)",
+              "base": "local [ˈloʊkl] + government [ˈɡʌvərnmənt]"
+            },
+            {
+              "word": "percent",
+              "ko": "퍼센트, 백분율 (명사)",
+              "base": "percent [pərˈsent]"
+            },
+            {
+              "word": "pump station",
+              "ko": "펌프장 (명사구)",
+              "base": "pump [pʌmp] + station [ˈsteɪʃn]"
+            },
+            {
+              "word": "design",
+              "ko": "설계 (명사)",
+              "base": "design [dɪˈzaɪn]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "상습침수지역을 중점관리지역으로 지정하면 국비 지원과 하수도 확충 공사가 따라온다",
+                "하수도법을 올해 새로 만들었다",
+                "지방정부가 하수도 공사를 그만두기로 했다",
+                "지정된 지역에는 비가 적게 온다"
+              ],
+              "answer": 0,
+              "explain": "지정되면 지방정부가 하수도 확충 사업을 조속히 추진할 수 있도록 국비를 지원한다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "올해 지정된 곳의 수와 투입할 금액은?",
+              "choices": [
+                "9곳에 2조 2,151억 원",
+                "228곳에 5,500여억 원",
+                "11곳에 5,500여억 원",
+                "11곳에 68억 원"
+              ],
+              "answer": 2,
+              "explain": "올해 지정된 11곳에 5,500여억 원을 투입할 계획이라고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "국비 보조율에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "광역지자체 30%, 기초지자체 60%다",
+                "광역지자체 60%, 기초지자체 30%다",
+                "어느 쪽이든 100%다",
+                "지자체 종류와 상관없이 같다"
+              ],
+              "answer": 0,
+              "explain": "글은 국비 보조율이 광역지자체 30%, 기초지자체 60%라고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「국비」는 무엇인가요?",
+              "choices": [
+                "공사를 맡은 회사의 돈",
+                "나라가 내는 돈",
+                "주민이 모아서 내는 돈",
+                "지방정부가 거두는 세금"
+              ],
+              "answer": 1,
+              "explain": "지정되면 나라가 내는 돈, 곧 국비를 지원한다고 했다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「지정은 이름을 붙이는 일에서 끝나지 않는다」는 말의 뜻으로 알맞은 것은?",
+              "choices": [
+                "이름을 두 번 붙인다는 뜻",
+                "지정된 곳에는 국비와 하수도 확충 공사가 따라온다는 뜻",
+                "지정되면 비가 줄어든다는 뜻",
+                "지정은 주민이 직접 한다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "지정되면 국비를 지원해 지방정부가 하수도 확충 사업을 추진하도록 한다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "어느 기초지자체가 중점관리지역 지정을 받았다면, 글을 근거로 말할 수 있는 것은?",
+              "choices": [
+                "국비 보조율 60%가 적용된다",
+                "국비 보조율 30%가 적용된다",
+                "공사비 전액을 나라가 낸다",
+                "국비 없이 지방정부가 모두 낸다"
+              ],
+              "answer": 0,
+              "explain": "국비 보조율은 광역지자체 30%, 기초지자체 60%라고 했다.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L3": {
+          "title": "지정이라는 행정 행위",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "기후에너지환경부는 집중강우 시 ",
+              "하수도 용량 부족으로 인한 ",
+              "도시침수 피해를 예방하기 위해 ",
+              "인천광역시 작정동, 서산시 읍내동 일원 등 ",
+              "상습침수지역 11곳을 ",
+              "「2026년도 하수도정비 중점관리지역」으로 ",
+              "신규 지정한다. ",
+              "자료는 10월 30일 이를 ",
+              "공고한다고 적었다."
+            ],
+            [
+              "지정은 어떤 곳을 골라 ",
+              "이름을 붙이는 일이지만, ",
+              "뒤에 따라오는 것이 있다. ",
+              "이 제도는 하수도법 제4조의3에 따라 ",
+              "2013년에 도입됐다. ",
+              "하수 범람으로 인한 침수 피해가 ",
+              "상습적으로 발생하거나 발생될 우려가 있는 ",
+              "지역을 지정하고, ",
+              "지방정부가 침수 원인 해소를 위한 ",
+              "하수도 확충 사업을 조속히 추진할 수 있도록 ",
+              "국비를 지원한다. ",
+              "국비 보조율은 광역지자체 30%, ",
+              "기초지자체 60%다."
+            ],
+            [
+              "올해에는 19개 지방정부가 ",
+              "29곳을 지정해 달라고 신청했다. ",
+              "기후에너지환경부와 한국환경공단이 ",
+              "서류검토 및 현장조사를 실시한 뒤, ",
+              "선정위원회가 침수피해 정도와 시급성 등을 ",
+              "종합적으로 고려해 최종 9곳을 선정했다. ",
+              "나머지 2곳은 경로가 다르다. ",
+              "올여름 기록적인 집중호우로 특별재난지역이 선포된 ",
+              "거제시 계룡로 일원, ",
+              "통영시 봉평동 일원 등 2곳을 ",
+              "피해복구 및 도시침수대응사업 ",
+              "예산 지원을 위해 직권지정했다."
+            ],
+            [
+              "자료는 지정된 곳에서 할 일을 ",
+              "공사의 이름으로 적었다. ",
+              "하수관경 확대, 하수저류시설 및 ",
+              "빗물펌프장 설치 등이다. ",
+              "각 공사가 물을 어떻게 다루는 일인지는 ",
+              "이 보도자료 본문에 적혀 있지 않다. ",
+              "올해 지정된 11곳에는 5,500여억 원을 투입해 ",
+              "하수관로 68㎞ 개량, 펌프장 12개 신·증설, ",
+              "빗물받이 설치 등 하수도시설을 확충한다는 계획이다. ",
+              "다만 총사업비와 사업 물량은 ",
+              "실시 설계 결과에 따라 ",
+              "변동 가능하다고 적혀 있다."
+            ],
+            [
+              "자료에는 2013년부터 2026년까지 ",
+              "침수가 발생했던 지역을 중심으로 ",
+              "매년 10~37곳, 총 228곳을 지정하고 ",
+              "지금까지 2조 2,151억 원의 국고를 지원해 ",
+              "하수도 확충 사업을 추진하고 있다고 적혀 있다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "상습침수지역",
+              "easy": "비가 올 때 물에 잠기는 일이 되풀이되는 지역",
+              "hanja": "常(항상 상)+習(익힐 습)+浸(잠길 침)+水(물 수)+地(땅 지)+域(지경 역)"
+            },
+            {
+              "word": "공고",
+              "easy": "여러 사람에게 널리 알리는 일",
+              "hanja": "公(공평할 공)+告(알릴 고)"
+            },
+            {
+              "word": "선정위원회",
+              "easy": "여러 후보 가운데 뽑는 일을 맡은 회의 기구",
+              "hanja": "選(가릴 선)+定(정할 정)+委(맡길 위)+員(인원 원)+會(모일 회)"
+            },
+            {
+              "word": "직권지정",
+              "easy": "신청을 받아 고르는 대신 권한을 가진 쪽이 스스로 정해 지정하는 일",
+              "hanja": "職(직분 직)+權(권세 권)+指(가리킬 지)+定(정할 정)"
+            },
+            {
+              "word": "보조율",
+              "easy": "전체 비용 가운데 도와주는 돈이 차지하는 비율",
+              "hanja": "補(기울 보)+助(도울 조)+率(비율 률)"
+            }
+          ],
+          "en": [
+            "The Ministry of Climate, Energy and Environment is newly designating 11 areas that flood repeatedly as 2026 priority management areas for sewer improvement, and will announce this on October 30. The areas include Jakjeong-dong in Incheon and the area around Eupnae-dong in Seosan. The aim is to prevent urban flood damage that happens when sewers do not have enough capacity during heavy rain.",
+            "Designation means choosing a place and giving it a name, but something follows it. Under article 4-3 of the Sewerage Act (하수도법), the system was introduced in 2013. Areas where flood damage from sewer overflow happens repeatedly, or where there is a concern that it may happen, are designated. The state then supports the cost so that the local government can quickly push ahead with work to expand the sewers and remove the cause of flooding. The state subsidy rate is 30 percent for a metropolitan local government and 60 percent for a basic local government.",
+            "This year 19 local governments applied for 29 places. The ministry and 한국환경공단 carried out a document review and an on-site survey, and then a selection committee considered things such as the degree of flood damage and the urgency, and selected 9 places in the end. The other 2 places came by a different route. The ministry designated two areas ex officio — the area around Gyeryong-ro in Geoje and the area around Bongpyeong-dong in Tongyeong, which were declared special disaster areas after the record heavy rain this summer — so that budget for recovery and urban flood response projects could be supported.",
+            "The paper writes what will be done in the designated places as the names of the work: widening sewer pipe diameters, and building sewer storage facilities and rainwater pump stations, among others. How each piece of work handles water is not written in the body of the press release. The plan is to put a little over 550 billion won into the 11 places designated this year, improving 68 kilometers of sewer pipe, adding or enlarging 12 pump stations, and installing rainwater inlets. The paper notes, however, that the total project cost and the amounts may change according to the result of the detailed design.",
+            "The paper also says that from 2013 to 2026, mainly in areas where flooding had occurred, 10 to 37 places were designated each year, 228 places in total, and that 2.2151 trillion won of state funds has been provided so far to push ahead with work to expand the sewers."
+          ],
+          "enseg": [
+            [
+              "The Ministry of Climate, Energy and Environment ",
+              "is newly designating 11 areas ",
+              "that flood repeatedly ",
+              "as 2026 priority management areas ",
+              "for sewer improvement, ",
+              "and will announce this on October 30. ",
+              "The areas include Jakjeong-dong in Incheon ",
+              "and the area around Eupnae-dong in Seosan. ",
+              "The aim is to prevent urban flood damage ",
+              "that happens when sewers ",
+              "do not have enough capacity ",
+              "during heavy rain."
+            ],
+            [
+              "Designation means choosing a place ",
+              "and giving it a name, ",
+              "but something follows it. ",
+              "Under article 4-3 of the Sewerage Act (하수도법), ",
+              "the system was introduced in 2013. ",
+              "Areas where flood damage from sewer overflow ",
+              "happens repeatedly, ",
+              "or where there is a concern that it may happen, ",
+              "are designated. ",
+              "The state then supports the cost ",
+              "so that the local government can quickly ",
+              "push ahead with work to expand the sewers ",
+              "and remove the cause of flooding. ",
+              "The state subsidy rate is 30 percent ",
+              "for a metropolitan local government ",
+              "and 60 percent for a basic local government."
+            ],
+            [
+              "This year 19 local governments ",
+              "applied for 29 places. ",
+              "The ministry and 한국환경공단 ",
+              "carried out a document review ",
+              "and an on-site survey, ",
+              "and then a selection committee ",
+              "considered things such as the degree of flood damage ",
+              "and the urgency, ",
+              "and selected 9 places in the end. ",
+              "The other 2 places came by a different route. ",
+              "The ministry designated two areas ex officio ",
+              "— the area around Gyeryong-ro in Geoje ",
+              "and the area around Bongpyeong-dong in Tongyeong, ",
+              "which were declared special disaster areas ",
+              "after the record heavy rain this summer — ",
+              "so that budget for recovery ",
+              "and urban flood response projects could be supported."
+            ],
+            [
+              "The paper writes what will be done ",
+              "in the designated places ",
+              "as the names of the work: ",
+              "widening sewer pipe diameters, ",
+              "and building sewer storage facilities ",
+              "and rainwater pump stations, ",
+              "among others. ",
+              "How each piece of work handles water ",
+              "is not written in the body of the press release. ",
+              "The plan is to put ",
+              "a little over 550 billion won ",
+              "into the 11 places designated this year, ",
+              "improving 68 kilometers of sewer pipe, ",
+              "adding or enlarging 12 pump stations, ",
+              "and installing rainwater inlets. ",
+              "The paper notes, however, ",
+              "that the total project cost and the amounts ",
+              "may change according to the result ",
+              "of the detailed design."
+            ],
+            [
+              "The paper also says that from 2013 to 2026, ",
+              "mainly in areas where flooding had occurred, ",
+              "10 to 37 places were designated each year, ",
+              "228 places in total, ",
+              "and that 2.2151 trillion won of state funds ",
+              "has been provided so far ",
+              "to push ahead with work to expand the sewers."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "designate",
+              "ko": "지정하다 (동사)",
+              "base": "designate [ˈdezɪɡneɪt]"
+            },
+            {
+              "word": "repeatedly",
+              "ko": "되풀이해서, 상습적으로 (부사)",
+              "base": "repeatedly [rɪˈpiːtɪdli]"
+            },
+            {
+              "word": "subsidy rate",
+              "ko": "보조율 (명사구)",
+              "base": "subsidy [ˈsʌbsədi] + rate [reɪt]"
+            },
+            {
+              "word": "on-site survey",
+              "ko": "현장조사 (명사구)",
+              "base": "on-site [ˌɒnˈsaɪt] + survey [ˈsɜːrveɪ]"
+            },
+            {
+              "word": "selection committee",
+              "ko": "선정위원회 (명사구)",
+              "base": "selection [sɪˈlekʃn] + committee [kəˈmɪti]"
+            },
+            {
+              "word": "ex officio",
+              "ko": "직권으로 (부사구)",
+              "base": "ex officio [ˌeks əˈfɪʃioʊ]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "하수도법이 올해 처음 만들어졌다",
+                "중점관리지역으로 지정하는 일이 법에 따른 선정과 국비 지원, 하수도 확충 공사로 이어진다",
+                "올해 신청한 29곳이 모두 지정됐다",
+                "지정된 곳의 공사비는 전부 지방정부가 낸다"
+              ],
+              "answer": 1,
+              "explain": "글은 지정의 근거인 하수도법 제4조의3, 선정 절차, 국비 지원과 공사 계획을 차례로 들었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "올해 지정된 11곳에 투입한다는 금액과 하수관로 개량 길이는?",
+              "choices": [
+                "5,500여억 원·68㎞",
+                "2조 2,151억 원·68㎞",
+                "5,500여억 원·12㎞",
+                "228억 원·68㎞"
+              ],
+              "answer": 0,
+              "explain": "올해 지정된 11곳에 5,500여억 원을 투입해 하수관로 68㎞를 개량한다는 계획이라고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "올해 신청과 선정에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "19개 지방정부가 29곳을 신청해 최종 9곳이 선정됐다",
+                "29개 지방정부가 19곳을 신청했다",
+                "19곳이 신청해 19곳이 모두 선정됐다",
+                "올해 228개 지방정부가 29곳을 신청해 최종 9곳이 선정됐다"
+              ],
+              "answer": 0,
+              "explain": "올해에는 19개 지방정부가 29곳을 신청했고 최종 9곳이 선정됐다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「직권지정」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "주민 투표로 지정하는 일",
+                "이미 한 지정을 취소하는 일",
+                "신청을 받아 고르는 대신 권한을 가진 쪽이 스스로 정해 지정하는 일",
+                "지방정부의 신청을 받아 선정위원회가 서류검토와 현장조사를 거쳐 고르는 일"
+              ],
+              "answer": 2,
+              "explain": "선정위원회가 고른 9곳과 달리, 특별재난지역 2곳은 예산 지원을 위해 직권지정했다고 했다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "거제시와 통영시의 2곳이 다른 9곳과 다른 점은?",
+              "choices": [
+                "국비를 지원받지 못한다",
+                "침수 피해가 없었다",
+                "공고 날짜가 다르다",
+                "특별재난지역 선포에 따라 피해복구·도시침수대응사업 예산 지원을 위해 직권으로 지정됐다"
+              ],
+              "answer": 3,
+              "explain": "9곳은 서류검토·현장조사와 선정위원회를 거쳐 선정됐고, 2곳은 특별재난지역 선포에 따라 예산 지원을 위해 직권지정됐다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "자료가 적은 공사 이름을 두고, 이 글을 근거로 할 수 있는 말은?",
+              "choices": [
+                "그 공사들이 모두 같은 공사라고 적혀 있다",
+                "그 공사들 가운데 하나만 한다고 적혀 있다",
+                "이름만 적혀 있고 각 공사가 물을 어떻게 다루는지는 보도자료 본문에 없다",
+                "그 공사들의 비용이 각각 적혀 있다"
+              ],
+              "answer": 2,
+              "explain": "글은 공사의 이름을 적었을 뿐, 각 공사가 물을 어떻게 다루는지는 보도자료 본문에 없다고 했다.",
+              "evidencePara": 3
+            }
+          ]
+        },
+        "L4": {
+          "title": "이름을 붙이면 따라오는 것",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "기후에너지환경부의 2026년 10월 29일자 ",
+              "보도자료에 따르면, ",
+              "이 부처는 집중강우 시 ",
+              "하수도 용량 부족으로 인한 ",
+              "도시침수 피해 예방을 위해 ",
+              "인천광역시 작정동, 서산시 읍내동 일원 등 ",
+              "상습침수지역 11곳을 ",
+              "「2026년도 하수도정비 중점관리지역」으로 ",
+              "신규 지정하고 10월 30일 이를 공고한다."
+            ],
+            [
+              "눈여겨볼 것은 ",
+              "「지정」이 무엇을 하는 행위인가다. ",
+              "하수도정비 중점관리지역 지정 제도는 ",
+              "하수도법 제4조의3에 따라 2013년에 도입됐다. ",
+              "대상은 하수 범람으로 인한 침수 피해가 ",
+              "상습적으로 발생하거나 발생될 우려가 있는 지역이다. ",
+              "지정하면 지방정부가 ",
+              "침수 원인 해소를 위한 ",
+              "하수도 확충 사업을 ",
+              "조속히 추진할 수 있도록 국비를 지원한다. ",
+              "국비 보조율은 광역지자체 30%, 기초지자체 60%다. ",
+              "법이 근거를 주고, 부처가 지역을 고르고, ",
+              "사업은 지방정부가 추진하며, ",
+              "국비가 그 비용의 일부를 받치는 구조다."
+            ],
+            [
+              "고르는 길은 둘이었다. ",
+              "올해에는 19개 지방정부가 29곳을 ",
+              "지정해 달라고 신청했고, ",
+              "기후에너지환경부와 한국환경공단이 ",
+              "서류검토 및 현장조사를 실시한 후 ",
+              "선정위원회가 침수피해 정도와 시급성 등을 ",
+              "종합적으로 고려해 최종 9곳을 선정했다. ",
+              "여기에 올여름 기록적인 집중호우로 ",
+              "특별재난지역이 선포된 ",
+              "거제시 계룡로 일원, ",
+              "통영시 봉평동 일원 등 2곳을 ",
+              "피해복구 및 도시침수대응사업 ",
+              "예산 지원을 위해 직권지정했다."
+            ],
+            [
+              "자료가 적은 공사 이름은 ",
+              "하수관경 확대, 하수저류시설 및 빗물펌프장 설치 등이다. ",
+              "각 공사가 물을 어떻게 다루는 일인지는 ",
+              "이 보도자료 본문에 적혀 있지 않다. ",
+              "올해 지정된 11곳에는 5,500여억 원을 투입해 ",
+              "하수관로 68㎞ 개량, 펌프장 12개 신·증설, ",
+              "빗물받이 설치 등 하수도시설을 확충하여 ",
+              "침수 원인을 근본적으로 해결할 계획이다. ",
+              "다만 자료는 총사업비 및 사업 물량이 ",
+              "실시 설계 결과에 따라 ",
+              "변동 가능하다고 적어 두었다."
+            ],
+            [
+              "자료에는 2013년부터 2026년까지 ",
+              "침수가 발생했던 지역을 중심으로 ",
+              "매년 10~37곳, 총 228곳을 지정하고 ",
+              "지금까지 2조 2,151억 원의 국고를 지원해 ",
+              "하수도 확충 사업을 추진하고 있다고 적혀 있다."
+            ],
+            [
+              "조현수 기후에너지환경부 물환경정책관은 ",
+              "「기후변화로 집중호우가 빈번해지고 ",
+              "도시침수 위험이 커짐에 따라, ",
+              "올해는 빗물받이 청소와 맨홀 추락방지시설 설치를 ",
+              "중점 추진하는 한편, ",
+              "관로 정비와 펌프장 확충에도 힘써왔다」라고 밝혔다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "하수도법",
+              "easy": "하수도에 관한 일을 정해 놓은 법",
+              "hanja": "下(아래 하)+水(물 수)+道(길 도)+法(법 법)"
+            },
+            {
+              "word": "직권지정",
+              "easy": "신청을 받아 고르는 대신 권한을 가진 쪽이 스스로 정해 지정하는 일",
+              "hanja": "職(직분 직)+權(권세 권)+指(가리킬 지)+定(정할 정)"
+            },
+            {
+              "word": "보조율",
+              "easy": "전체 비용 가운데 도와주는 돈이 차지하는 비율",
+              "hanja": "補(기울 보)+助(도울 조)+率(비율 률)"
+            },
+            {
+              "word": "실시 설계",
+              "easy": "공사를 실제로 하기 전에 내용과 물량을 자세히 정하는 설계",
+              "hanja": "實(열매 실)+施(베풀 시)+設(베풀 설)+計(셀 계)"
+            },
+            {
+              "word": "확충",
+              "easy": "모자란 것을 늘리고 넓히는 일",
+              "hanja": "擴(넓힐 확)+充(채울 충)"
+            }
+          ],
+          "en": [
+            "According to the Ministry of Climate, Energy and Environment's press release dated October 29, 2026, the ministry is newly designating 11 areas that flood repeatedly — among them Jakjeong-dong in Incheon and the area around Eupnae-dong in Seosan — as 2026 priority management areas for sewer improvement, in order to prevent urban flood damage caused by a shortage of sewer capacity during heavy rain, and will announce this on October 30.",
+            "What is worth noticing is what the act of designation does. The priority management area system for sewer improvement was introduced in 2013 under article 4-3 of the Sewerage Act (하수도법). The targets are areas where flood damage from sewer overflow happens repeatedly, or where there is a concern that it may happen. Once an area is designated, the state supports the cost so that the local government can quickly push ahead with work to expand the sewers and remove the cause of flooding. The state subsidy rate is 30 percent for a metropolitan local government and 60 percent for a basic local government. The law provides the ground, the ministry chooses the areas, the local government carries out the projects, and state funds carry part of the cost.",
+            "There were two routes for being chosen. This year 19 local governments applied for 29 places; the ministry and 한국환경공단 carried out a document review and an on-site survey, and a selection committee then considered the degree of flood damage and the urgency, among other things, and selected 9 places in the end. In addition, two areas — the area around Gyeryong-ro in Geoje and the area around Bongpyeong-dong in Tongyeong, declared special disaster areas after the record heavy rain this summer — were designated ex officio so that budget for recovery and urban flood response projects could be supported.",
+            "The work the paper lists is named as widening sewer pipe diameters, and building sewer storage facilities and rainwater pump stations, among others. How each piece of work handles water is not written in the body of the press release. The plan is to put a little over 550 billion won into the 11 places designated this year and expand sewer facilities — improving 68 kilometers of sewer pipe, adding or enlarging 12 pump stations, installing rainwater inlets — so as to solve the cause of flooding fundamentally. The paper notes, however, that the total project cost and the amounts of work may change according to the result of the detailed design.",
+            "The paper says that from 2013 to 2026, mainly in areas where flooding had occurred, 10 to 37 places were designated each year, 228 places in total, and that 2.2151 trillion won of state funds has been provided so far to push ahead with work to expand the sewers.",
+            "조현수, the ministry's 물환경정책관 (water environment policy official), said: “As climate change makes heavy rain more frequent and the risk of urban flooding grows, this year we have focused on cleaning rainwater inlets and installing fall-prevention devices on manholes, while also working on pipe maintenance and expanding pump stations.”"
+          ],
+          "enseg": [
+            [
+              "According to ",
+              "the Ministry of Climate, Energy and Environment's ",
+              "press release dated October 29, 2026, ",
+              "the ministry is newly designating 11 areas ",
+              "that flood repeatedly ",
+              "— among them Jakjeong-dong in Incheon ",
+              "and the area around Eupnae-dong in Seosan — ",
+              "as 2026 priority management areas for sewer improvement, ",
+              "in order to prevent urban flood damage ",
+              "caused by a shortage of sewer capacity ",
+              "during heavy rain, ",
+              "and will announce this on October 30."
+            ],
+            [
+              "What is worth noticing ",
+              "is what the act of designation does. ",
+              "The priority management area system ",
+              "for sewer improvement was introduced in 2013 ",
+              "under article 4-3 of the Sewerage Act (하수도법). ",
+              "The targets are areas where flood damage ",
+              "from sewer overflow happens repeatedly, ",
+              "or where there is a concern that it may happen. ",
+              "Once an area is designated, ",
+              "the state supports the cost ",
+              "so that the local government can quickly ",
+              "push ahead with work to expand the sewers ",
+              "and remove the cause of flooding. ",
+              "The state subsidy rate is 30 percent ",
+              "for a metropolitan local government ",
+              "and 60 percent for a basic local government. ",
+              "The law provides the ground, ",
+              "the ministry chooses the areas, ",
+              "the local government carries out the projects, ",
+              "and state funds carry part of the cost."
+            ],
+            [
+              "There were two routes for being chosen. ",
+              "This year 19 local governments applied for 29 places; ",
+              "the ministry and 한국환경공단 ",
+              "carried out a document review and an on-site survey, ",
+              "and a selection committee then considered ",
+              "the degree of flood damage and the urgency, ",
+              "among other things, ",
+              "and selected 9 places in the end. ",
+              "In addition, two areas ",
+              "— the area around Gyeryong-ro in Geoje ",
+              "and the area around Bongpyeong-dong in Tongyeong, ",
+              "declared special disaster areas ",
+              "after the record heavy rain this summer — ",
+              "were designated ex officio ",
+              "so that budget for recovery ",
+              "and urban flood response projects could be supported."
+            ],
+            [
+              "The work the paper lists ",
+              "is named as widening sewer pipe diameters, ",
+              "and building sewer storage facilities ",
+              "and rainwater pump stations, ",
+              "among others. ",
+              "How each piece of work handles water ",
+              "is not written in the body of the press release. ",
+              "The plan is to put ",
+              "a little over 550 billion won ",
+              "into the 11 places designated this year ",
+              "and expand sewer facilities ",
+              "— improving 68 kilometers of sewer pipe, ",
+              "adding or enlarging 12 pump stations, ",
+              "installing rainwater inlets — ",
+              "so as to solve the cause of flooding fundamentally. ",
+              "The paper notes, however, ",
+              "that the total project cost and the amounts of work ",
+              "may change according to the result ",
+              "of the detailed design."
+            ],
+            [
+              "The paper says that from 2013 to 2026, ",
+              "mainly in areas where flooding had occurred, ",
+              "10 to 37 places were designated each year, ",
+              "228 places in total, ",
+              "and that 2.2151 trillion won of state funds ",
+              "has been provided so far ",
+              "to push ahead with work to expand the sewers."
+            ],
+            [
+              "조현수, the ministry's 물환경정책관 ",
+              "(water environment policy official), said: ",
+              "“As climate change makes heavy rain more frequent ",
+              "and the risk of urban flooding grows, ",
+              "this year we have focused on cleaning rainwater inlets ",
+              "and installing fall-prevention devices on manholes, ",
+              "while also working on pipe maintenance ",
+              "and expanding pump stations.”"
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "designation",
+              "ko": "지정 (명사)",
+              "base": "designation [ˌdezɪɡˈneɪʃn]"
+            },
+            {
+              "word": "subsidy rate",
+              "ko": "보조율 (명사구)",
+              "base": "subsidy [ˈsʌbsədi] + rate [reɪt]"
+            },
+            {
+              "word": "ex officio",
+              "ko": "직권으로 (부사구)",
+              "base": "ex officio [ˌeks əˈfɪʃioʊ]"
+            },
+            {
+              "word": "detailed design",
+              "ko": "실시 설계 (명사구)",
+              "base": "detailed [ˈdiːteɪld] + design [dɪˈzaɪn]"
+            },
+            {
+              "word": "expand",
+              "ko": "확충하다, 넓히다 (동사)",
+              "base": "expand [ɪkˈspænd]"
+            },
+            {
+              "word": "fundamentally",
+              "ko": "근본적으로 (부사)",
+              "base": "fundamentally [ˌfʌndəˈmentəli]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 힘주어 설명하는 것은?",
+              "choices": [
+                "올해 집중호우가 잦아진 기상 원인",
+                "「지정」이라는 행정 행위가 법·선정·국비·공사로 이어지는 구조",
+                "하수도 공사를 맡은 회사들의 경쟁",
+                "특별재난지역 선포 절차의 문제점"
+              ],
+              "answer": 1,
+              "explain": "글은 지정의 근거(하수도법 제4조의3), 고르는 경로, 국비 보조율, 공사 계획을 묶어 지정이 무엇을 하는 행위인지 설명한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "지정 제도의 근거와 도입 시기는?",
+              "choices": [
+                "하수도법 제4조의3에 따라 2013년 도입",
+                "하수도법 제4조의3에 따라 2026년 도입",
+                "하수도법 제4조에 따라 2013년 도입",
+                "도시침수대응사업법에 따라 2013년 도입"
+              ],
+              "answer": 0,
+              "explain": "하수도정비 중점관리지역 지정 제도는 하수도법 제4조의3에 따라 2013년에 도입됐다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "올해 11곳이 정해진 경로를 바르게 말한 것은?",
+              "choices": [
+                "19개 지방정부가 신청한 29곳을 모두 지정했다",
+                "신청·검토를 거쳐 선정위원회가 9곳을 고르고, 특별재난지역 2곳을 직권지정했다",
+                "한국환경공단이 11곳을 직접 지정했다",
+                "선정위원회가 11곳을 모두 선정했다"
+              ],
+              "answer": 1,
+              "explain": "29곳 신청 가운데 선정위원회가 최종 9곳을 선정하고, 거제시·통영시의 2곳은 직권지정했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「보조율」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "공사를 마치는 데 걸리는 기간",
+                "전체 비용 가운데 도와주는 돈이 차지하는 비율",
+                "매년 지정된 곳의 수를 전체 햇수로 나누어 얻은 평균 값",
+                "지방정부가 신청한 곳의 비율"
+              ],
+              "answer": 1,
+              "explain": "국비 보조율이 광역지자체 30%, 기초지자체 60%라는 것은 국비가 사업비의 일부를 보조하는 비율을 뜻한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "critical",
+              "q": "이 자료를 바탕으로 기사를 쓸 때 가장 조심해야 할 표현은?",
+              "choices": [
+                "올해 11곳이 신규 지정됐다",
+                "국비 보조율은 광역지자체 30%, 기초지자체 60%다",
+                "하수관로 68㎞ 개량과 펌프장 12개 신·증설이 확정되었다",
+                "지정 제도는 2013년에 도입됐다"
+              ],
+              "answer": 2,
+              "explain": "자료는 총사업비 및 사업 물량이 실시 설계 결과에 따라 변동 가능하다고 적어 두었으므로 확정된 물량으로 쓸 수 없다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「매년 10~37곳, 총 228곳」이라는 표기에서 알 수 있는 것은?",
+              "choices": [
+                "해마다 지정된 곳의 수가 같지 않았다",
+                "2013년부터 2026년까지 해마다 꼭 37곳씩 지정했다",
+                "228곳이 모두 올해 지정됐다",
+                "지정은 2026년에 처음 시작됐다"
+              ],
+              "answer": 0,
+              "explain": "해마다 10곳에서 37곳 사이라는 범위로 적었으므로 연도별 수가 일정하지 않았음을 알 수 있다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "자료가 적은 공사에 대해 자료가 적지 않은 것은?",
+              "choices": [
+                "침수 원인 해소를 위한 하수도 확충 사업이라는 점",
+                "올해 지정된 11곳에 5,500여억 원을 투입한다는 점",
+                "하수도법에 따라 국비를 지원해 지방정부가 사업을 추진한다는 점",
+                "각 공사가 물을 어떻게 다루는 일인지에 대한 본문의 설명"
+              ],
+              "answer": 3,
+              "explain": "자료는 공사의 이름만 적었고, 각 공사가 물을 어떻게 다루는 일인지는 본문에 적혀 있지 않다.",
+              "evidencePara": 3
+            }
           ]
         }
       }

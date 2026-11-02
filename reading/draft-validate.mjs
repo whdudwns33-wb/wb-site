@@ -6,11 +6,16 @@
  *
  *   --numbers   숫자가 든 문장을 모두 뽑아 준다(⑦ 수치 교차 확인용).
  *               숫자만 맞고 가리키는 양이 다른 종류를 사람이 보려면
- *               숫자를 그 문장째로 읽어야 한다. */
+ *               숫자를 그 문장째로 읽어야 한다.
+ *
+ * 어휘 카드의 한자 훈음은 저장소의 articles.json 과도 대조한다 — 한 글자를 지문마다
+ * 다르게 적어 두면 같은 학생이 어휘 카드와 한자 카드에서 다른 훈을 읽는다.
+ * content.test.cjs 가 오류로 막는 자리인데, 집필은 한 편씩 따로 하므로 병합할 때까지
+ * 드러나지 않는다(2026-11-02 에 네 편에서 10건이 한꺼번에 나왔다). 미리 여기서 잡는다. */
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { checkDraft, LEVELS } = require('./draft-check.js');
+const { checkDraft, LEVELS, collectReadings, hanjaClash } = require('./draft-check.js');
 
 const args = process.argv.slice(2);
 const wantNumbers = args.includes('--numbers');
@@ -39,6 +44,15 @@ function numbers(a) {
   return out;
 }
 
+/* 저장소의 articles.json 에서 글자당 훈음을 모은다 — 없으면 이 대조는 건너뛴다 */
+function corpusReadings() {
+  try {
+    const db = JSON.parse(fs.readFileSync(new URL('./articles.json', import.meta.url), 'utf8'));
+    return collectReadings(db.articles || []);
+  } catch { return null; }
+}
+const CORPUS = corpusReadings();
+
 let bad = 0;
 for (const f of files) {
   if (!fs.existsSync(f)) { console.log('없음', f); bad++; continue; }
@@ -56,9 +70,11 @@ for (const f of files) {
       + ` · 어휘 ${t.vocab} · 문항 ${t.q}+심화 ${t.challenge}`
       + (t.qCount ? ` · 최장=정답 ${t.lengthTell}/${t.qCount}` : ''));
   }
+  const clash = hanjaClash(a, CORPUS);
+  clash.forEach((m) => console.log('  X', m));
   warns.forEach((w) => console.log('  WARN:', w));
   errors.forEach((e) => console.log('  X', e));
-  bad += errors.length;
+  bad += errors.length + clash.length;
   if (wantNumbers) {
     console.log('  — 숫자가 든 문장 (출처 문장과 뜻까지 맞는지 본다)');
     numbers(a).forEach((l) => console.log(l));
