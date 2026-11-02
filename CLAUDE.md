@@ -48,6 +48,8 @@ node scripts/check.mjs --only letter   # 고친 앱만 (경로에 letter 가 든
 node <앱>/<이름>.test.cjs           # 단위 테스트 (의존성 없음, 파일별 실행)
 node reading-server/<이름>.test.mjs # 서버 테스트
 node reading-server/build-dist.mjs  # dist 조립 (+ SW 캐시 이름 스탬프)
+node reading/extract-source.mjs <주소|파일.html> -o <출력.txt>   # 진로독서: 출처 지면 → 본문 텍스트 (③ 확정·④ 브리프에 그대로 넘긴다)
+node reading/draft-validate.mjs <지문.json> [--numbers]        # 진로독서: 병합 전 초안 한 편 검사 (--numbers 는 숫자가 든 문장을 뽑아 준다)
 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 로컬 서버
 WB_ADMIN_ONLY=1 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 터널로 외부 공개할 때(결정 A — 학생 로그인을 내주지 않는다. 기동 로그에 [관리 전용] 이 뜨는지 눈으로 확인)
 node naesin/pack-validate.mjs <팩 디렉터리>     # 영어 레슨 팩 검증
