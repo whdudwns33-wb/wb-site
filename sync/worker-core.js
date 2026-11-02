@@ -100,7 +100,7 @@ import { taskDirectorSession } from './task-director.js';
 import { handlePrivateChat } from './private-chat.js';
 import { handleSelfIdentity } from './self-identity.js';
 import { handleTaskPush, dispatchTaskPush } from './task-push.js';
-import { handleTuitionAlert, handleStudentAttendance } from './tuition-alert.js';
+import { handleTuitionAlert, handleStudentAttendance, handleSessionAttendanceCorrection } from './tuition-alert.js';
 import { handleBookIssue } from './book-issue.js';
 import { handleBookCatalog } from './completed-book-catalog.js';
 import { handleTransport } from './transport.js';
@@ -3732,6 +3732,10 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleTuitionAlert(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/session-attendance-correction') {
+        const auth = await resolveAuth(env, app, body.auth);
+        return await handleSessionAttendanceCorrection(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/student-attendance') {
         const auth = await resolveAuth(env, app, body.auth);

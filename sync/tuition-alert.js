@@ -52,6 +52,14 @@ async function alertId(studentId, cycleStartDate) {
   return 'tga_' + (await sha256Hex('tuition-generation-alert-v1\n' + studentId + '\n' + cycleStartDate)).slice(0, 52);
 }
 
+// 과거 수동 보정에서 발급한 알림 ID도 같은 학생·회차의 불변 기록으로 유지한다.
+async function existingOrNewAlertId(env, studentId, cycleStartDate) {
+  const row = await env.DB.prepare("SELECT alert_id FROM tuition_generation_alerts WHERE app='task' AND student_id=? AND cycle_start_date=? LIMIT 1")
+    .bind(studentId, cycleStartDate).first();
+  if (row && ALERT_ID.test(String(row.alert_id || ''))) return String(row.alert_id);
+  return alertId(studentId, cycleStartDate);
+}
+
 async function confirmationId(exactAlertId) {
   return 'tgc_' + (await sha256Hex('tuition-generation-confirmation-v1\n' + exactAlertId)).slice(0, 52);
 }
@@ -830,7 +838,7 @@ function exactActiveAlertState(state, generation, trigger) {
  * 관리자가 확인한 전체 과거 구간을 새 append-only 세대로 적재한다. 이전 세대는 삭제하지 않으며,
  * expectedGeneration + supersedes_event_count를 함께 사용해 Cron과의 동시 쓰기를 fail-closed 처리한다.
  */
-async function reconcileStudentSessionLedgerInput(env, input) {
+async function reconcileStudentSessionLedgerInput(env, input, transaction = {}) {
   const roster = await loadRoster(env, input.sourceCutoffDate, true);
   if (roster.error) return { ok: false, code: roster.error };
   const student = roster.students.get(input.studentId);
@@ -878,7 +886,7 @@ async function reconcileStudentSessionLedgerInput(env, input) {
     if (cycle.entries.length < ATTENDANCE_THRESHOLD) continue;
     const trigger = cycle.entries[ATTENDANCE_THRESHOLD - 1];
     activeAlerts.push({
-      alertId: await alertId(input.studentId, cycle.cycleStartDate),
+      alertId: await existingOrNewAlertId(env, input.studentId, cycle.cycleStartDate),
       studentId: input.studentId, configuredStartDate: input.configuredStartDate,
       ledgerGeneration: generationNo, stateRevision: 1,
       cycleStartDate: cycle.cycleStartDate, effectiveStatus: 'active',
@@ -911,7 +919,7 @@ async function reconcileStudentSessionLedgerInput(env, input) {
   for (const row of baseRows.results || []) {
     const cycleStartDate = String(row.cycle_start_date || '');
     if (!relevantStarts.has(cycleStartDate) || activeStarts.has(cycleStartDate)) continue;
-    const expectedId = await alertId(input.studentId, cycleStartDate);
+    const expectedId = await existingOrNewAlertId(env, input.studentId, cycleStartDate);
     if (String(row.alert_id || '') !== expectedId || String(row.student_id || '') !== input.studentId) {
       return { ok: false, code: 'STUDENT_SESSION_RECONCILIATION_ALERT_READ_FAILED' };
     }
@@ -957,7 +965,7 @@ async function reconcileStudentSessionLedgerInput(env, input) {
   for (const spec of activeAlerts.concat(suppressedAlerts)) {
     statements.push(alertStateStatement(env, spec));
   }
-  try { await env.DB.batch(statements); }
+  try { await env.DB.batch([...(transaction.before || []), ...statements, ...(transaction.after || [])]); }
   catch (error) {
     return { ok: false, code: 'STUDENT_SESSION_RECONCILIATION_CONFLICT' };
   }
@@ -1116,7 +1124,7 @@ export async function syncStudentSessionLedgers(env, scheduledTime) {
 
 async function ensureLegacyTuitionAlert(env, student, cycle, cutoff) {
   const trigger = cycle.entries[ATTENDANCE_THRESHOLD - 1];
-  const id = await alertId(student.studentId, cycle.cycleStartDate);
+  const id = await existingOrNewAlertId(env, student.studentId, cycle.cycleStartDate);
   const saved = await baseAlertStatement(
     env, id, student.studentId, cycle.cycleStartDate, trigger, cutoff
   ).run();
@@ -1133,7 +1141,7 @@ async function ensureLegacyTuitionAlert(env, student, cycle, cutoff) {
 
 async function ensureGenerationTuitionAlert(env, student, ledger, cycle, cutoff) {
   const trigger = cycle.entries[ATTENDANCE_THRESHOLD - 1];
-  const id = await alertId(student.studentId, cycle.cycleStartDate);
+  const id = await existingOrNewAlertId(env, student.studentId, cycle.cycleStartDate);
   let prior = await latestAlertState(env, id, student.cycleStartDate);
   if (exactActiveAlertState(prior, ledger.generation.generation, trigger)) return 'idempotent';
   const stateRevision = prior && prior.ledgerGeneration === ledger.generation.generation
@@ -1525,4 +1533,65 @@ export async function handleTuitionAlert(env, app, body, origin, auth, json) {
   if (action === 'list') return await listAlerts(env, body, origin, auth, json);
   if (action === 'confirm') return await confirmAlert(env, body, origin, auth, json);
   return reply(json, origin, { ok: false, error: '지원하지 않는 수강료 알림 작업입니다' }, 400);
+}
+
+/** 마감 출결의 관리자 전용 정정. 일반 sync 잠금은 그대로 유지한다. */
+export async function handleSessionAttendanceCorrection(env, app, body, origin, auth, json) {
+  const fail = (error, status = 400) => reply(json, origin, {ok:false,error}, status);
+  if (app !== 'task' || !auth || auth.scope !== 'all') return fail('관리자만 출결을 정정할 수 있습니다',403);
+  const taskId=String(body.taskId || ''), date=String(body.date || '');
+  const now=Date.now(), cutoff=finalizedAttendanceDateAt(now);
+  if (!SAFE_ID.test(taskId) || !validDate(date) || date>cutoff) return fail('마감된 수업 날짜를 선택해 주세요');
+  const taskRow=await env.DB.prepare("SELECT id,owner,data FROM tasks WHERE app='task' AND id=?").bind(taskId).first();
+  if (!taskRow) return fail('수업을 찾을 수 없습니다',404);
+  const task=JSON.parse(taskRow.data);
+  const rosterRow=await env.DB.prepare("SELECT data FROM private_rosters WHERE app='task'").first();
+  const document=JSON.parse(rosterRow?.data || '{}');
+  const student=billingStudents(document,cutoff,true).get(String(task.studentId || ''));
+  if (!student || date<student.cycleStartDate || !lessonTask(task,taskId,taskRow.owner) ||
+      (student.sessionBillingSubject && task.subject!==student.sessionBillingSubject))
+    return fail('회차 시작일 이후의 회차제 정규수업만 정정할 수 있습니다');
+  const key=taskId+'|'+date;
+  const current=await env.DB.prepare("SELECT data,updated_at FROM checks WHERE app='task' AND k=?").bind(key).first();
+  // 신규 출결을 넣을 때도 실제 수업일/비정기 방문 근거를 확인한다.
+  const visit=await env.DB.prepare("SELECT visit_id FROM weekend_actual_visits WHERE app='task' AND lesson_task_id=? AND student_id=? AND visit_date=? LIMIT 1")
+    .bind(taskId,student.studentId,date).first();
+  const policy=weekendAttendancePolicyOn(task,date);
+  if (!taskRangeAllowsOn(task,date) || (policy==='flexible' ? !visit : !occursOn(task,date) && !visit))
+    return fail('해당 날짜의 수업 또는 실제 방문 기록을 확인해 주세요');
+  const check=JSON.parse(current?.data || '{}');
+  if (body.action==='preview') return reply(json,origin,{ok:true,studentName:student.name,subject:task.subject || '',date,
+    attendance:String(check.att || ''),expectedUpdatedAt:Number(current?.updated_at || 0)});
+  const status=String(body.status || ''),reason=String(body.reason || '').trim();
+  if (body.action!=='correct' || !CALENDAR_ATTENDANCE.has(status) || !reason || reason.length>300)
+    return fail('출결과 정정 사유(300자 이내)를 입력해 주세요');
+  if (!Number.isSafeInteger(body.expectedUpdatedAt) || body.expectedUpdatedAt!==Number(current?.updated_at || 0))
+    return fail('출결 기록이 변경됐습니다. 창을 다시 열어 확인해 주세요',409);
+  if (check.att===status) return reply(json,origin,{ok:true,unchanged:true,check:{key,data:check}});
+  const state=await ensureInitialLedgerState(env,student,now);
+  if (state.storage!=='generation' || !state.generation) return fail('회차 원장을 준비하지 못했습니다',503);
+  const raw=await qualifyingRows(env,student.cycleStartDate,cutoff);
+  const evidence=raw.map(row=>qualifyingEvidence(row,new Map([[student.studentId,student]]),cutoff)).filter(Boolean);
+  const authoritative=state.cycles.flatMap(cycle=>cycle.entries).map(item=>({...item,studentId:student.studentId}));
+  const candidates=authoritative.concat(evidence.filter(item=>!state.sourceCutoffDate || item.date>state.sourceCutoffDate || item.directAttested));
+  const entries=sortedUniqueEvidence(candidates).filter(item=>(item.checkKey || item.taskId+'|'+item.date)!==key)
+    .map(item=>({studentId:student.studentId,taskId:item.taskId,date:item.date,status:item.status,
+      checkKey:item.checkKey || item.taskId+'|'+item.date,sourceKind:'admin_attested'}));
+  if (QUALIFYING_ATTENDANCE.has(status)) entries.push({studentId:student.studentId,taskId,date,status,checkKey:key,sourceKind:'admin_attested'});
+  const stamp=Math.max(now,Number(current?.updated_at || 0)+1);
+  const next={...check,taskId,date,att:status,absenceType:'',updatedAt:stamp};
+  const data=JSON.stringify(next), id=crypto.randomUUID(),actor=actorKey(auth);
+  const before=[
+    env.DB.prepare("INSERT INTO session_attendance_correction_permits(app,check_key,expected_data,expected_updated_at,next_data,next_updated_at,task_id,task_data,roster_data) VALUES('task',?,?,?,?,?,?,?,?)")
+      .bind(key,current?.data ?? null,Number(current?.updated_at || 0),data,stamp,taskId,taskRow.data,rosterRow.data),
+    env.DB.prepare("INSERT INTO session_attendance_corrections(app,correction_id,student_id,task_id,check_key,before_data,after_data,reason,actor,created_at) VALUES('task',?,?,?,?,?,?,?,?,?)")
+      .bind(id,student.studentId,taskId,key,current?.data ?? null,data,reason,actor,stamp),
+    env.DB.prepare("INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES('task',?,?,?,?,?) ON CONFLICT(app,k) DO UPDATE SET owner=excluded.owner,data=excluded.data,updated_at=excluded.updated_at,srv_at=excluded.srv_at")
+      .bind(key,taskRow.owner,data,stamp,stamp)
+  ];
+  const after=[env.DB.prepare("DELETE FROM session_attendance_correction_permits WHERE app='task' AND check_key=?").bind(key)];
+  const result=await reconcileStudentSessionLedgerInput(env,{studentId:student.studentId,configuredStartDate:student.cycleStartDate,
+    sourceCutoffDate:cutoff,entries,reasonCode:'attendance_correction',actor,expectedGeneration:state.generation.generation,now:stamp},{before,after});
+  if (!result.ok) return fail('정정을 저장하지 못했습니다. 최신 출결을 확인한 뒤 다시 시도해 주세요 ('+result.code+')',409);
+  return reply(json,origin,{ok:true,check:{key,data:next},generation:result.generation});
 }
