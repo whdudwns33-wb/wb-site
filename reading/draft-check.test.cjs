@@ -213,6 +213,39 @@ function sample() {
   ok(r.stats.L4.lengthTell === 0, '정답이 최장이 아니면 0 — ' + r.stats.L4.lengthTell);
 }
 
+/* ── 한자 훈음은 글자당 하나 ──
+   집필은 한 편씩 따로 하므로 훈음 충돌은 병합할 때까지 드러나지 않는다.
+   2026-11-02 에 네 편에서 10건이 한꺼번에 나와 content.test.cjs 가 막았다. */
+{
+  const corpus = C.collectReadings([
+    { id: 'old-one', levels: { L3: { vocab: [{ word: '매개변수', hanja: '媒(중매 매)+數(셈 수)' }] } } },
+    { id: 'old-two', levels: { L4: { vocab: [{ word: '피폭', hanja: '曝(쬘 폭)' }] } } }
+  ]);
+  ok(corpus['數'] && corpus['數']['셈 수'] === 'old-one/L3 매개변수', '훈음 모으기 — 출처 자리까지');
+  ok(corpus['曝'] && Object.keys(corpus['曝']).length === 1, '훈음 모으기 — 글자별 하나');
+
+  const clash = C.hanjaClash(
+    { id: 'new', levels: { L2: { vocab: [{ word: '전수', hanja: '全(온전 전)+數(셀 수)' }] } } }, corpus);
+  has(clash, '數(셀 수)', '어긋난 훈음을 집는다');
+  has(clash, '數(셈 수)', '모아 둔 훈음을 함께 보여 준다');
+  has(clash, 'old-one/L3 매개변수', '어디서 쓰였는지 알려 준다');
+  ok(clash.length === 1, '새 글자(全)는 충돌이 아니다 — 나온 것 ' + clash.length);
+
+  ok(C.hanjaClash({ id: 'same', levels: { L2: { vocab: [{ word: '피폭', hanja: '曝(쬘 폭)' }] } } }, corpus).length === 0,
+    '같은 훈음은 통과');
+  ok(C.hanjaClash({ id: 'none', levels: { L2: { vocab: [{ word: '전수', hanja: '全(온전 전)' }] } } }, corpus).length === 0,
+    '모아 둔 것에 없는 글자는 통과');
+  ok(C.hanjaClash({ id: 'x', levels: { L1: { vocab: [{ word: '기록' }] } } }, corpus).length === 0,
+    '한자 없는 어휘는 통과');
+  ok(C.hanjaClash(null, corpus).length === 0 && C.hanjaClash({}, null).length === 0,
+    '빈 입력에 터지지 않는다');
+  /* 여러 레벨에서 같은 글자를 다르게 쓰면 각각 집는다 */
+  const two = C.hanjaClash({ id: 'n2', levels: {
+    L2: { vocab: [{ word: '전수', hanja: '數(셀 수)' }] },
+    L3: { vocab: [{ word: '결산', hanja: '數(셈할 수)' }] } } }, corpus);
+  ok(two.length === 2, '레벨마다 집는다 — 나온 것 ' + two.length);
+}
+
 /* ── 정본 대조: content.test.cjs 와 수치가 같은가 ──
    한쪽만 고치면 병합 전과 병합 후가 다른 규격을 잰다. */
 {

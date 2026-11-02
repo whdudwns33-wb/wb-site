@@ -197,7 +197,50 @@
     return { errors: errors, warns: warns, stats: stats };
   }
 
+  /* 어휘 카드의 한자 훈음 — 글자당 하나로 고정해야 한다.
+     어휘 카드는 vocab.hanja 를 그대로 보여 주고 한자 카드는 그것을 낱글자로 쪼개 모으므로,
+     한 글자를 지문마다 다르게 적으면 같은 학생이 두 화면에서 다른 훈을 읽는다.
+     content.test.cjs 가 오류로 막지만, 집필은 한 편씩 따로 하므로 병합할 때까지 드러나지 않는다
+     (2026-11-02 에 네 편에서 10건이 한꺼번에 나왔다). 그래서 병합 전에 미리 잰다. */
+  function collectReadings(articles) {
+    var map = {};
+    (articles || []).forEach(function (a) {
+      Object.keys((a && a.levels) || {}).forEach(function (lv) {
+        ((a.levels[lv] || {}).vocab || []).forEach(function (v) {
+          if (!v || !v.hanja) return;
+          String(v.hanja).replace(/(.)\(([^)]+)\)/g, function (_, ch, rd) {
+            if (!map[ch]) map[ch] = {};
+            if (!map[ch][rd]) map[ch][rd] = a.id + '/' + lv + ' ' + v.word;
+            return '';
+          });
+        });
+      });
+    });
+    return map;
+  }
+
+  /* 초안 하나가 쓰는 훈음이 모아 둔 것과 어긋나는 자리를 돌려준다 */
+  function hanjaClash(a, corpus) {
+    var out = [];
+    if (!a || !corpus) return out;
+    Object.keys((a.levels) || {}).forEach(function (lv) {
+      ((a.levels[lv] || {}).vocab || []).forEach(function (v) {
+        if (!v || !v.hanja) return;
+        String(v.hanja).replace(/(.)\(([^)]+)\)/g, function (_, ch, rd) {
+          var seen = corpus[ch];
+          if (!seen || seen[rd]) return '';      /* 새 글자이거나 같은 훈음이면 괜찮다 */
+          var have = Object.keys(seen)[0];
+          out.push(lv + ' ' + v.word + ': 한자 "' + ch + '(' + rd + ')" — 모아 둔 것은 "'
+            + ch + '(' + have + ')" 입니다 (' + seen[have] + '). 하나로 통일하지 않으면 content.test.cjs 가 막습니다');
+          return '';
+        });
+      });
+    });
+    return out;
+  }
+
   return {
+    collectReadings: collectReadings, hanjaClash: hanjaClash,
     LIMITS: LIMITS, SPEC: SPEC, TOL: TOL, LONG: LONG, LEVELS: LEVELS,
     QTYPES: QTYPES, CHTYPES: CHTYPES, CATS: CATS, CAREERS: CAREERS,
     words: words, isIndexPage: isIndexPage, isAttachmentOnly: isAttachmentOnly,
