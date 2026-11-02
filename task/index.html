@@ -6238,7 +6238,7 @@ function quickAttendanceRows(staffId, date) {
     const times = slots.map(slot => slot.startTime + '–' + slot.endTime).sort();
     return { task, recordDate, att: String(check && check.att || ''), time: times.join(', ') || task.time || '시간 미지정',
       issue: !context.inputEnabled || !recordDate ? context.issue || '실제 등원 기록 확인 중' :
-        locked && locked.locked ? '회차 출결 마감 · 관리자 정정 필요' :
+        locked && locked.locked ? '회차 출결 마감' :
         reconcile && reconcile.status === 'pending' ? '보강 정리 처리 중' : '' };
   }).sort((a, b) => a.time.localeCompare(b.time) || String(a.task.id).localeCompare(String(b.task.id)));
 }
@@ -6274,7 +6274,7 @@ function quickAttendanceHtml(staffId, date) {
         (row.recordDate && row.recordDate !== date ? '<div class="small">실제 기록일 ' + esc(row.recordDate) + '</div>' : '') + '</div>' +
         '<div class="quick-att-actions">' + button('P', '출석') + button('A', '결석') +
         '<details><summary>기타</summary><div>' + button('L', '지각') + button('E', '조퇴') + '</div></details></div>' +
-        '<div class="quick-att-error" role="status">' + esc(row.issue || quickAttendance.errors.get(t.id) || '') + '</div></div>';
+        '<div class="quick-att-error" role="status">' + esc(row.issue || quickAttendance.errors.get(t.id) || '') + sessionAttendanceCorrectionButton(t, row.recordDate) + '</div></div>';
     }).join('') + '</div></details>';
 }
 async function saveQuickAttendanceBatch() {
@@ -7283,7 +7283,7 @@ function taskPanel(t, date, c, editable) {
       [['P', '출석'], ['L', '지각'], ['A', '결석'], ['E', '조퇴']].map(([v, l]) =>
         '<button class="chip ' + (att === v ? 'on' : '') + '" data-act="latt" data-id="' + t.id + '" data-date="' + date + '" data-v="' + v + '"' +
           (attendanceLocked || attendanceReconcileBusy ? ' disabled' : '') + '>' + l + '</button>'
-      ).join('') + '</div>' + sessionPackAttendanceHintHtml(t, date, c, sessionAttendance) +
+      ).join('') + '</div>' + sessionPackAttendanceHintHtml(t, date, c, sessionAttendance) + sessionAttendanceCorrectionButton(t, date) +
       makeupAttendanceReconcileHintHtml(t.id, date) +
       (isScheduledMakeupTask(t) ? '' : makeupRequestHtml(t, date, c)) + '</section>';
   }
@@ -11582,6 +11582,43 @@ function sessionPackForLessonTask(task, referenceDate) {
   return sessionPackRows.find(pack => pack && pack.status === 'active' &&
     String(pack.lessonTaskId || '') === String(task.id || '') &&
     (!date || ((!pack.validFrom || String(pack.validFrom) <= date) && (!pack.expiresOn || String(pack.expiresOn) >= date)))) || null;
+}
+
+function sessionAttendanceCorrectionButton(task, date) {
+  const locked = date && sessionPackAttendanceState(task, date);
+  if (!session.isAdmin || !locked || !locked.locked || !locked.rosterSession4 || locked.pack ||
+      isScheduledMakeupTask(task) || isSubscriptionSessionTask(task)) return '';
+  return '<button class="btn btn-sm btn-warn" data-act="sessionattcorrect" data-id="' + esc(task.id) + '" data-date="' + esc(date) + '">출결 정정</button>';
+}
+let sessionAttendanceCorrectionDraft = null;
+async function openSessionAttendanceCorrection(task, date) {
+  if (!session.isAdmin || !task) return;
+  try {
+    await settleSync();
+    const result = await sync.post('/session-attendance-correction', {app:SYNC_APP,auth:sync.auth(),action:'preview',taskId:task.id,date});
+    sessionAttendanceCorrectionDraft = {taskId:task.id,date,expectedUpdatedAt:result.expectedUpdatedAt};
+    modal('마감 출결 정정', '<div class="hint mb14">' + esc(result.studentName) + ' · ' + esc(result.subject) + '<br>' + esc(date) +
+      ' · 기존 출결: ' + esc((ATT_LABEL[result.attendance] || ['미입력'])[0]) + '</div>' +
+      '<label class="field"><span class="fl">정정할 출결</span><select class="in" id="sessionCorrectionStatus">' +
+      [['P','출석'],['A','결석'],['L','지각'],['E','조퇴']].map(([value,label]) => '<option value="' + value + '"' + (value===result.attendance?' selected':'') + '>' + label + '</option>').join('') + '</select></label>' +
+      '<label class="field"><span class="fl">정정 사유</span><textarea class="in" id="sessionCorrectionReason" maxlength="300" placeholder="예: 실제 결석했으나 출결 입력이 누락됨"></textarea></label>' +
+      '<div class="small muted">회차 원장과 수강료 생성 안내를 함께 재계산합니다. 기존 수업 메모는 유지됩니다.</div><div id="sessionCorrectionError" role="alert"></div>',
+      '<button class="btn btn-primary btn-block" data-act="sessionattcorrectsave">정정 저장</button>');
+  } catch(error) { toast('정정 화면을 열지 못했습니다 — ' + error.message); }
+}
+async function saveSessionAttendanceCorrection(button) {
+  if (!session.isAdmin || !sessionAttendanceCorrectionDraft || button.disabled) return;
+  const reason = String($('#sessionCorrectionReason')?.value || '').trim();
+  const errorNode = $('#sessionCorrectionError');
+  if (!reason) { errorNode.textContent='정정 사유를 입력해 주세요'; return; }
+  button.disabled=true;
+  try {
+    const result=await sync.post('/session-attendance-correction', {app:SYNC_APP,auth:sync.auth(),action:'correct',
+      ...sessionAttendanceCorrectionDraft,status:$('#sessionCorrectionStatus').value,reason});
+    state.checks[result.check.key]=result.check.data; save();
+    sessionAttendanceCorrectionDraft=null; closeModal(); render(); loadSession4Ledger(true);
+    toast('출결과 회차 원장을 정정했습니다');
+  } catch(error) { if(errorNode.isConnected) errorNode.textContent=error.message; button.disabled=false; }
 }
 
 const SESSION_PACK_ATTENDANCE_CUTOFF_MINUTE = 23 * 60 + 50;
@@ -25079,6 +25116,8 @@ document.addEventListener('click', async ev => {
       } else openMsg();
       break;
     }
+    case 'sessionattcorrect': await openSessionAttendanceCorrection(task(), date); break;
+    case 'sessionattcorrectsave': await saveSessionAttendanceCorrection(el); break;
     case 'latt': {
       const t = task(); if (!t) break;
       const quick = el.dataset.quick === '1';
