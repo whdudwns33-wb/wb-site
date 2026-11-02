@@ -14,6 +14,7 @@ function setup() {
   ];
   const checks = {b:{att:'A'}}, writes=[];
   const ctx = { Map, Set, console, tasks, checks, writes,
+    sessionAttendanceCorrectionButton:()=>'',
     teacherTaskCardsFor:(id)=>tasks.filter(t=>t.staffId===id), isLesson:()=>true,
     lessonRecordContext:(t,d)=>({recordDate:t.id==='a'?'2026-10-18':d,inputEnabled:true}),
     getCheck:id=>checks[id], sessionPackAttendanceState:t=>({locked:t.id==='c'}),
