@@ -138,9 +138,30 @@
       }
     }
 
+    /* 정답이 「혼자 가장 긴 선지」인 문항을 센다.
+       학생이 지문을 읽지 않고 가장 긴 선지만 골라도 맞으면 문항이 재는 것이 없다.
+       2026-11-02 전수 측정에서 발행된 63편의 1,512문항 가운데 85%가 이 꼴이었다 —
+       긴 정답은 쓰다 보면 저절로 생긴다(정답에는 근거를 다 담고 오답은 짧게 끝내므로).
+       기존 지문을 막지 않도록 경고로 둔다. */
+    var tell = 0, qn = 0;
+    [].concat(b.questions || [], b.challenge || []).forEach(function (q) {
+      var ch = q.choices;
+      if (!Array.isArray(ch) || ch.length !== 4) return;
+      if (!Number.isInteger(q.answer) || q.answer < 0 || q.answer > 3) return;
+      qn += 1;
+      var len = ch.map(function (c) { return String(c).length; });
+      var mx = Math.max.apply(null, len);
+      var ties = len.filter(function (x) { return x === mx; }).length;
+      if (len[q.answer] === mx && ties === 1) tell += 1;
+    });
+    if (qn >= 4 && tell / qn > 0.5)
+      W(tag + ': 정답이 혼자 가장 긴 선지인 문항 ' + tell + '/' + qn
+        + ' — 지문을 읽지 않고 가장 긴 선지만 골라도 맞습니다. 정답을 줄이거나 오답 하나를 같은 길이로 늘리세요');
+
     return { chars: chars, segs: lens.length, mean: mean, max: maxSeg,
              vocab: (b.vocab || []).length, q: (b.questions || []).length,
-             challenge: (b.challenge || []).length };
+             challenge: (b.challenge || []).length,
+             lengthTell: tell, qCount: qn };
   }
 
   /* 지문 한 편을 검사한다 → {errors, warns, stats} */
