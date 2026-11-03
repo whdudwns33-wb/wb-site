@@ -3821,7 +3821,7 @@ function viewPersonAccess() {
         '<div class="guide"><b>안전하게 여는 방법</b>1. 아래에서 원본 개인 링크를 복사합니다.<br>2. Safari 또는 Chrome 주소창에 붙여넣습니다.<br>3. 열린 화면에서 <b>이 기기에 연결</b>을 누릅니다.</div>' +
         '<div class="link-actions"><button class="btn btn-primary btn-block" data-act="copyentrylink">원본 개인 링크 복사</button>' +
         (navigator.share ? '<button class="btn btn-ghost btn-block" data-act="shareentrylink">다른 브라우저로 보낼 링크 공유</button>' : '') +
-        (hasVerifiedPersonAuth() ? '<button class="btn btn-ghost btn-block" data-act="useexistingauth">새 링크를 쓰지 않고 이 기기의 기존 연결 계속 사용</button>' : '') +
+        (hasStoredPersonToken() ? '<button class="btn btn-ghost btn-block" data-act="useexistingauth"' + (linkExchangeBusy ? ' disabled' : '') + '>새 링크를 쓰지 않고 이 기기의 기존 연결 계속 사용</button>' : '') +
         '</div><div class="hint" style="margin-top:12px">복사나 공유만으로는 코드가 사용되지 않습니다.</div></div>';
     }
     const canRetry = !problem || problem.retryable;
@@ -3831,7 +3831,7 @@ function viewPersonAccess() {
       '<div class="link-actions">' +
       (canRetry ? '<button class="btn btn-primary btn-block" data-act="connectdevice"' + (linkExchangeBusy ? ' disabled' : '') + '>' + (linkExchangeBusy ? '연결하는 중…' : '이 기기에 연결') + '</button>' : '') +
       '<button class="btn btn-ghost btn-block" data-act="copyentrylink">이 개인 링크 다시 복사</button>' +
-      (hasVerifiedPersonAuth() ? '<button class="btn btn-ghost btn-block" data-act="useexistingauth">새 링크를 쓰지 않고 이 기기의 기존 연결 계속 사용</button>' : '') +
+      (hasStoredPersonToken() ? '<button class="btn btn-ghost btn-block" data-act="useexistingauth"' + (linkExchangeBusy ? ' disabled' : '') + '>새 링크를 쓰지 않고 이 기기의 기존 연결 계속 사용</button>' : '') +
       '</div></div>';
   }
 
@@ -23503,15 +23503,17 @@ async function connectPendingDevice() {
 }
 
 function useExistingPersonAuth() {
-  if (!hasVerifiedPersonAuth()) {
-    toast('기존 개인 인증이 확인되지 않았습니다');
+  // 저장된 연결 선택은 인증 완료와 별개다. 업무 접근은 기존 서버·출근 로그인 게이트가 검증한다.
+  if (!session.isStaffLink || !hasStoredPersonToken()) {
+    toast('이 기기에 저장된 연결이 없습니다 — 새 QR 또는 링크로 연결해 주세요');
     return;
   }
+  if (linkExchangeBusy) return;
   pendingBootstrapCode = '';
   personAccessProblem = null;
   scrubBootstrapCodeFromAddress();
   render();
-  ensureSyncLoopStarted();
+  startSyncSession();
 }
 
 async function retryExistingPersonAuth(button) {
