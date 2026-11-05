@@ -5814,7 +5814,7 @@ function lessonHandoffCardHtml(row, mode) {
     lessonHandoffReadOnlyMemo(row.sourceMemo, sourceName + '의 인계 당시 원 수업 메모' + (row.simple ? '' : ' · ' + row.completedHours)) +
     '<div class="guide lesson-handoff-note"><b>' + esc(sourceName) + '의 전달 메모</b><br>' + esc(row.note || '전달 메모 없음') + '</div>';
   if (!popup && lessonHandoffCanAct(row, 'attendance')) body += '<div class="lesson-handoff-actions">' +
-    [['P', '출석'], ['L', '지각'], ['A', '결석'], ['E', '조퇴']].map(item => '<button class="btn ' + (att === item[0] ? 'btn-primary' : 'btn-ghost') +
+    [['P', '출석'], ['L', '지각'], ['A', '결석'], ['E', '조퇴'], ['', '미완료']].map(item => '<button class="btn ' + (att === item[0] ? 'btn-primary' : 'btn-ghost') +
       '" data-act="lessonHandoffAttendance" data-att="' + item[0] + '"' + attrs + '>' + item[1] + '</button>').join('') + '</div>';
   if (memoEditable) {
     body += '<div class="lesson-handoff-memo"><div class="fl">' + esc(recipientName) + '의 인계 수업 메모' + (row.simple ? '' : ' · ' + esc(row.remainingHours)) + '</div>' +
@@ -6273,7 +6273,7 @@ function quickAttendanceHtml(staffId, date) {
         (isScheduledMakeupTask(t) ? ' · 보강' : isFlexibleWeekendLesson(t, date) || isSubscriptionSessionTask(t) ? ' · 비정기' : '') + '</div>' +
         (row.recordDate && row.recordDate !== date ? '<div class="small">실제 기록일 ' + esc(row.recordDate) + '</div>' : '') + '</div>' +
         '<div class="quick-att-actions">' + button('P', '출석') + button('A', '결석') +
-        '<details><summary>기타</summary><div>' + button('L', '지각') + button('E', '조퇴') + '</div></details></div>' +
+        '<details><summary>기타</summary><div>' + button('L', '지각') + button('E', '조퇴') + button('', '미완료') + '</div></details></div>' +
         '<div class="quick-att-error" role="status">' + esc(row.issue || quickAttendance.errors.get(t.id) || '') + sessionAttendanceCorrectionButton(t, row.recordDate) + '</div></div>';
     }).join('') + '</div></details>';
 }
@@ -7280,7 +7280,7 @@ function taskPanel(t, date, c, editable) {
     const attendanceReconcileBusy = !!(attendanceReconcile && attendanceReconcile.status === 'pending');
     h += '<section class="lesson-progress-section lesson-attendance"><div class="lesson-progress-section-title">학생 출결</div>' +
       '<div class="row wraprow" style="gap:6px">' +
-      [['P', '출석'], ['L', '지각'], ['A', '결석'], ['E', '조퇴']].map(([v, l]) =>
+      [['P', '출석'], ['L', '지각'], ['A', '결석'], ['E', '조퇴'], ['', '미완료']].map(([v, l]) =>
         '<button class="chip ' + (att === v ? 'on' : '') + '" data-act="latt" data-id="' + t.id + '" data-date="' + date + '" data-v="' + v + '"' +
           (attendanceLocked || attendanceReconcileBusy ? ' disabled' : '') + '>' + l + '</button>'
       ).join('') + '</div>' + sessionPackAttendanceHintHtml(t, date, c, sessionAttendance) + sessionAttendanceCorrectionButton(t, date) +
@@ -11600,7 +11600,7 @@ async function openSessionAttendanceCorrection(task, date) {
     modal('마감 출결 정정', '<div class="hint mb14">' + esc(result.studentName) + ' · ' + esc(result.subject) + '<br>' + esc(date) +
       ' · 기존 출결: ' + esc((ATT_LABEL[result.attendance] || ['미입력'])[0]) + '</div>' +
       '<label class="field"><span class="fl">정정할 출결</span><select class="in" id="sessionCorrectionStatus">' +
-      [['P','출석'],['A','결석'],['L','지각'],['E','조퇴']].map(([value,label]) => '<option value="' + value + '"' + (value===result.attendance?' selected':'') + '>' + label + '</option>').join('') + '</select></label>' +
+      [['P','출석'],['A','결석'],['L','지각'],['E','조퇴'],['','미완료']].map(([value,label]) => '<option value="' + value + '"' + (value===result.attendance?' selected':'') + '>' + label + '</option>').join('') + '</select></label>' +
       '<label class="field"><span class="fl">정정 사유</span><textarea class="in" id="sessionCorrectionReason" maxlength="300" placeholder="예: 실제 결석했으나 출결 입력이 누락됨"></textarea></label>' +
       '<div class="small muted">회차 원장과 수강료 생성 안내를 함께 재계산합니다. 기존 수업 메모는 유지됩니다.</div><div id="sessionCorrectionError" role="alert"></div>',
       '<button class="btn btn-primary btn-block" data-act="sessionattcorrectsave">정정 저장</button>');
@@ -12318,7 +12318,7 @@ function makeupAttendanceReconcileHintHtml(taskId, date) {
   const pending = makeupAttendanceReconcileStates.get(makeupCreateKey(taskId, date));
   if (!pending) return '';
   if (pending.status === 'pending') {
-    return '<div class="small muted mt8" role="status" aria-live="polite">출석 저장을 확인한 뒤 연결된 보강건을 정리하고 있습니다.</div>';
+    return '<div class="small muted mt8" role="status" aria-live="polite">출결 저장을 확인한 뒤 연결된 보강건을 정리하고 있습니다.</div>';
   }
   if (pending.status === 'blocked' && pending.message) {
     return '<div class="guide mt8" role="alert">' + esc(pending.message) +
@@ -12327,7 +12327,10 @@ function makeupAttendanceReconcileHintHtml(taskId, date) {
   return '';
 }
 
-async function reconcileMakeupAfterAttendanceCorrection(taskId, date, expectedUpdatedAt) {
+async function reconcileMakeupAfterAttendanceCorrection(taskId, date, expectedUpdatedAt, expectedAttendance = 'P') {
+  if (!['P', ''].includes(expectedAttendance)) return false;
+  const label = expectedAttendance === '' ? '미완료' : '출석';
+  const direction = expectedAttendance === '' ? '미완료로' : '출석으로';
   const sourceKey = makeupCreateKey(taskId, date);
   const previous = makeupAttendanceReconcileStates.get(sourceKey);
   if (previous && previous.status === 'pending') return false;
@@ -12341,7 +12344,7 @@ async function reconcileMakeupAfterAttendanceCorrection(taskId, date, expectedUp
     attendanceSynced = true;
     const current = getCheck(taskId, date);
     const inFlight = makeupAttendanceReconcileStates.get(sourceKey);
-    if (!inFlight || inFlight.operationId !== operationId || !current || current.att !== 'P' ||
+    if (!inFlight || inFlight.operationId !== operationId || !current || String(current.att || '') !== expectedAttendance ||
         (expectedUpdatedAt && Number(current.updatedAt) !== Number(expectedUpdatedAt))) {
       if (inFlight && inFlight.operationId === operationId) makeupAttendanceReconcileStates.delete(sourceKey);
       renderAfterSync();
@@ -12359,7 +12362,7 @@ async function reconcileMakeupAfterAttendanceCorrection(taskId, date, expectedUp
     if (result.lessonTask) applyMakeupLessonTask(result.lessonTask);
     makeupAttendanceReconcileStates.delete(sourceKey);
     const cleaned = !!(result.case && result.case.hiddenByAttendanceCorrection);
-    const message = cleaned ? '출석으로 정정 · 보강건 정리됨' : '출석으로 저장했습니다';
+    const message = cleaned ? direction + ' 정정 · 보강건 정리됨' : direction + ' 저장했습니다';
     makeupLiveMessage = message;
     toast(message);
     renderAfterSync();
@@ -12369,10 +12372,10 @@ async function reconcileMakeupAfterAttendanceCorrection(taskId, date, expectedUp
     if (!latest || latest.operationId !== operationId) return false;
     const reason = String(error && error.message || error || '사유 확인 필요');
     const message = !attendanceSynced
-      ? '출석은 이 기기에 저장됐지만 서버 동기화를 확인할 수 없습니다 — 연결을 확인한 뒤 다시 시도해 주세요'
+      ? label + '은 이 기기에 저장됐지만 서버 동기화를 확인할 수 없습니다 — 연결을 확인한 뒤 다시 시도해 주세요'
       : Number(error && error.status) === 409
-        ? '출석은 정정됐지만 보강 기록은 자동 삭제할 수 없음 — ' + reason + ' · 보강 탭에서 확인해 주세요'
-        : '출석은 정정됐지만 보강 기록 정리 결과를 확인하지 못했습니다 — ' + reason + ' · 보강 탭에서 확인해 주세요';
+        ? direction + ' 정정됐지만 보강 기록은 자동 삭제할 수 없음 — ' + reason + ' · 보강 탭에서 확인해 주세요'
+        : direction + ' 정정됐지만 보강 기록 정리 결과를 확인하지 못했습니다 — ' + reason + ' · 보강 탭에서 확인해 주세요';
     makeupAttendanceReconcileStates.set(sourceKey, {
       status: 'blocked', operationId: operationId, expectedUpdatedAt: Number(expectedUpdatedAt) || 0, message: message
     });
@@ -25130,8 +25133,8 @@ document.addEventListener('click', async ev => {
         quickAttendance.errors.delete(id);
       }
       const v = el.dataset.v;
-      const attendanceLabel = ATT_LABEL[v] && ATT_LABEL[v][0];
-      if (!attendanceLabel || !['P', 'L', 'A', 'E'].includes(v)) break;
+      const attendanceLabel = v === '' ? '미완료' : ATT_LABEL[v] && ATT_LABEL[v][0];
+      if (!attendanceLabel || !['P', 'L', 'A', 'E', ''].includes(v)) break;
       const sourceKey = makeupCreateKey(id, date);
       const reconcileState = makeupAttendanceReconcileStates.get(sourceKey);
       if (reconcileState && reconcileState.status === 'pending') {
@@ -25144,14 +25147,14 @@ document.addEventListener('click', async ev => {
         render();
         break;
       }
-      if (!(quick && v === 'P' && !(getCheck(id, date) || {}).att) && !confirm(attendanceLabel + '으로 저장하겠습니까?')) break;
+      if (!(quick && v === 'P' && !(getCheck(id, date) || {}).att) && !confirm(attendanceLabel + ' 상태로 저장하겠습니까?')) break;
       const next = v;
       const previousAttendance = String((getCheck(id, date) || {}).att || '');
-      const shouldReconcileMakeup = previousAttendance === 'A' && next === 'P' && isMakeupLessonTask(t);
+      const shouldReconcileMakeup = previousAttendance === 'A' && (next === 'P' || next === '') && isMakeupLessonTask(t);
       if (!shouldReconcileMakeup) makeupAttendanceReconcileStates.delete(sourceKey);
       const savedCheck = setCheck(id, date, { att: next, absenceType: '' });
       if (shouldReconcileMakeup) {
-        reconcileMakeupAfterAttendanceCorrection(id, date, savedCheck.updatedAt);
+        reconcileMakeupAfterAttendanceCorrection(id, date, savedCheck.updatedAt, next);
       } else if (!(next === 'A' && isScheduledMakeupTask(t) && !isTestTeacherTask(t))) {
         settleSync().catch(error => {
           if (quick) { quickAttendance.errors.set(id, '기기 저장됨 · 서버 반영 확인 필요: ' + String(sync.err || error.message)); render(); }
@@ -25160,7 +25163,7 @@ document.addEventListener('click', async ev => {
       }
       if (next !== 'A') makeupCreateStates.delete(sourceKey);
       if (shouldReconcileMakeup) {
-        toast('출석으로 정정 중 · 연결된 보강건을 확인합니다');
+        toast(attendanceLabel + ' 상태로 정정 중 · 연결된 보강건을 확인합니다');
       } else if (next === 'A' && isTestTeacherTask(t)) {
         toast('테스트쌤 수업은 보강을 생성하지 않습니다 · 다음날 출석으로 자동 처리됩니다');
       } else if (next === 'A' && isScheduledMakeupTask(t)) {
@@ -25176,7 +25179,7 @@ document.addEventListener('click', async ev => {
         toast('결석 출결 저장 중 · 보강 필요를 자동 생성합니다');
         createMakeupFromAbsence(id, date, null, { automatic: true, expectedUpdatedAt: savedCheck.updatedAt });
       } else {
-        toast(attendanceLabel + '으로 저장했습니다');
+        toast(attendanceLabel + ' 상태로 저장했습니다');
       }
       render();
       break;
