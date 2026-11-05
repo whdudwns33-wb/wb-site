@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>삼육중 및 영재원 대비</title>
+  <title>영재원 대비 삼육중 화산중 영선중 용정중 컨설팅 앱웹</title>
   <meta name="description" content="오늘 카드 한 장 — WB 독해력학원 원내 학습 도구 (원내 전용)">
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
@@ -35,8 +35,8 @@
     input { font-family:inherit; font-size:1.05rem; color:var(--ink); background:var(--panel); }
     :focus-visible { outline:3px solid var(--blue); outline-offset:2px; border-radius:8px; }
     [hidden] { display:none !important; }
-    .bar { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
-    .bar .brand { min-width:0; font-weight:900; font-size:.9375em; color:var(--accent); }
+    .bar { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
+    .bar .brand { flex:1 1 100%; min-width:0; overflow-wrap:anywhere; font-weight:900; font-size:.9375em; color:var(--accent); }
     .bar .who { margin-left:auto; font-size:.8125em; color:var(--soft); }
     .bar .who b { color:var(--ink); }
     .bar .dot { font-size:.75em; color:var(--soft); white-space:nowrap; }
@@ -50,6 +50,7 @@
     .chip { display:inline-block; font-size:.8125em; font-weight:800; line-height:1.5; padding:1px 9px; border-radius:99px; background:var(--green-soft); color:var(--accent); margin:0 4px 2px 0; }
     .chip.fin { background:var(--btn); color:var(--on-btn); }
     .slot { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-top:1px solid var(--line); }
+    .slot > div:last-child { min-width:0; overflow-wrap:anywhere; }
     .slot:first-of-type { border-top:none; padding-top:4px; }
     .slot .k { flex:none; width:2em; height:2em; border-radius:50%; background:var(--green-soft); color:var(--accent); font-weight:900; display:flex; align-items:center; justify-content:center; font-size:.875em; }
     .slot .k svg { width:1.1em; height:1.1em; }
@@ -157,7 +158,7 @@
 </head>
 <body>
   <header class="bar">
-    <span class="brand">삼육중 및 영재원 대비</span>
+    <span class="brand">영재원 대비 삼육중 화산중 영선중 용정중 컨설팅 앱웹</span>
     <span class="dot" id="savedot" role="status" hidden><i aria-hidden="true"></i><span id="savetxt"></span></span>
     <span class="who" id="who"></span>
   </header>
@@ -165,7 +166,7 @@
     <strong>샘플 미리보기</strong>
     <p class="small">직접 만든 예시로 둘러보세요. 기록은 저장되지 않고 새로고침하면 초기화됩니다. 영재원 기능은 준비 중입니다.</p>
     <nav aria-label="샘플 화면 선택">
-      <a href="./guide.html">준비 안내</a>
+      <a href="./v2/">컨설팅 안내</a>
       <a href="./?preview=1">학생 홈</a>
       <a href="./?preview=1&amp;view=map">좌표</a>
       <a href="./?preview=1&amp;view=omr">답안지</a>
@@ -276,7 +277,7 @@
     function showLink(msg, typed) {
       LINK_SEQ++;
       $('savedot').hidden = true; $('who').textContent = '';
-      render('<div class="card"><h2>삼육중·영재원 준비 안내</h2><p class="small">전형 정보와 학년별 준비 순서를 먼저 확인하세요.</p><a class="big ghost" href="./guide.html">준비 안내 먼저 보기</a></div>' +
+      render('<div class="card"><h2>영재원·삼육중·화산중·영선중·용정중 컨설팅 안내</h2><p class="small">전형 정보와 학년별 준비 순서를 먼저 확인하세요.</p><a class="big ghost" href="./v2/">컨설팅 안내 먼저 보기</a></div>' +
         '<form class="card link" id="lf" novalidate><h2><label for="code">선생님께 받은 학생 코드</label></h2>' + (msg ? '<div class="err" id="lerr">' + esc(msg) + '</div>' : '') +
         /* 학생 코드는 대소문자를 가린다(서버 정확 일치) — 태블릿이 첫 글자를 대문자로 바꾸지 않게 자동 고침을 모두 끈다. 소문자로 바꾸지도 않는다 */
         '<input id="code" name="code" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="go" placeholder="wb-…"' + (msg ? ' aria-invalid="true" aria-describedby="lerr"' : '') + '>' +
