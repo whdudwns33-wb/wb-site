@@ -2182,8 +2182,8 @@ async function reconcileAttendance(env, app, body, auth, json, origin) {
   const key = sourceTaskId + '|' + sourceDate;
   const checkRow = await env.DB.prepare('SELECT owner,data FROM checks WHERE app=? AND k=? LIMIT 1').bind(app, key).first();
   const check = checkRow && parseJson(checkRow.data);
-  if (!checkRow || String(checkRow.owner || '') !== currentTeacherId || !check || check.att !== 'P') {
-    problem('서버 출결이 출석(P)으로 저장된 경우에만 연결된 보강을 취소할 수 있습니다',
+  if (!checkRow || String(checkRow.owner || '') !== currentTeacherId || !check || !['P', ''].includes(String(check.att || ''))) {
+    problem('서버 출결이 출석 또는 미완료로 저장된 경우에만 연결된 보강을 취소할 수 있습니다',
       409, 'ATTENDANCE_CORRECTION_REQUIRED');
   }
   if (!row) return json({ ok: true, idempotent: true, case: null }, 200, origin);
@@ -2212,8 +2212,8 @@ async function reconcileAttendance(env, app, body, auth, json, origin) {
     env.DB.prepare(
       "UPDATE makeup_cases SET updated_at=updated_at WHERE app=? AND case_id=? AND revision=? AND status=? " +
       "AND EXISTS (SELECT 1 FROM checks WHERE checks.app=? AND checks.k=? AND checks.owner=? " +
-      "AND json_valid(checks.data)=1 AND json_extract(checks.data,'$.att')='P')"
-    ).bind(app, row.case_id, Number(row.revision), row.status, app, key, currentTeacherId),
+      "AND json_valid(checks.data)=1 AND COALESCE(json_extract(checks.data,'$.att'),'')=?)"
+    ).bind(app, row.case_id, Number(row.revision), row.status, app, key, currentTeacherId, String(check.att || '')),
     await casGuard(env, app, 'makeup_reconcile_attendance', row, now)
   ];
   if (!taskDelete) {
@@ -2233,8 +2233,8 @@ async function reconcileAttendance(env, app, body, auth, json, origin) {
       const freshCheck = await env.DB.prepare('SELECT owner,data FROM checks WHERE app=? AND k=? LIMIT 1')
         .bind(app, key).first();
       const fresh = freshCheck && parseJson(freshCheck.data);
-      if (!freshCheck || String(freshCheck.owner || '') !== currentTeacherId || !fresh || fresh.att !== 'P') {
-        problem('서버 출결이 더 이상 출석(P)이 아닙니다', 409, 'ATTENDANCE_CORRECTION_REQUIRED');
+      if (!freshCheck || String(freshCheck.owner || '') !== currentTeacherId || !fresh || String(fresh.att || '') !== String(check.att || '')) {
+        problem('서버 출결이 변경되었습니다. 최신 출결을 확인해 주세요', 409, 'ATTENDANCE_CORRECTION_REQUIRED');
       }
     }
     mapAtomicMakeupError(error);

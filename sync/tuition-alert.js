@@ -1563,7 +1563,7 @@ export async function handleSessionAttendanceCorrection(env, app, body, origin, 
   if (body.action==='preview') return reply(json,origin,{ok:true,studentName:student.name,subject:task.subject || '',date,
     attendance:String(check.att || ''),expectedUpdatedAt:Number(current?.updated_at || 0)});
   const status=String(body.status || ''),reason=String(body.reason || '').trim();
-  if (body.action!=='correct' || !CALENDAR_ATTENDANCE.has(status) || !reason || reason.length>300)
+  if (body.action!=='correct' || typeof body.status!=='string' || (status!=='' && !CALENDAR_ATTENDANCE.has(status)) || !reason || reason.length>300)
     return fail('출결과 정정 사유(300자 이내)를 입력해 주세요');
   if (!Number.isSafeInteger(body.expectedUpdatedAt) || body.expectedUpdatedAt!==Number(current?.updated_at || 0))
     return fail('출결 기록이 변경됐습니다. 창을 다시 열어 확인해 주세요',409);
