@@ -1350,3 +1350,17 @@ test('correction preserves legacy alert ID and confirmation instead of creating 
   const res=await correct(db,{});assert.equal(res.body.ok,true,JSON.stringify(res));
   assert.equal(db.database.prepare('SELECT alert_id,effective_status FROM tuition_generation_alert_states ORDER BY ledger_generation DESC LIMIT 1').get().effective_status,'suppressed');
 });
+
+test('admin can reset finalized attendance with audit while retaining notes and recalculating sessions',async()=>{
+  const db=correctionFixture();await handleScheduledTuitionAlerts({DB:db},CUTOFF);
+  assert.equal((await correct(db,{status:undefined})).status,400);
+  const result=await correct(db,{status:'',reason:'출석 확인 전으로 정정'});
+  assert.equal(result.body.ok,true,JSON.stringify(result));
+  assert.equal(result.body.check.data.att,'');assert.equal(result.body.check.data.note,'preserve memo');
+  const gen=db.database.prepare('SELECT MAX(generation) n FROM student_session_ledger_generations').get().n;
+  assert.equal(db.database.prepare('SELECT COUNT(*) n FROM student_session_ledger_events WHERE generation=?').get(gen).n,2);
+  assert.equal(db.database.prepare('SELECT effective_status FROM tuition_generation_alert_states ORDER BY ledger_generation DESC LIMIT 1').get().effective_status,'suppressed');
+  assert.equal(db.database.prepare('SELECT COUNT(*) n FROM session_attendance_corrections').get().n,1);
+  assert.equal((await correct(db,{status:'',expectedUpdatedAt:result.body.check.data.updatedAt})).body.unchanged,true);
+  assert.equal((await correct(db,{status:'',expectedUpdatedAt:result.body.check.data.updatedAt},{scope:'own',id:'teacher-a'})).status,403);
+});
