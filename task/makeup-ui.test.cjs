@@ -126,12 +126,12 @@ test('automatic creation cancels if attendance changes while sync runs', () => {
   assert.ok(create.indexOf("latestCheck.att !== 'A'") < create.indexOf("sync.post('/makeup'"));
 });
 
-test('only an A-to-P correction syncs attendance first and reconciles its linked makeup case', async () => {
+test('an A-to-P or incomplete correction syncs attendance first and reconciles its linked makeup case', async () => {
   const reconcile = block('async function reconcileMakeupAfterAttendanceCorrection', 'async function loadMakeups');
   const click = block("case 'latt':", "case 'fbtext':");
   const panel = block('function taskPanel(t, date, c, editable)', '/** 수업 출결 표시용 */');
-  assert.match(click, /previousAttendance === 'A' && next === 'P' && isMakeupLessonTask\(t\)/);
-  assert.match(click, /reconcileMakeupAfterAttendanceCorrection\(id, date, savedCheck\.updatedAt\)/);
+  assert.match(click, /previousAttendance === 'A' && \(next === 'P' \|\| next === ''\) && isMakeupLessonTask\(t\)/);
+  assert.match(click, /reconcileMakeupAfterAttendanceCorrection\(id, date, savedCheck\.updatedAt, next\)/);
   assert.match(panel, /attendanceReconcileBusy/);
   assert.match(panel, /makeupAttendanceReconcileHintHtml\(t\.id, date\)/);
   assert.ok(reconcile.indexOf('await settleSync()') < reconcile.indexOf("sync.post('/makeup'"));
@@ -167,6 +167,9 @@ test('only an A-to-P correction syncs attendance first and reconciles its linked
   assert.equal(states.has('lesson-1|2026-09-03'), false);
   assert.equal(api.live(), '출석으로 정정 · 보강건 정리됨');
   assert.ok(calls.includes('출석으로 정정 · 보강건 정리됨'));
+  check.att = '';
+  assert.equal(await api.run('lesson-1', '2026-09-03', 22, ''), true);
+  assert.equal(api.live(), '미완료로 정정 · 보강건 정리됨');
 });
 
 test('attendance reconciliation blocks duplicate calls and keeps a precise 409 reason after attendance is saved', async () => {
@@ -208,7 +211,7 @@ test('attendance reconciliation blocks duplicate calls and keeps a precise 409 r
   assert.equal(await blocked('lesson-2', '2026-09-03', 31), false);
   const state = blockedStates.get('lesson-2|2026-09-03');
   assert.equal(state.status, 'blocked');
-  assert.match(state.message, /출석은 정정됐지만 보강 기록은 자동 삭제할 수 없음/);
+  assert.match(state.message, /출석으로 정정됐지만 보강 기록은 자동 삭제할 수 없음/);
   assert.match(state.message, /이미 출결·메모가 있는 보강수업입니다/);
   assert.match(state.message, /보강 탭에서 확인해 주세요/);
   assert.equal(messages.at(-1), state.message);

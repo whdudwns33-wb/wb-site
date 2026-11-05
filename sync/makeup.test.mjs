@@ -2841,3 +2841,27 @@ test('unknown and PII-shaped fields are rejected and never stored', async () => 
   assert.match(rejected.body.error, /허용되지 않은/);
   assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
 });
+
+test('resetting attendance cancels unperformed automatic makeup, retains source memo and permits later absence', async()=>{
+  const db=new TestD1();seed(db);
+  const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+  await callAt(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'},'2026-08-11T12:00:00+09:00');
+  const check={taskId:'lesson-a',date:'2026-08-10',att:'',note:'keep'};
+  db.prepare("UPDATE checks SET data=? WHERE k='lesson-a|2026-08-10'").bind(JSON.stringify(check)).run();
+  const result=await call(db,own('teacher-a'),{action:'reconcile_attendance',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+  assert.equal(result.status,200,JSON.stringify(result.body));assert.equal(result.body.case.hiddenByAttendanceCorrection,true);assert.equal(result.body.lessonTask.deleted,true);
+  assert.deepEqual(JSON.parse(db.database.prepare("SELECT data FROM checks WHERE k='lesson-a|2026-08-10'").get().data),check);
+  db.prepare("UPDATE checks SET data=? WHERE k='lesson-a|2026-08-10'").bind(JSON.stringify({...check,att:'A'})).run();
+  const reopened=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+  assert.equal(reopened.status,200);assert.equal(reopened.body.case.status,'review_pending');
+});
+
+test('reset reconciliation cannot cancel makeup if attendance becomes absent concurrently',async()=>{
+  const db=new TestD1();seed(db);
+  const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+  db.prepare("UPDATE checks SET data=json_set(data,'$.att','') WHERE k='lesson-a|2026-08-10'").run();
+  db.beforeBatch=()=>db.prepare("UPDATE checks SET data=json_set(data,'$.att','A') WHERE k='lesson-a|2026-08-10'").run();
+  const result=await call(db,own('teacher-a'),{action:'reconcile_attendance',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+  assert.equal(result.status,409);assert.equal(result.body.code,'ATTENDANCE_CORRECTION_REQUIRED');
+  assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?').get(created.body.case.caseId).status,'review_pending');
+});
