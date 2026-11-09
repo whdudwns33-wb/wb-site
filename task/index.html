@@ -2165,7 +2165,7 @@ function viewStaffWorkLogin() {
       '<div class="hint mt14">비밀번호를 잊었으면 관리자에게 재설정을 요청해 주세요.</div>' :
       '<div class="hint mt14">' + (staffWork.checked ? '개인 비밀번호가 아직 설정되지 않았습니다. 관리자에게 연락해 주세요.' : '출근 로그인 상태를 확인하고 있습니다.') + '</div>') +
     '<button class="btn btn-ghost btn-block mt14" data-act="managerinspectopen"' + (typeof managerInspection !== 'undefined' && managerInspection.busy ? ' disabled' : '') + '>관리자 로그인</button>' +
-    '<button class="btn btn-ghost btn-block mt14" data-act="staffworkretry"' + (staffWork.busy ? ' disabled' : '') + '>연결 상태 다시 확인</button></div>';
+    '<button class="btn btn-ghost btn-block mt14" data-act="staffworkretry"' + (staffWork.busy ? ' disabled' : '') + '>기존 연결로 다시 접속</button></div>';
 }
 function openManagerInspectionModal() {
   const host = $('#modalHost');
@@ -3842,9 +3842,9 @@ function viewPersonAccess() {
   if (hasStoredPersonToken() && !personAccessProblem) {
     if (sync.problem) return '<div class="card link-gate"><div class="card-title">연결 확인을 완료하지 못했습니다</div>' +
       '<div class="card-sub">' + esc(sync.problem.message) + '</div>' +
-      '<button class="btn btn-primary btn-block mt14" data-act="retryexistingauth">이 기기의 기존 연결 다시 확인</button></div>';
+      '<button class="btn btn-primary btn-block mt14" data-act="retryexistingauth">기존 연결로 다시 접속</button></div>';
     return '<div class="card link-gate"><div class="empty"><b>⏳</b>이 브라우저의 개인 인증을 확인하는 중입니다.<br>확인이 끝난 뒤 업무를 표시합니다.</div>' +
-      '<button class="btn btn-primary btn-block" data-act="retryexistingauth">이 기기의 기존 연결 다시 확인</button></div>';
+      '<button class="btn btn-primary btn-block" data-act="retryexistingauth">기존 연결로 다시 접속</button></div>';
   }
   const problem = personAccessProblem || missingPersonLinkProblem();
   return '<div class="card link-gate"><div class="card-title">' + esc(problem.title) + '</div>' +
@@ -23579,15 +23579,16 @@ async function retryExistingPersonAuth(button) {
   }
   if (sync.busy) { toast('기존 연결을 확인하고 있습니다'); return false; }
   if (button) { button.disabled = true; button.textContent = '기존 연결 확인 중…'; }
-  const verified = await sync.run();
+  const verified = await reconnectSavedDevice();
   if (verified && hasVerifiedPersonAuth()) {
     toast('이 기기의 기존 연결을 확인했습니다');
     render();
     return true;
   }
-  if (hasStoredPersonToken()) toast(sync.problem ? sync.problem.message : '서버에 연결하지 못했습니다 — 인터넷을 확인하고 다시 눌러 주세요');
+  if (hasStoredPersonToken() && staffWork.checked && shouldGateStaffWork()) toast('기기 연결을 확인했습니다 — 출근 비밀번호를 입력해 주세요');
+  else if (hasStoredPersonToken()) toast(sync.problem ? sync.problem.message : '서버에 연결하지 못했습니다 — 인터넷을 확인하고 다시 눌러 주세요');
   else toast('기존 연결이 만료되었거나 해지되었습니다 — 새 QR 또는 링크가 필요합니다');
-  if (button && document.contains(button)) { button.disabled = false; button.textContent = '이 기기의 기존 연결 다시 확인'; }
+  if (button && document.contains(button)) { button.disabled = false; button.textContent = '기존 연결로 다시 접속'; }
   return false;
 }
 
@@ -24197,7 +24198,7 @@ document.addEventListener('click', async ev => {
 
     case 'staffworklogin': loginStaffWork(el); break;
     case 'staffworklogout': logoutStaffWork(el); break;
-    case 'staffworkretry': ensureStaffWorkStatus(true).then(ok => { if (ok) startSyncSession(); }); break;
+    case 'staffworkretry': retryExistingPersonAuth(el); break;
     case 'managerinspectopen': openManagerInspectionModal(); break;
     case 'managerinspectsubmit': submitManagerInspection(el); break;
     case 'managerinspectlogout': logoutManagerInspection(el); break;
@@ -26548,6 +26549,9 @@ document.addEventListener('keydown', ev => {
 /* 복귀 시 최신화 */
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
+  if (session.isStaffLink && !sync.personVerified && hasStoredPersonToken() && !pendingBootstrapCode) {
+    resumeSavedDevice(); return;
+  }
   if (session.isStaffLink && shouldGateStaffWork()) { render(); ensureStaffWorkStatus(true).then(ok => { if (ok) startSyncSession(); }); return; }
   if (!cursorPinned && cursor !== today()) { cursor = today(); render(); }
   const auth = sync.auth();
@@ -26584,6 +26588,47 @@ if (route === 'lesson' && session.isAdmin) {
 render();
 
 let syncLoopStarted = false;
+let savedDeviceReconnectPromise = null;
+let savedDeviceRetryTimer = null;
+let savedDeviceRetryCount = 0;
+let savedDeviceLastAttempt = 0;
+
+// 새 기기 등록이 아니라 저장된 bearer를 다시 검증한다. 출근 로그인·관리자 해제는 우회하지 않는다.
+async function reconnectSavedDevice() {
+  if (!session.isStaffLink || !hasStoredPersonToken() || pendingBootstrapCode || personAccessProblem || linkExchangeBusy) return false;
+  if (savedDeviceReconnectPromise) return savedDeviceReconnectPromise;
+  if (sync.busy || staffWork.busy) return false;
+  clearTimeout(savedDeviceRetryTimer); savedDeviceRetryTimer = null;
+  savedDeviceLastAttempt = Date.now();
+  savedDeviceReconnectPromise = (async () => {
+    try {
+      if (!(await ensureStaffWorkStatus(true))) { scheduleSavedDeviceRetry(); return false; }
+      return await startSyncSession();
+    } finally { savedDeviceReconnectPromise = null; }
+  })();
+  return savedDeviceReconnectPromise;
+}
+
+function scheduleSavedDeviceRetry() {
+  if (!session.isStaffLink || !hasStoredPersonToken() || pendingBootstrapCode || personAccessProblem ||
+      sync.personVerified || (staffWork.checked && shouldGateStaffWork()) || savedDeviceRetryTimer ||
+      savedDeviceRetryCount >= 3 || navigator.onLine === false || document.visibilityState !== 'visible') return;
+  const delay = [5000, 15000, 30000][savedDeviceRetryCount++];
+  savedDeviceRetryTimer = setTimeout(() => {
+    savedDeviceRetryTimer = null;
+    if (document.visibilityState === 'visible' && navigator.onLine !== false) reconnectSavedDevice();
+  }, delay);
+}
+
+function resumeSavedDevice() {
+  if (document.visibilityState !== 'visible' || navigator.onLine === false || sync.personVerified ||
+      Date.now() - savedDeviceLastAttempt < 5000 || $('#staffWorkPin')) return;
+  savedDeviceRetryCount = 0;
+  reconnectSavedDevice();
+}
+window.addEventListener('online', resumeSavedDevice);
+window.addEventListener('pageshow', resumeSavedDevice);
+
 function ensureSyncLoopStarted() {
   if (syncLoopStarted || !sync.enabled()) return;
   syncLoopStarted = true;
@@ -26609,6 +26654,9 @@ async function startSyncSession() {
     return false;
   }
   const verified = await sync.run();
+  if (verified) {
+    clearTimeout(savedDeviceRetryTimer); savedDeviceRetryTimer = null; savedDeviceRetryCount = 0;
+  } else scheduleSavedDeviceRetry();
   if (sync.enabled()) ensureSyncLoopStarted();
   if (verified && (session.isAdmin || session.isStaffLink)) {
     loadCenterChat(true);
