@@ -158,7 +158,7 @@ test('이전 수업 메모는 같은 수업의 기준일 전 기록만 최신순
   assert.ok(rows.every(row => row.taskId === 'lesson-1' && row.date < '2026-08-14'));
 });
 
-test('이전 수업 메모는 기본 접힘 상태이며 제목을 누르면 최신순 3개가 펼쳐진다', () => {
+test('이전 수업 메모는 기본 접힘 상태이며 제목을 누르면 최신순 기록이 펼쳐진다', () => {
   const start = source.indexOf('function previousTaskMemos(');
   const end = source.indexOf('function lessonWorkInstructionHtml(', start);
   const state = { checks: {
@@ -213,4 +213,19 @@ test('수업 메모는 코멘트를 제외한 네 항목을 한 저장 버튼으
   assert.match(source, /guardianNoticeField[\s\S]{0,260}length > 300[\s\S]{0,180}안내사항은 300자까지 입력할 수 있습니다/,
     'DOM 제한을 우회한 긴 입력도 조용히 자르지 말고 저장 전에 거부해야 한다');
   assert.doesNotMatch(source, /setTimeout\(\(\) => \{\s*setCheck\(noteEl\.dataset\.id/);
+});
+
+test('이관된 수업은 확인된 원수업 메모를 최근 3개만 읽기 전용으로 보여주고 다른 학생 기록은 제외한다', () => {
+  const start = source.indexOf('function previousTaskMemos(');
+  const end = source.indexOf('function lessonWorkInstructionHtml(', start);
+  const archived = Array.from({length: 8}, (_, i) => ({taskId:'old-lesson', date:'2026-10-' + String(i+1).padStart(2,'0'), note:'이전 메모 <' + i + '>', sourceStaffName:'이전교사'}));
+  const task = {id:'new-lesson',studentId:'student-a',start:'2026-11-10',predecessorTaskId:'old-lesson',inheritedLessonMemos:{studentId:'student-a',sourceTaskId:'old-lesson',records:archived}};
+  const state = {tasks:[task],checks:{current:{taskId:'new-lesson',date:'2026-11-11',note:'새 메모'}}};
+  const esc = v => String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  const api = new Function('state','esc',source.slice(start,end)+';return {previousTaskMemos,previousTaskMemosProgressHtml};')(state,esc);
+  assert.equal(api.previousTaskMemos('new-lesson','2026-11-12').length,3);
+  const html=api.previousTaskMemosProgressHtml('new-lesson','2026-11-12');
+  assert.doesNotMatch(html,/이전 기록 더 보기/);assert.doesNotMatch(html,/2026-10-01/);assert.match(html,/&lt;7>/);assert.doesNotMatch(html,/<textarea|data-act=/);
+  task.inheritedLessonMemos.studentId='other-student';assert.equal(api.previousTaskMemos('new-lesson','2026-11-12').length,1);
+  task.inheritedLessonMemos.studentId='student-a';task.inheritedLessonMemos.sourceTaskId='wrong-source';assert.equal(api.previousTaskMemos('new-lesson','2026-11-12').length,1);
 });
