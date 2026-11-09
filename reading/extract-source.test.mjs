@@ -3,7 +3,7 @@
  *
  * 망을 쓰지 않는다. 지면 모양을 흉내 낸 HTML 조각으로 「짧은 줄을 남기는 규칙」을 잰다 —
  * 그 규칙이 무너져서 W41·W44 에 두 번 사고가 났다. */
-import { htmlToText, decode } from './extract-source.mjs';
+import { htmlToText, decode, links } from './extract-source.mjs';
 
 let fail = 0;
 const ok = (c, what) => { if (!c) { console.error('X', what); fail++; } };
@@ -98,6 +98,29 @@ ok(decode('&unknownent;') === '&unknownent;', '모르는 엔티티는 그대로'
 {
   const t = htmlToText('<table><tr><th>등록일자</th><td>2026-10-21</td></tr></table>');
   hasLine(t, '2026-10-21', '표 안의 날짜');
+}
+
+/* ── 목록 지면에서 (주소, 제목) 짝을 뽑는다 ──
+   세 주 연속으로 스크래치패드에 다시 쓰던 한 줄짜리 스크립트를 여기로 들였다(루틴 v2.2).
+   게시판 지면은 같은 글을 제목 링크·섬네일 링크로 두 번 걸어 두는 일이 흔해서,
+   같은 주소가 두 줄로 나오면 ③에서 글 수를 잘못 센다. */
+{
+  const html = `<table><tbody>
+<tr><td><a href="/bbs/artclView.do?nttSn=1076">  &lsquo;한글 점자&rsquo;의 날
+     100주년  </a></td><td>2026-11-04</td></tr>
+<tr><td><a href="/bbs/artclView.do?nttSn=1075">조사 결과 발표</a></td></tr>
+<tr><td><a href="/bbs/artclView.do?nttSn=1076"><img src="t.png">같은 글 섬네일 링크</a></td></tr>
+<tr><td><a href="/bbs/artclList.do?page=2">다음 목록</a></td></tr>
+<tr><td><a href="/bbs/artclView.do?nttSn=1074">짧음</a></td></tr>
+</tbody></table>`;
+  const found = links(html, 'artclView');
+  ok(found.length === 2, '짝 두 개 — 받은 것 ' + found.length);
+  ok(found[0].href === '/bbs/artclView.do?nttSn=1076', '첫 주소');
+  ok(found[0].title === '‘한글 점자’의 날 100주년', '제목의 엔티티·줄바꿈이 정리된다 — 받은 것 「' + found[0].title + '」');
+  ok(found[1].href === '/bbs/artclView.do?nttSn=1075', '둘째 주소');
+  noLine(found.map((f) => f.href).join('\n'), 'artclList', '패턴에 안 맞는 주소는 안 뽑는다');
+  noLine(found.map((f) => f.title).join('\n'), '섬네일', '같은 주소를 두 번 걸어 둔 줄은 한 번만');
+  noLine(found.map((f) => f.title).join('\n'), '짧음', '네 자 미만 제목은 글 제목이 아니다');
 }
 
 if (fail) { console.error(`\nFAIL — ${fail}건`); process.exit(1); }
