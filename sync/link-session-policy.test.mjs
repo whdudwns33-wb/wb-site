@@ -591,3 +591,19 @@ test('admin device handoff is consult-only and requires valid admin auth', async
   assert.equal(task.status, 400);
   assert.equal(unauthenticated.status, 401);
 });
+
+test('same-browser reconnect replaces its proven slot at the three-device limit',async()=>{
+ const db=new TestD1();db.seedStaff();const tokens=[];
+ for(let i=0;i<3;i++){const link=await bootstrap(db);const r=await exchange(db,link.body.code);assert.equal(r.status,200);tokens.push(r.body.token);}
+ const link=await bootstrap(db);
+ const wrong=await post(db,'/exchange',{staffId:'teacher-1',code:link.body.code,previousToken:'a'.repeat(48)});
+ assert.equal(wrong.body.code,'DEVICE_LIMIT');
+ const good=await post(db,'/exchange',{staffId:'teacher-1',code:link.body.code,previousToken:tokens[0]});
+ assert.equal(good.status,200);
+ assert.equal(db.count('SELECT count(*) AS n FROM tokens WHERE app=? AND staff_id=? AND revoked=0','task','teacher-1'),3);
+ for(const token of tokens.slice(1))assert.equal((await post(db,'/personal-devices',{auth:{mode:'person',id:'teacher-1',token},action:'list'})).status,200);
+ assert.equal((await post(db,'/personal-devices',{auth:{mode:'person',id:'teacher-1',token:tokens[0]},action:'list'})).status,403);
+ const used=await post(db,'/exchange',{staffId:'teacher-1',code:link.body.code,previousToken:good.body.token});assert.equal(used.status,410);
+ assert.equal((await post(db,'/personal-devices',{auth:{mode:'person',id:'teacher-1',token:good.body.token},action:'list'})).status,200);
+});
+
