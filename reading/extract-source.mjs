@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 /* 출처 지면 → 본문 텍스트 — node reading/extract-source.mjs <주소|파일.html> [-o 출력.txt]
  *
+ * 게시판 목록에서 글 주소와 제목만 뽑으려면 `--links <패턴>` 을 쓴다 —
+ * 세 주 연속으로 이 한 줄짜리 스크립트를 스크래치패드에 다시 썼다(루틴 v2.2 의 교훈).
+ *   node reading/extract-source.mjs <목록 주소> --links artclView
+ * 본문 추출은 링크를 버리므로(본문용이다) 목록에는 이 플래그를 쓴다.
+ *
  * ③에서 출처를 확정할 때와 ④에서 집필 에이전트에게 근거를 넘길 때 쓴다.
  * 집필에 출처 원문 파일을 그대로 넘기는 것이 규칙이고(루틴 v2.1), 요약해 넘기면
  * 「등」·「기본적으로」·「이내」 같은 한정어가 떨어져 나가 지문이 단정으로 바뀐다.
@@ -74,16 +79,41 @@ export async function fetchPage(url, tries = 4) {
   throw new Error(`받지 못했다 (${last}) — ${url}`);
 }
 
+/* 목록 지면에서 (상세 주소, 제목) 짝을 뽑는다 */
+export function links(html, pattern) {
+  const re = new RegExp(`href="([^"]*${pattern}[^"]*)"[^>]*>\\s*([^<]{4,160})`, 'g');
+  const seen = new Set();
+  const out = [];
+  for (const m of html.matchAll(re)) {
+    const href = m[1];
+    const title = decode(m[2]).replace(/\s+/g, ' ').trim();
+    if (!title || seen.has(href)) continue;
+    seen.add(href);
+    out.push({ href, title });
+  }
+  return out;
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2);
   const oi = args.indexOf('-o');
   const outPath = oi >= 0 ? args[oi + 1] : null;
-  const target = args.filter((a, i) => !a.startsWith('-') && i !== oi + 1)[0];
+  const li = args.indexOf('--links');
+  const skip = new Set([oi + 1, li + 1].filter((i) => i > 0));
+  const target = args.filter((a, i) => !a.startsWith('-') && !skip.has(i))[0];
   if (!target) {
     console.error('쓰기: node reading/extract-source.mjs <주소|파일.html> [-o 출력.txt]');
     process.exit(2);
   }
   const html = /^https?:\/\//.test(target) ? await fetchPage(target) : fs.readFileSync(target, 'utf8');
+  if (li >= 0) {
+    const pat = args[li + 1];
+    if (!pat) { console.error('--links 뒤에 패턴이 필요하다 (예: --links artclView)'); process.exit(2); }
+    const found = links(html, pat);
+    if (!found.length) console.error(`(짝을 못 찾음 — 받은 길이 ${html.length}. 목록이 자바스크립트로 그려지는 지면일 수 있다)`);
+    for (const f of found) console.log(f.href, '|', f.title);
+    process.exit(0);
+  }
   const text = htmlToText(html);
   if (outPath) {
     fs.writeFileSync(outPath, text);
