@@ -158,10 +158,25 @@
       W(tag + ': 정답이 혼자 가장 긴 선지인 문항 ' + tell + '/' + qn
         + ' — 지문을 읽지 않고 가장 긴 선지만 골라도 맞습니다. 정답을 줄이거나 오답 하나를 같은 길이로 늘리세요');
 
+    /* 정답 번호가 한 자리에 쏠린 문항을 센다.
+       집필 기본값이 「근거를 담은 선지를 맨 앞에 쓴다」라서 손대지 않으면 전부 0번이 된다 —
+       W46 에 두 레벨이 그 꼴로 왔다. content.test 는 「모두 같음」만 막으므로(6문항 중 5개가
+       0번이면 통과한다) 병합 전에 여기서 더 좁게 잰다. 기존 지문을 막지 않도록 경고로 둔다. */
+    var pos = [0, 0, 0, 0], pn = 0;
+    [].concat(b.questions || [], b.challenge || []).forEach(function (q) {
+      if (!Array.isArray(q.choices) || q.choices.length !== 4) return;
+      if (!Number.isInteger(q.answer) || q.answer < 0 || q.answer > 3) return;
+      pos[q.answer] += 1; pn += 1;
+    });
+    var top = Math.max.apply(null, pos);
+    if (pn >= 4 && top / pn > 2 / 3)
+      W(tag + ': 정답 번호가 ' + pos.join('·') + ' 로 한 자리에 쏠렸습니다 ('
+        + top + '/' + pn + ') — 선지 순서를 흩으세요');
+
     return { chars: chars, segs: lens.length, mean: mean, max: maxSeg,
              vocab: (b.vocab || []).length, q: (b.questions || []).length,
              challenge: (b.challenge || []).length,
-             lengthTell: tell, qCount: qn };
+             lengthTell: tell, qCount: qn, answerPos: pos };
   }
 
   /* 지문 한 편을 검사한다 → {errors, warns, stats} */

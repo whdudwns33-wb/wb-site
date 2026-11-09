@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-02.1",
+  "version": "2026-11-09.1",
   "articles": [
     {
       "id": "nuri-space",
@@ -66941,6 +66941,4037 @@
               "answer": 3,
               "explain": "자료는 공사의 이름만 적었고, 각 공사가 물을 어떻게 다루는 일인지는 본문에 적혀 있지 않다.",
               "evidencePara": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "algae-carbon-formula",
+      "category": "science",
+      "careers": [
+        "bio",
+        "it",
+        "nat"
+      ],
+      "publishedAt": "2026-11-09",
+      "status": "published",
+      "issue": false,
+      "sources": [
+        {
+          "title": "기후에너지환경부 국립환경과학원 보도자료 — ‘녹조 예측력 향상’ 위한 담수 조류 탄소량 산정기법 개발 (2026.11.04)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1904030"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "부피를 재어 탄소를 알아내요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "강과 호수에는 ",
+              "아주 작은 생물이 살아요. ",
+              "이 생물이 모여서 ",
+              "녹조가 생겨요. ",
+              "생물의 세포가 너무 작아요. ",
+              "그래서 세포 하나하나의 탄소량을 ",
+              "바로 재기 어려워요."
+            ],
+            [
+              "연구하는 사람들은 ",
+              "다른 방법을 찾았어요. ",
+              "디지털 현미경으로 ",
+              "세포 영상을 살펴요. ",
+              "거기서 세포의 길이와 너비 ",
+              "같은 크기를 재요. ",
+              "그 크기로 세포의 부피를 계산해요."
+            ],
+            [
+              "그리고 원소분석기로 탄소량을 재요. ",
+              "부피와 탄소량의 관계를 ",
+              "통계로 살펴요. ",
+              "이제 부피만 알면 ",
+              "탄소량을 어림할 수 있어요. ",
+              "작은 생물 36종을 ",
+              "이렇게 알아봤어요."
+            ],
+            [
+              "전에는 바다 생물 자료로 ",
+              "만든 식을 썼어요. ",
+              "그래서 오차가 컸어요. ",
+              "새로 만든 식은 ",
+              "오차가 줄었어요. ",
+              "우리 강과 호수의 녹조를 ",
+              "더 잘 알아낼 바탕이 생겼어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "세포",
+              "easy": "생물의 몸을 이루는 아주 작은 알맹이예요."
+            },
+            {
+              "word": "부피",
+              "easy": "물건이 차지하는 공간의 크기예요."
+            },
+            {
+              "word": "오차",
+              "easy": "계산한 값과 실제로 잰 값의 차이예요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "강과 호수에 작은 생물을 새로 풀어 놓고 기르는 일",
+                "세포의 부피로 탄소량을 알아내는 방법을 만든 일",
+                "현미경을 더 크고 무겁게 고쳐서 새로 만든 일",
+                "바다에 사는 생물의 종류를 하나씩 모두 세어 본 일"
+              ],
+              "answer": 1,
+              "explain": "세포의 부피를 재고 부피와 탄소량의 관계를 살펴서, 부피만 알면 탄소량을 어림할 수 있게 만든 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "세포의 길이와 너비를 재려고 쓴 것은 무엇인가요?",
+              "choices": [
+                "물을 담는 큰 유리컵",
+                "무게를 재는 저울",
+                "종이로 만든 지도",
+                "디지털 현미경 영상"
+              ],
+              "answer": 3,
+              "explain": "연구진은 디지털 현미경 영상분석을 활용했고, 부피는 잰 세포의 크기로 계산한다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「부피」는 무슨 뜻인가요?",
+              "choices": [
+                "물건이 차지하는 공간의 크기",
+                "물건의 무게를 나타낸 수",
+                "물건의 색깔을 나타낸 말",
+                "물건이 움직이는 빠르기를 뜻하는 말"
+              ],
+              "answer": 0,
+              "explain": "부피는 물건이 차지하는 공간의 크기예요. 세포의 길이와 너비로 계산해요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "부피와 탄소량의 관계를 알아낸 뒤에 좋아진 점은 무엇인가요?",
+              "choices": [
+                "세포가 전보다 훨씬 더 크게 자라게 되었어요",
+                "강과 호수의 물이 모두 저절로 깨끗해졌어요",
+                "부피만 알면 탄소량을 어림할 수 있어요",
+                "작은 생물이 모두 한 종류로 바뀌었어요"
+              ],
+              "answer": 2,
+              "explain": "두 값의 관계를 알고 나서, 부피만 알면 탄소량을 어림할 수 있게 되었어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "작은 생물의 세포를 보았을 때, 이 글에 따라 먼저 할 일은 무엇인가요?",
+              "choices": [
+                "세포를 둘로 나누어 무게를 따로 달아요",
+                "세포의 색을 보고 탄소량을 바로 적어요",
+                "세포를 물에 넣고 며칠 동안 가만히 기다려요",
+                "세포의 길이와 너비를 재어 부피를 계산해요"
+              ],
+              "answer": 3,
+              "explain": "먼저 영상에서 길이와 너비 같은 크기를 재고, 그 크기로 부피를 계산해요.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L2": {
+          "title": "부피를 재어 탄소량을 알아내다",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "강과 호수의 물에는 ",
+              "식물플랑크톤이라는 아주 작은 생물이 산다. ",
+              "녹조를 이루는 주요 생물도 식물플랑크톤이다. ",
+              "그런데 이 생물의 세포는 ",
+              "크기가 매우 작아서 ",
+              "세포 하나하나의 탄소량을 ",
+              "직접 재기 어렵다."
+            ],
+            [
+              "국립환경과학원 연구진은 ",
+              "바로 재는 대신 다른 길을 택했다. ",
+              "먼저 디지털 현미경 영상분석으로 ",
+              "세포의 길이와 너비 등 크기를 재고 ",
+              "그 크기로 세포의 부피를 계산했다. ",
+              "다음에는 원소분석기로 탄소량을 재어 ",
+              "부피와 탄소량이 어떤 관계인지 ",
+              "통계로 따졌다. ",
+              "그 결과 부피만 알면 ",
+              "탄소량을 추정할 수 있는 ",
+              "새 산정식을 얻었다."
+            ],
+            [
+              "새 식을 만든 까닭이 있다. ",
+              "그동안 학계와 현장 연구에서는 ",
+              "국외에서 개발된 산정식을 활용해 왔다. ",
+              "그 식은 해양 생물 자료를 ",
+              "바탕으로 만든 것이어서 ",
+              "국내 담수 생태계의 ",
+              "환경 및 조류 특성과는 차이가 있었다. ",
+              "그래서 녹조를 이루는 ",
+              "주요 식물플랑크톤의 탄소 생물량을 ",
+              "산정하는 과정에서 ",
+              "상당한 오차가 발생했다."
+            ],
+            [
+              "연구진은 국내 하천과 호소에 사는 ",
+              "주요 식물플랑크톤 36종에 맞는 ",
+              "산정식을 개발했다. ",
+              "새 식의 탄소량 추정 오차는 ",
+              "기존 국외 산정식 대비 ",
+              "26~39% 감소하는 것으로 확인됐다. ",
+              "이제 기존 녹조 관측자료에 ",
+              "정밀한 탄소 생물량 정보를 ",
+              "추가할 수 있게 돼 ",
+              "녹조의 발생 규모와 변화를 ",
+              "보다 정확히 예측할 수 있는 ",
+              "기반이 마련된 것으로 평가된다. ",
+              "국립환경과학원 물환경연구부장은 ",
+              "앞으로 현장 검증을 거치겠다고 밝혔다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "담수",
+              "easy": "바닷물이 아니라 소금기가 거의 없는 물",
+              "hanja": "淡(맑을 담)+水(물 수)"
+            },
+            {
+              "word": "세포",
+              "easy": "생물의 몸을 이루는 가장 작은 단위",
+              "hanja": "細(가늘 세)+胞(세포 포)"
+            },
+            {
+              "word": "부피",
+              "easy": "물체가 차지하는 공간의 크기"
+            },
+            {
+              "word": "오차",
+              "easy": "계산한 값과 실제로 잰 값의 차이",
+              "hanja": "誤(그르칠 오)+差(다를 차)"
+            }
+          ],
+          "en": [
+            "Tiny living things live in rivers and lakes. They are called phytoplankton. Green algae blooms are made of these tiny things. Their cells are very small. So it is hard to measure the carbon in one cell.",
+            "So the research team found another way. First, they looked at cell images with a digital microscope. They measured the length and width of each cell. Then they used the size to find the cell volume. Next, they measured carbon with an elemental analyzer. They studied how volume and carbon are linked. Now volume alone can give an estimate of carbon.",
+            "Why did they need a new formula? Before, researchers used a formula made in other countries. That formula came from ocean life data. Korean fresh water and its algae are not like the ocean. So the old carbon numbers had large errors.",
+            "The team built a formula for 36 major phytoplankton species. They live in Korean rivers and lakes. The new formula was confirmed to cut the carbon error by 26 to 39 percent. Now carbon information can be added to algae records. This is seen as a base for better prediction. An institute official said field tests will come next."
+          ],
+          "enseg": [
+            [
+              "Tiny living things live ",
+              "in rivers and lakes. ",
+              "They are called phytoplankton. ",
+              "Green algae blooms ",
+              "are made of these tiny things. ",
+              "Their cells are very small. ",
+              "So it is hard ",
+              "to measure the carbon in one cell."
+            ],
+            [
+              "So the research team ",
+              "found another way. ",
+              "First, they looked at cell images ",
+              "with a digital microscope. ",
+              "They measured the length and width ",
+              "of each cell. ",
+              "Then they used the size ",
+              "to find the cell volume. ",
+              "Next, they measured carbon ",
+              "with an elemental analyzer. ",
+              "They studied how volume ",
+              "and carbon are linked. ",
+              "Now volume alone ",
+              "can give an estimate of carbon."
+            ],
+            [
+              "Why did they need a new formula? ",
+              "Before, researchers used a formula ",
+              "made in other countries. ",
+              "That formula came from ocean life data. ",
+              "Korean fresh water and its algae ",
+              "are not like the ocean. ",
+              "So the old carbon numbers ",
+              "had large errors."
+            ],
+            [
+              "The team built a formula ",
+              "for 36 major phytoplankton species. ",
+              "They live in Korean rivers and lakes. ",
+              "The new formula was confirmed to cut the carbon error ",
+              "by 26 to 39 percent. ",
+              "Now carbon information ",
+              "can be added to algae records. ",
+              "This is seen as a base ",
+              "for better prediction. ",
+              "An institute official said ",
+              "field tests will come next."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "phytoplankton",
+              "ko": "식물플랑크톤 (명사)",
+              "base": "phytoplankton [ˌfaɪtoʊˈplæŋktən]"
+            },
+            {
+              "word": "measure",
+              "ko": "재다, 측정하다 (동사)",
+              "base": "measure [ˈmeʒər]"
+            },
+            {
+              "word": "volume",
+              "ko": "부피 (명사)",
+              "base": "volume [ˈvɑːljuːm]"
+            },
+            {
+              "word": "formula",
+              "ko": "식, 공식 (명사)",
+              "base": "formula [ˈfɔːrmjələ]"
+            },
+            {
+              "word": "error",
+              "ko": "오차 (명사)",
+              "base": "error [ˈerər]"
+            },
+            {
+              "word": "estimate",
+              "ko": "추정, 어림잡은 값 (명사)",
+              "base": "estimate [ˈestɪmət]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 힘주어 설명하는 것은 무엇인가?",
+              "choices": [
+                "해양 생물 자료를 모으는 데 쓰는 배와 장비",
+                "직접 재기 어려운 탄소량을 부피로 알아내는 길",
+                "국외 산정식을 만든 연구자들이 세운 새 기준",
+                "국내 하천과 호소에 사는 생물 36종의 이름 목록"
+              ],
+              "answer": 1,
+              "explain": "세포 하나하나의 탄소량은 직접 재기 어렵다. 그래서 부피를 재고 부피와 탄소량의 관계를 따져 추정하는 길을 만든 이야기다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "연구진이 세포의 부피를 계산하는 데 쓴 것은?",
+              "choices": [
+                "원소분석기로 재어 낸 탄소량의 값",
+                "국외 산정식이 미리 정해 둔 분류군별 평균 부피",
+                "디지털 현미경 영상분석으로 잰 길이와 너비",
+                "해양 생물 자료에 적혀 있던 세포의 무게"
+              ],
+              "answer": 2,
+              "explain": "부피는 측정된 세포의 크기, 곧 길이와 너비 등을 바탕으로 계산해 낸 값이라고 자료가 적었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「오차」는 무슨 뜻인가?",
+              "choices": [
+                "계산한 값과 실제로 잰 값의 차이",
+                "물체가 차지하는 공간의 크기를 나타낸 값",
+                "생물을 비슷한 것끼리 묶어 놓은 무리",
+                "바닷물이 아니라 소금기가 거의 없는 물"
+              ],
+              "answer": 0,
+              "explain": "오차는 계산한 값과 실제로 잰 값의 차이다. 국외 산정식을 쓸 때 이 차이가 컸다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "새 산정식이 있으면 전에 없던 무엇이 가능해지는가?",
+              "choices": [
+                "녹조를 이루는 생물을 모두 없앨 수 있다",
+                "국외 산정식을 그대로 써도 오차가 사라진다",
+                "세포를 보지 않고도 생물의 종류를 알 수 있다",
+                "부피만 알아도 탄소량을 추정할 수 있다"
+              ],
+              "answer": 3,
+              "explain": "부피와 탄소량의 관계를 식으로 만들어 두었으므로, 부피만 알면 탄소량을 추정할 수 있다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "국외 산정식을 국내 담수에 그대로 쓰면 오차가 생기는 까닭은?",
+              "choices": [
+                "국외 산정식에 쓰인 글자와 기호가 어렵기 때문",
+                "국외 산정식이 너무 오래전에 만들어졌기 때문",
+                "바탕이 된 자료가 해양 생물 자료였기 때문",
+                "국내 하천과 호소의 물이 바다보다 적기 때문"
+              ],
+              "answer": 2,
+              "explain": "국외 산정식은 해양 생물 자료를 바탕으로 만든 것이어서, 국내 담수 생태계의 환경 및 조류 특성과는 차이가 있었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "어떤 호소의 식물플랑크톤 탄소량을 새 산정식으로 알아내려면 먼저 할 일은?",
+              "choices": [
+                "세포의 영상을 보고 길이와 너비를 재는 일",
+                "호소의 물을 모두 퍼내어 무게를 재는 일",
+                "국외 산정식의 값을 그대로 옮겨 적는 일",
+                "녹조가 생길 날짜를 달력에 미리 적어 두는 일"
+              ],
+              "answer": 0,
+              "explain": "새 산정식은 부피로 탄소량을 추정한다. 부피를 얻으려면 먼저 영상에서 세포의 길이와 너비를 재야 한다.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L3": {
+          "title": "재기 어려운 값을 어떻게 재는가",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "녹조를 이루는 주요 식물플랑크톤의 양을 ",
+              "탄소로 나타내려면 ",
+              "세포 하나의 탄소량을 알아야 한다. ",
+              "그런데 식물플랑크톤은 세포 크기가 매우 작아 ",
+              "개별 세포의 탄소량을 직접 측정하기 어렵다. ",
+              "재기 어려운 값이 먼저 필요했던 셈이다."
+            ],
+            [
+              "국립환경과학원 연구진은 ",
+              "직접 재는 대신 ",
+              "다른 두 값을 재어 연결했다. ",
+              "하나는 디지털 현미경 영상분석으로 얻은 생물체적이다. ",
+              "생물체적은 측정된 세포의 크기, ",
+              "곧 길이와 너비 등을 바탕으로 ",
+              "계산해 낸 3차원적인 부피다. ",
+              "다른 하나는 원소분석기로 측정한 탄소량이다. ",
+              "연구진은 이 둘의 관계를 통계적으로 분석했고 ",
+              "그 결과 생물체적만으로 탄소량을 ",
+              "추정할 수 있는 ",
+              "새로운 분류군별 산정식을 도출했다."
+            ],
+            [
+              "그동안 학계와 현장 연구에서는 ",
+              "국외에서 개발된 탄소 산정식을 활용해 왔다. ",
+              "그 식은 해양 생물 자료를 바탕으로 만들어졌고 ",
+              "국내 담수 생태계의 ",
+              "환경 및 조류 특성과는 차이가 있었다. ",
+              "그래서 유해남조류 등 ",
+              "녹조를 구성하는 주요 식물플랑크톤의 ",
+              "탄소 생물량을 산정하는 과정에서 ",
+              "상당한 오차가 발생했다."
+            ],
+            [
+              "국립환경과학원은 2025년 연구 사업을 통해 ",
+              "국내 하천 및 호소에 ",
+              "서식하는 주요 식물플랑크톤 36종에 맞는 ",
+              "산정식을 개발했다. ",
+              "새 산정식의 탄소량 추정 오차는 ",
+              "기존 국외 산정식 대비 ",
+              "26~39% 감소하는 것으로 확인됐다. ",
+              "분류군별로는 남조류 35%, 규조류 39%, ",
+              "기타 조류 26%의 오차 감소율을 보였다."
+            ],
+            [
+              "이번 산정식 개발로 ",
+              "기존 녹조 관측자료에 ",
+              "정밀한 탄소 생물량 정보를 ",
+              "추가할 수 있게 돼 ",
+              "녹조의 발생 규모와 변화를 ",
+              "보다 정확히 예측할 수 있는 ",
+              "기반이 마련된 것으로 평가된다. ",
+              "국립환경과학원 물환경연구부장은 ",
+              "앞으로 현장 검증을 거쳐 ",
+              "기존의 녹조 관측 자료에 ",
+              "탄소량 정보를 추가해 ",
+              "녹조 감시·예측 체계를 ",
+              "발전시켜 나가겠다고 밝혔다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "담수",
+              "easy": "바닷물이 아니라 소금기가 거의 없는 물",
+              "hanja": "淡(맑을 담)+水(물 수)"
+            },
+            {
+              "word": "생물체적",
+              "easy": "측정된 세포의 크기를 바탕으로 계산해 낸 3차원적인 부피",
+              "hanja": "生(날 생)+物(물건 물)+體(몸 체)+積(쌓을 적)"
+            },
+            {
+              "word": "산정식",
+              "easy": "어떤 양을 셈해서 정할 때 쓰는 식",
+              "hanja": "算(셈 산)+定(정할 정)+式(법 식)"
+            },
+            {
+              "word": "분류군",
+              "easy": "생물을 비슷한 것끼리 묶어 놓은 무리",
+              "hanja": "分(나눌 분)+類(무리 류)+群(무리 군)"
+            },
+            {
+              "word": "오차",
+              "easy": "계산한 값과 실제로 측정한 값의 차이",
+              "hanja": "誤(그르칠 오)+差(다를 차)"
+            }
+          ],
+          "en": [
+            "To express in carbon terms the amount of the phytoplankton that make up algae blooms, scientists first need the carbon content of a single cell. Yet phytoplankton cells are so small that the carbon in an individual cell is hard to measure directly. The number they needed first was a hard one to measure.",
+            "Researchers at the National Institute of Environmental Research measured two other things instead and linked them. One was biovolume, obtained through digital microscope image analysis. Biovolume is the three-dimensional volume calculated from measured cell dimensions such as length and width. The other was the carbon content measured with an elemental analyzer. The team analyzed the relationship between the two statistically, and derived a new set of taxon-specific formulas that can estimate carbon from biovolume alone.",
+            "Until now, academic and field studies had used a carbon formula developed abroad. That formula was built on marine organism data, which differs from the environment and algal characteristics of Korean fresh water. As a result, considerable error arose when the carbon biomass of the main phytoplankton making up algae blooms, including harmful cyanobacteria, was calculated.",
+            "Through a 2025 research project, the institute developed formulas fitted to 36 major phytoplankton species living in Korean rivers and lakes. Compared with the existing foreign formula, the carbon estimation error of the new formulas was confirmed to fall by 26 to 39 percent. By taxon, the error reduction was 35 percent for cyanobacteria, 39 percent for diatoms and 26 percent for other algae.",
+            "Because precise carbon biomass information can now be added to existing algae monitoring data, this is assessed as laying a base for predicting the scale and change of algae blooms more accurately. The head of the institute's Water Environment Research Department said that field verification would follow, that carbon information would be added to existing algae monitoring records, and that the algae monitoring and prediction system would be developed further."
+          ],
+          "enseg": [
+            [
+              "To express in carbon terms ",
+              "the amount of the phytoplankton ",
+              "that make up algae blooms, ",
+              "scientists first need ",
+              "the carbon content of a single cell. ",
+              "Yet phytoplankton cells are so small ",
+              "that the carbon in an individual cell ",
+              "is hard to measure directly. ",
+              "The number they needed first ",
+              "was a hard one to measure."
+            ],
+            [
+              "Researchers at the National Institute of Environmental Research ",
+              "measured two other things instead ",
+              "and linked them. ",
+              "One was biovolume, ",
+              "obtained through digital microscope image analysis. ",
+              "Biovolume is the three-dimensional volume ",
+              "calculated from measured cell dimensions ",
+              "such as length and width. ",
+              "The other was the carbon content ",
+              "measured with an elemental analyzer. ",
+              "The team analyzed the relationship ",
+              "between the two statistically, ",
+              "and derived a new set of taxon-specific formulas ",
+              "that can estimate carbon from biovolume alone."
+            ],
+            [
+              "Until now, academic and field studies ",
+              "had used a carbon formula developed abroad. ",
+              "That formula was built on marine organism data, ",
+              "which differs from the environment ",
+              "and algal characteristics of Korean fresh water. ",
+              "As a result, considerable error arose ",
+              "when the carbon biomass ",
+              "of the main phytoplankton making up algae blooms, ",
+              "including harmful cyanobacteria, ",
+              "was calculated."
+            ],
+            [
+              "Through a 2025 research project, ",
+              "the institute developed formulas ",
+              "fitted to 36 major phytoplankton species ",
+              "living in Korean rivers and lakes. ",
+              "Compared with the existing foreign formula, ",
+              "the carbon estimation error of the new formulas ",
+              "was confirmed to fall by 26 to 39 percent. ",
+              "By taxon, the error reduction was ",
+              "35 percent for cyanobacteria, ",
+              "39 percent for diatoms ",
+              "and 26 percent for other algae."
+            ],
+            [
+              "Because precise carbon biomass information ",
+              "can now be added to existing algae monitoring data, ",
+              "this is assessed as laying a base ",
+              "for predicting the scale and change ",
+              "of algae blooms more accurately. ",
+              "The head of the institute's ",
+              "Water Environment Research Department said ",
+              "that field verification would follow, ",
+              "that carbon information would be added ",
+              "to existing algae monitoring records, ",
+              "and that the algae monitoring and prediction system ",
+              "would be developed further."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "phytoplankton",
+              "ko": "식물플랑크톤 (명사)",
+              "base": "phytoplankton [ˌfaɪtoʊˈplæŋktən]"
+            },
+            {
+              "word": "biovolume",
+              "ko": "생물체적 (명사)",
+              "base": "biovolume [ˌbaɪoʊˈvɑːljuːm]"
+            },
+            {
+              "word": "elemental analyzer",
+              "ko": "원소분석기 (명사구)",
+              "base": "elemental [ˌelɪˈmentl] + analyzer [ˈænəlaɪzər]"
+            },
+            {
+              "word": "taxon",
+              "ko": "분류군 (명사)",
+              "base": "taxon [ˈtæksɑːn]"
+            },
+            {
+              "word": "error",
+              "ko": "오차 (명사)",
+              "base": "error [ˈerər]"
+            },
+            {
+              "word": "verification",
+              "ko": "검증 (명사)",
+              "base": "verification [ˌverɪfɪˈkeɪʃn]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용은 무엇인가?",
+              "choices": [
+                "국외 산정식을 만든 연구가 해양에서 이루어진 경위",
+                "녹조 관측자료를 모으는 기관과 그 조직이 바뀐 일",
+                "재기 어려운 세포 탄소량을 생물체적으로 추정하게 된 일",
+                "국내 하천과 호소에 서식하는 식물플랑크톤 36종의 전체 명단"
+              ],
+              "answer": 2,
+              "explain": "글의 뼈대는 직접 측정하기 어려운 탄소량을 생물체적과 이어 추정하게 된 과정이다. 국외 산정식의 내력은 그 과정이 왜 필요했는지를 받치는 곁가지다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "연구진이 통계적으로 분석한 두 값은 무엇인가?",
+              "choices": [
+                "세포의 생물체적과 세포의 탄소량",
+                "녹조의 발생 규모와 기존 관측자료의 양",
+                "해양 생물 자료의 양과 국내 담수 생태계의 넓이",
+                "분류군별 오차 감소율과 녹조가 생긴 날짜"
+              ],
+              "answer": 0,
+              "explain": "연구진은 디지털 현미경 영상분석과 원소분석기를 활용해 생물체적과 탄소량의 관계를 통계적으로 분석했다고 적혀 있다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「생물체적」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "세포 하나에 들어 있는 탄소의 무게를 잰 값",
+                "생물을 비슷한 것끼리 묶어 놓은 무리의 이름",
+                "계산한 탄소량과 실제로 측정한 탄소량의 차이",
+                "세포 크기로 계산해 낸 3차원적인 부피"
+              ],
+              "answer": 3,
+              "explain": "생물체적은 측정된 세포의 크기, 곧 길이와 너비 등을 바탕으로 계산해 낸 3차원적인 부피다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "새 산정식을 하나로 두지 않고 분류군별로 나눈 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "분류군마다 사는 하천과 호소가 서로 다르기 때문",
+                "무리마다 생물체적과 탄소량의 관계가 다르기 때문",
+                "국외 산정식이 분류군을 하나로 묶어 두었기 때문",
+                "원소분석기가 한 번에 한 무리만 측정할 수 있기 때문"
+              ],
+              "answer": 1,
+              "explain": "산정식이 분류군별로 따로 도출됐고, 오차 감소율도 남조류 35%, 규조류 39%, 기타 조류 26%로 각각 달랐다. 무리마다 관계가 다르다는 뜻이다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "어떤 호소의 식물플랑크톤 탄소량을 새 산정식으로 구하려 할 때 반드시 있어야 하는 것은?",
+              "choices": [
+                "세포의 생물체적을 구할 수 있는 영상과 크기 값",
+                "녹조가 생길 날짜를 미리 알려 주는 예보 자료 묶음",
+                "해양 식물플랑크톤의 탄소량을 적어 둔 표",
+                "국외 산정식을 만든 연구진이 보낸 승인 문서"
+              ],
+              "answer": 0,
+              "explain": "새 산정식은 생물체적만으로 탄소량을 추정한다. 그러니 영상에서 잰 크기로 생물체적을 구할 수 있어야 한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 본문만으로는 답할 수 없는 질문은?",
+              "choices": [
+                "새 산정식은 몇 종을 대상으로 만들었는가",
+                "세포의 탄소량을 측정할 때 쓴 장비는 무엇인가",
+                "국외 산정식은 본래 어떤 자료를 바탕으로 만들어졌는가",
+                "분류군별 오차 감소율이 서로 다른 까닭은 무엇인가"
+              ],
+              "answer": 3,
+              "explain": "대상 종수(36종), 측정 장비(원소분석기), 국외 산정식의 바탕(해양 생물 자료)은 본문에 있다. 분류군별로 감소율이 다른 까닭은 이 보도자료 본문에 적혀 있지 않다.",
+              "evidencePara": 3
+            }
+          ]
+        },
+        "L4": {
+          "title": "직접 못 재는 것을 이어서 재다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "기후에너지환경부 소속 국립환경과학원은 ",
+              "녹조 발생 예측력 향상을 위해 ",
+              "국내 담수 식물플랑크톤 36종을 ",
+              "대상으로 탄소량을 정밀 분석하고 ",
+              "생물 특성을 반영한 ",
+              "분류군별 탄소 산정식을 ",
+              "국내 최초로 개발했다고 밝혔다. ",
+              "2026년 11월 4일 등록된 보도자료의 내용이다."
+            ],
+            [
+              "그동안 학계와 현장 연구에서는 ",
+              "국외에서 개발된 탄소 산정식을 활용해 왔다. ",
+              "보도자료는 그 식의 출전을 ",
+              "「해양 식물플랑크톤·원생생물 기반 ",
+              "생물체적-탄소량 관계식(Menden-Deuer & Lessard, 2000)」으로 적어 두었다. ",
+              "바탕이 된 것은 해양 생물 자료여서 ",
+              "국내 담수 생태계의 환경 및 조류 특성과 ",
+              "차이가 있었고 ",
+              "이로 인해 유해남조류 등 ",
+              "녹조를 구성하는 주요 식물플랑크톤의 ",
+              "탄소 생물량을 산정하는 과정에서 ",
+              "상당한 오차가 발생했다."
+            ],
+            [
+              "문제는 재는 일 자체에 있었다. ",
+              "식물플랑크톤은 세포 크기가 매우 작아 ",
+              "개별 세포의 탄소량을 ",
+              "직접 측정하기 어렵다. ",
+              "그래서 연구진은 탄소량을 바로 겨누지 않고 ",
+              "재기 쉬운 값을 먼저 재어 ",
+              "탄소량과 연결했다. ",
+              "디지털 현미경 영상분석과 원소분석기를 ",
+              "활용해 세포의 생물체적과 ",
+              "탄소량을 재고 ",
+              "두 값의 관계를 통계적으로 분석한 것이다. ",
+              "생물체적은 측정된 세포의 크기, ",
+              "곧 길이와 너비 등을 바탕으로 ",
+              "계산해 낸 3차원적인 부피다."
+            ],
+            [
+              "그 결과 생물체적만으로 탄소량을 ",
+              "추정할 수 있는 ",
+              "새로운 분류군별 산정식이 도출됐다. ",
+              "개별 세포의 탄소량을 직접 재지 않아도 ",
+              "영상에서 잰 크기만으로 ",
+              "탄소량을 추정할 수 있다는 뜻이다. ",
+              "이 산정식은 2025년 ",
+              "「낙동강 녹조 대발생의 기원 추적 및 ",
+              "기후변화에 따른 발생량 예측 연구」 ",
+              "사업을 통해 개발됐고 ",
+              "대상은 국내 하천 및 호소에 서식하는 ",
+              "주요 식물플랑크톤 36종이다."
+            ],
+            [
+              "이번에 개발한 산정식은 ",
+              "기존 국외 산정식 대비 ",
+              "탄소량 추정 오차가 ",
+              "26~39% 감소하는 것으로 확인됐다. ",
+              "분류군별로는 남조류 35%, 규조류 39%, ",
+              "기타 조류 26%의 오차 감소율을 보였다. ",
+              "여기서 말하는 오차는 ",
+              "기존식으로 계산된 탄소량이 ",
+              "실제 측정한 탄소량보다 ",
+              "높거나 낮게 나타나는 오차다. ",
+              "줄어든 것은 녹조의 양이 아니라 ",
+              "그 양을 셈할 때 생기던 어긋남이다."
+            ],
+            [
+              "이번 산정식 개발로 ",
+              "기존 녹조 관측자료에 ",
+              "정밀한 탄소 생물량 정보를 ",
+              "추가할 수 있게 돼 ",
+              "녹조의 발생 규모와 변화를 ",
+              "보다 정확히 예측할 수 있는 ",
+              "기반이 마련된 것으로 평가된다. ",
+              "김경현 국립환경과학원 물환경연구부장은 ",
+              "이번 연구를 국내 담수 녹조를 ",
+              "탄소 생물량으로 정량화하는 ",
+              "기술 개발의 성공 사례라고 하면서 ",
+              "앞으로 현장 검증을 거쳐 ",
+              "기존의 녹조 관측 자료에 ",
+              "탄소량 정보를 추가해 ",
+              "국민이 안심할 수 있는 ",
+              "녹조 감시·예측 체계를 ",
+              "발전시켜 나가겠다고 밝혔다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "생물체적",
+              "easy": "측정된 세포의 크기를 바탕으로 계산해 낸 3차원적인 부피",
+              "hanja": "生(날 생)+物(물건 물)+體(몸 체)+積(쌓을 적)"
+            },
+            {
+              "word": "원소분석기",
+              "easy": "물질에 들어 있는 원소의 양을 재는 장비",
+              "hanja": "元(으뜸 원)+素(본디 소)+分(나눌 분)+析(가를 석)+器(그릇 기)"
+            },
+            {
+              "word": "분류군",
+              "easy": "생물을 비슷한 것끼리 묶어 놓은 무리",
+              "hanja": "分(나눌 분)+類(무리 류)+群(무리 군)"
+            },
+            {
+              "word": "정량화",
+              "easy": "어떤 것을 수로 나타내어 양으로 셈하는 일",
+              "hanja": "定(정할 정)+量(헤아릴 량)+化(될 화)"
+            },
+            {
+              "word": "현장 검증",
+              "easy": "실제 현장에서 맞는지 확인하는 일",
+              "hanja": "現(나타날 현)+場(마당 장)+檢(검사할 검)+證(증거 증)"
+            }
+          ],
+          "en": [
+            "The National Institute of Environmental Research, under the Ministry of Climate, Energy and Environment, said it had analyzed in detail the carbon content of 36 freshwater phytoplankton species in Korea and had developed, for the first time in the country, taxon-specific carbon formulas that reflect biological characteristics, in order to improve the prediction of algae blooms. This is the content of a press release registered on November 4, 2026.",
+            "Until now, academic and field studies had used a carbon formula developed abroad. The press release records its source as a 'biovolume-carbon relationship for marine phytoplankton and protists (Menden-Deuer & Lessard, 2000).' Because it rested on marine organism data, it differed from the environment and algal characteristics of Korean fresh water, and considerable error arose when the carbon biomass of the main phytoplankton making up algae blooms, including harmful cyanobacteria, was calculated.",
+            "The difficulty lay in the measuring itself. Phytoplankton cells are so small that the carbon content of an individual cell is hard to measure directly. So the researchers did not aim at carbon directly; they measured an easier quantity first and tied it to carbon. They obtained the biovolume of cells through digital microscope image analysis, measured carbon with an elemental analyzer, and then analyzed the relationship between the two values statistically. Biovolume is the three-dimensional volume calculated from measured cell dimensions such as length and width.",
+            "The result was a new set of taxon-specific formulas that can estimate carbon from biovolume alone. In other words, the carbon content can be estimated from a size read off an image, without measuring each cell's carbon directly. The formulas were developed through the 2025 project 'Tracing the origin of large algae blooms in the Nakdong River and predicting their scale under climate change,' and they cover 36 major phytoplankton species living in Korean rivers and lakes.",
+            "The new formulas were confirmed to reduce the carbon estimation error by 26 to 39 percent compared with the existing foreign formula. By taxon, the error reduction was 35 percent for cyanobacteria, 39 percent for diatoms and 26 percent for other algae. The error here means the gap by which carbon calculated with the old formula came out higher or lower than the carbon actually measured. What shrank was not the amount of algae but the mismatch that used to appear when that amount was counted.",
+            "Because precise carbon biomass information can now be added to existing algae monitoring data, this is assessed as laying a base for predicting the scale and change of algae blooms more accurately. Kim Kyung-hyun, head of the institute's Water Environment Research Department, called the study a successful case of developing technology to quantify freshwater algae blooms in Korea as carbon biomass, and said that after field verification, carbon information would be added to existing algae monitoring records and that a monitoring and prediction system the public can trust would be developed further."
+          ],
+          "enseg": [
+            [
+              "The National Institute of Environmental Research, ",
+              "under the Ministry of Climate, Energy and Environment, ",
+              "said it had analyzed in detail ",
+              "the carbon content of 36 freshwater phytoplankton species in Korea ",
+              "and had developed, for the first time in the country, ",
+              "taxon-specific carbon formulas ",
+              "that reflect biological characteristics, ",
+              "in order to improve the prediction of algae blooms. ",
+              "This is the content of a press release ",
+              "registered on November 4, 2026."
+            ],
+            [
+              "Until now, academic and field studies ",
+              "had used a carbon formula developed abroad. ",
+              "The press release records its source as ",
+              "a 'biovolume-carbon relationship for marine phytoplankton and protists ",
+              "(Menden-Deuer & Lessard, 2000).' ",
+              "Because it rested on marine organism data, ",
+              "it differed from the environment ",
+              "and algal characteristics of Korean fresh water, ",
+              "and considerable error arose ",
+              "when the carbon biomass of the main phytoplankton ",
+              "making up algae blooms, including harmful cyanobacteria, ",
+              "was calculated."
+            ],
+            [
+              "The difficulty lay in the measuring itself. ",
+              "Phytoplankton cells are so small ",
+              "that the carbon content of an individual cell ",
+              "is hard to measure directly. ",
+              "So the researchers did not aim at carbon directly; ",
+              "they measured an easier quantity first ",
+              "and tied it to carbon. ",
+              "They obtained the biovolume of cells ",
+              "through digital microscope image analysis, ",
+              "measured carbon with an elemental analyzer, ",
+              "and then analyzed the relationship ",
+              "between the two values statistically. ",
+              "Biovolume is the three-dimensional volume ",
+              "calculated from measured cell dimensions ",
+              "such as length and width."
+            ],
+            [
+              "The result was a new set of taxon-specific formulas ",
+              "that can estimate carbon from biovolume alone. ",
+              "In other words, the carbon content ",
+              "can be estimated from a size read off an image, ",
+              "without measuring each cell's carbon directly. ",
+              "The formulas were developed through the 2025 project ",
+              "'Tracing the origin of large algae blooms in the Nakdong River ",
+              "and predicting their scale under climate change,' ",
+              "and they cover 36 major phytoplankton species ",
+              "living in Korean rivers and lakes."
+            ],
+            [
+              "The new formulas were confirmed to reduce ",
+              "the carbon estimation error by 26 to 39 percent ",
+              "compared with the existing foreign formula. ",
+              "By taxon, the error reduction was ",
+              "35 percent for cyanobacteria, ",
+              "39 percent for diatoms ",
+              "and 26 percent for other algae. ",
+              "The error here means the gap ",
+              "by which carbon calculated with the old formula ",
+              "came out higher or lower ",
+              "than the carbon actually measured. ",
+              "What shrank was not the amount of algae ",
+              "but the mismatch that used to appear ",
+              "when that amount was counted."
+            ],
+            [
+              "Because precise carbon biomass information ",
+              "can now be added to existing algae monitoring data, ",
+              "this is assessed as laying a base ",
+              "for predicting the scale and change ",
+              "of algae blooms more accurately. ",
+              "Kim Kyung-hyun, head of the institute's ",
+              "Water Environment Research Department, ",
+              "called the study a successful case ",
+              "of developing technology to quantify ",
+              "freshwater algae blooms in Korea as carbon biomass, ",
+              "and said that after field verification, ",
+              "carbon information would be added ",
+              "to existing algae monitoring records ",
+              "and that a monitoring and prediction system ",
+              "the public can trust ",
+              "would be developed further."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "biovolume",
+              "ko": "생물체적 (명사)",
+              "base": "biovolume [ˌbaɪoʊˈvɑːljuːm]"
+            },
+            {
+              "word": "taxon-specific",
+              "ko": "분류군별의 (형용사)",
+              "base": "taxon [ˈtæksɑːn] + specific [spəˈsɪfɪk]"
+            },
+            {
+              "word": "elemental analyzer",
+              "ko": "원소분석기 (명사구)",
+              "base": "elemental [ˌelɪˈmentl] + analyzer [ˈænəlaɪzər]"
+            },
+            {
+              "word": "quantify",
+              "ko": "정량화하다 (동사)",
+              "base": "quantify [ˈkwɑːntɪfaɪ]"
+            },
+            {
+              "word": "field verification",
+              "ko": "현장 검증 (명사구)",
+              "base": "field [fiːld] + verification [ˌverɪfɪˈkeɪʃn]"
+            },
+            {
+              "word": "protists",
+              "ko": "원생생물 (명사)",
+              "base": "protist [ˈproʊtɪst]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "재기 어려운 탄소량을 생물체적과 이어 추정하게 된 과정",
+                "국립환경과학원의 조직과 연구 사업 예산이 바뀐 내역",
+                "해양 식물플랑크톤과 원생생물의 분류 체계를 새로 세운 일",
+                "녹조 관측자료를 국민에게 공개하는 절차와 그 일정 변경"
+              ],
+              "answer": 0,
+              "explain": "개별 세포의 탄소량은 직접 측정하기 어렵다. 글은 그 값을 생물체적과 이어 추정하게 만든 과정을 뼈대로 삼는다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "이 글에 적힌 분류군별 오차 감소율 가운데 가장 큰 것은?",
+              "choices": [
+                "남조류 — 35%",
+                "기타 조류 — 26%",
+                "원생생물 — 26%",
+                "규조류 — 39%"
+              ],
+              "answer": 3,
+              "explain": "감소율은 남조류 35%, 규조류 39%, 기타 조류 26%다. 원생생물은 국외 산정식의 출전 표기에 나오는 말이고, 이 보도자료 본문에는 원생생물의 감소율이 적혀 있지 않다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "「정량화」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "여러 자료를 한곳에 모아 보관해 두는 일",
+                "어떤 것을 수로 나타내어 양으로 셈하는 일",
+                "측정값이 실제값과 어긋난 정도를 줄이는 일",
+                "생물을 비슷한 무리끼리 나누어 묶는 일"
+              ],
+              "answer": 1,
+              "explain": "물환경연구부장은 이번 연구를 담수 녹조를 탄소 생물량으로 정량화하는 기술 개발의 사례라고 했다. 녹조의 양을 수로 나타내 셈한다는 뜻이다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "infer",
+              "q": "연구진이 탄소량을 바로 겨누지 않고 생물체적을 먼저 잰 까닭은?",
+              "choices": [
+                "국외 산정식이 생물체적만 쓰도록 미리 정해 두었기 때문",
+                "원소분석기가 국내에 아직 들어오지 않았기 때문",
+                "세포가 매우 작아 탄소량을 직접 측정하기 어렵기 때문",
+                "생물체적이 탄소량보다 더 중요한 값이기 때문"
+              ],
+              "answer": 2,
+              "explain": "식물플랑크톤은 세포 크기가 매우 작아 개별 세포의 탄소량을 직접 측정하기 어렵다. 그래서 재기 쉬운 값을 먼저 재어 탄소량과 이었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 수치에 대한 해석으로 알맞은 것은?",
+              "choices": [
+                "줄어든 것은 녹조의 양이 아니라 셈할 때의 오차다",
+                "새 산정식을 쓰면 녹조 발생량이 26~39% 줄어든다",
+                "남조류는 규조류보다 탄소량이 35% 적다는 뜻이다",
+                "국외 산정식의 오차는 실제보다 늘 높게 나왔다는 뜻이다"
+              ],
+              "answer": 0,
+              "explain": "오차는 기존식으로 계산된 탄소량이 실제 측정한 탄소량보다 높거나 낮게 나타나는 어긋남이다. 줄어든 것은 그 어긋남이고, 본문은 그것이 「높거나 낮게」 나타난다고 적었다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "새 산정식을 현장에 적용하는 방법으로 알맞은 것은?",
+              "choices": [
+                "원소분석기로 모든 세포의 탄소량을 하나씩 측정한다",
+                "국외 산정식으로 계산한 값에 오차 감소율을 곱한다",
+                "녹조 관측자료의 날짜를 분류군별로 다시 나누어 적는다",
+                "영상분석으로 생물체적을 구한 뒤 분류군별 식에 넣는다"
+              ],
+              "answer": 3,
+              "explain": "새 산정식은 생물체적만으로 탄소량을 추정하고, 식은 분류군별로 따로 있다. 영상에서 생물체적을 구해 해당 분류군의 식에 넣는 것이 적용 방법이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "이 글에 적힌 앞으로의 계획은 무엇인가?",
+              "choices": [
+                "국외 산정식을 국내 담수 생태계에 다시 들여와 쓴다",
+                "현장 검증을 거쳐 기존 관측자료에 탄소량 정보를 더한다",
+                "식물플랑크톤 36종을 국내 하천과 호소에 새로 들여놓는다",
+                "원소분석기 없이 탄소량을 바로 재는 장비를 새로 만든다"
+              ],
+              "answer": 1,
+              "explain": "물환경연구부장은 앞으로 현장 검증을 거쳐 기존의 녹조 관측 자료에 탄소량 정보를 추가해 나가겠다고 밝혔다.",
+              "evidencePara": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "braille-teachers-100",
+      "category": "humanities",
+      "careers": [
+        "edu",
+        "hum",
+        "media"
+      ],
+      "issue": true,
+      "publishedAt": "2026-11-09",
+      "status": "published",
+      "sources": [
+        {
+          "title": "문화체육관광부·국립국어원 보도자료 — ‘한글 점자’ 탄생 100년, 「점자법」 제정 10년 만에 첫 점자 교원 20명 나와 (2026.11.04)",
+          "url": "https://www.korean.go.kr/front/board/boardStandardView.do?board_id=6&mn_id=183&b_seq=1076"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "첫 점자 교원이 나왔어요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "점자는 손끝에서 만나는 문자예요. ",
+              "올해는 한글 점자가 ",
+              "태어난 지 100년이 되는 해예요. ",
+              "그런데 점자를 가르치는 ",
+              "자격을 딴 사람은 ",
+              "올해 처음 나왔어요."
+            ],
+            [
+              "11월 4일은 ",
+              "「한글 점자의 날」이에요. ",
+              "이날 첫 점자 교원 20명이 나왔어요. ",
+              "문화체육관광부와 국립국어원이 그렇게 밝혔어요. ",
+              "이 자격은 「점자법」에 따라 ",
+              "주는 국가 자격이에요. ",
+              "점자를 잘 알고 ",
+              "가르치는 일도 잘하는 ",
+              "사람에게 줘요."
+            ],
+            [
+              "자격을 받으려면 ",
+              "정해진 요건을 갖추고 ",
+              "양성과정을 마쳐야 해요. ",
+              "제1호 자격증은 김윤미 사무국장이 받았어요. ",
+              "김 사무국장은 교육 자료와 ",
+              "교육 방법을 계속 연구하고 싶다고 했어요. ",
+              "더 많은 시각장애인이 점자로 ",
+              "배움의 즐거움을 느끼게 하려고요. ",
+              "두 기관은 앞으로도 ",
+              "점자 교원을 기르고 ",
+              "도울 계획이에요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "점자",
+              "easy": "손끝으로 만져서 읽는 문자예요.",
+              "hanja": null
+            },
+            {
+              "word": "자격",
+              "easy": "어떤 일을 할 수 있다고 인정받는 것이에요.",
+              "hanja": null
+            },
+            {
+              "word": "교원",
+              "easy": "학교나 교육 기관에서 가르치는 사람이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 알려 주는 일은 무엇인가요?",
+              "choices": [
+                "첫 점자 교원이 나온 일",
+                "점자를 손끝으로 읽는 방법을 알려 주는 일",
+                "점자 교원이 다니는 학교를 세운 일",
+                "교육 자료를 사고파는 가게가 생긴 일"
+              ],
+              "answer": 0,
+              "explain": "점자는 오래된 문자지만, 점자를 가르치는 자격을 딴 사람은 올해 처음 나왔다고 했어요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "점자 교원 자격은 무엇에 따라 주나요?",
+              "choices": [
+                "학교에서 받은 상",
+                "책을 읽은 시간",
+                "「점자법」이라는 법",
+                "도서관에서 쓴 글의 수"
+              ],
+              "answer": 2,
+              "explain": "이 자격은 「점자법」에 따라 주는 국가 자격이라고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「교원」은 어떤 사람인가요?",
+              "choices": [
+                "점자책을 만드는 기계",
+                "가르치는 일을 하는 사람",
+                "자격증을 나누어 주는 곳",
+                "교육 자료를 사서 모으는 사람"
+              ],
+              "answer": 1,
+              "explain": "교원은 학교나 교육 기관에서 가르치는 사람이에요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "점자와 첫 점자 교원을 견주면 무엇을 알 수 있나요?",
+              "choices": [
+                "점자와 점자 교원이 같은 해에 함께 생겼어요",
+                "점자는 올해 생기고 교원은 더 오래되었어요",
+                "점자와 점자 교원이 둘 다 100년 전에 나왔어요",
+                "점자는 오래되었지만 교원은 올해 처음 나왔어요"
+              ],
+              "answer": 3,
+              "explain": "한글 점자는 태어난 지 100년이 되었는데, 첫 점자 교원은 올해 나왔어요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "apply",
+              "q": "점자 교원이 앞으로 할 일로 글에 나온 것과 가장 가까운 것은 무엇인가요?",
+              "choices": [
+                "점자로 쓴 책을 모아 도서관에 보내는 일",
+                "점자를 가르칠 자료와 방법을 연구하는 일",
+                "점자를 읽는 속도를 재어 등수를 매기는 일",
+                "점자 자격증을 만들어 사람들에게 파는 일"
+              ],
+              "answer": 1,
+              "explain": "제1호 자격증을 받은 김 사무국장은 교육 자료와 교육 방법을 계속 연구하고 싶다고 했어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "점자를 가르치는 자격, 첫 취득자 나왔다",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "점자는 손끝에서 만나는 문자다. ",
+              "한글 점자가 태어난 지 ",
+              "올해로 100년이 되었다. ",
+              "그런데 점자를 가르치는 ",
+              "자격을 딴 사람은 ",
+              "올해 처음 나왔다. ",
+              "문화체육관광부와 국립국어원은 11월 4일 ",
+              "「한글 점자의 날」을 맞아 ",
+              "국내 첫 점자 교원 자격(2급) 취득자 ",
+              "20명을 배출했다고 밝혔다."
+            ],
+            [
+              "이 자격은 「점자법」 제11조에 따라 ",
+              "점자 교육 분야의 ",
+              "전문성을 갖춘 사람에게 ",
+              "부여하는 국가 자격이다. ",
+              "지난해 개정·시행된 「점자법」에 따라 ",
+              "점자 교육의 전문성을 확보하고 ",
+              "시각장애인에게 양질의 점자 교육을 ",
+              "제공하기 위해 추진한 제도다."
+            ],
+            [
+              "올해는 두 가지 점에서 ",
+              "뜻깊은 해다. ",
+              "「한글 점자의 날」 100주년이 ",
+              "되는 해이고, ",
+              "2016년에 「점자법」이 제정된 지 ",
+              "10년이 되는 해이기도 하다. ",
+              "자료는 첫 점자 교원이 탄생해 ",
+              "앞으로의 100년을 이끌어갈 ",
+              "점자 교육 기반을 마련했다고 적었다."
+            ],
+            [
+              "2급 자격은 ",
+              "300시간 이상의 점자 교육 경력, ",
+              "점역·교정사 3급 이상 취득, ",
+              "점자능력 검정시험 초급 이상 ",
+              "등급 합격 등의 요건을 갖추고 ",
+              "「적합 판정을 받은 ",
+              "점자 교원 양성과정」을 이수한 ",
+              "사람에게 부여한다. ",
+              "1급 자격은 2급을 취득한 뒤 ",
+              "총 300시간 이상의 경력을 ",
+              "쌓아야 받을 수 있다."
+            ],
+            [
+              "이번 자격 취득자들은 ",
+              "점자 교육 경력이 있거나 ",
+              "점역·교정사 자격증을 가진 이들이다. ",
+              "올해 처음 시행한 ",
+              "점자 교원 양성과정을 ",
+              "120시간 이상 추가로 이수했다. ",
+              "두 기관은 앞으로도 ",
+              "점자 교원을 양성하고 지원해 ",
+              "점자 교육이 필요한 ",
+              "모든 시각장애인이 소외되지 않는 ",
+              "환경을 구축할 계획이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "자격",
+              "easy": "어떤 일을 할 수 있다고 공식으로 인정하는 것",
+              "hanja": "資(재물 자)+格(격식 격)"
+            },
+            {
+              "word": "요건",
+              "easy": "무엇을 갖추어야 한다고 정해 둔 조건",
+              "hanja": "要(요긴할 요)+件(물건 건)"
+            },
+            {
+              "word": "경력",
+              "easy": "어떤 일을 해 온 지난 기간",
+              "hanja": "經(지날 경)+歷(지날 력)"
+            },
+            {
+              "word": "양성",
+              "easy": "어떤 일을 할 사람을 길러 내는 일",
+              "hanja": "養(기를 양)+成(이룰 성)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "점자를 읽는 속도를 재는 새 시험이 처음 생겼다",
+                "점자 도서관이 처음 문을 열고 점자책을 펴냈다",
+                "점자를 가르치는 국가 자격의 첫 취득자가 나왔다",
+                "한글 점자가 2016년에 처음으로 만들어졌다"
+              ],
+              "answer": 2,
+              "explain": "점자는 오래된 문자지만, 그것을 가르치는 국가 자격을 딴 사람은 올해 처음 나왔다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "2급 자격을 받으려고 갖추어야 할 것으로 글에 적히지 않은 것은?",
+              "choices": [
+                "점자 교육 경력 300시간 이상",
+                "점역·교정사 3급 이상 취득",
+                "점자능력 검정시험 초급 이상 합격",
+                "점자 교원 1급 자격증 취득"
+              ],
+              "answer": 3,
+              "explain": "1급은 2급을 취득한 뒤에 받는 자격이므로 2급 요건이 될 수 없다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「요건」의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "어떤 일을 해 온 지난 기간을 뜻하는 말",
+                "무엇을 갖추어야 한다고 정해 둔 조건",
+                "어떤 일을 할 사람을 길러 내는 일",
+                "법에서 정한 벌의 무게를 재는 자"
+              ],
+              "answer": 1,
+              "explain": "요건은 무엇을 갖추어야 한다고 정해 둔 조건이다. 둘째는 경력, 셋째는 양성의 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "올해가 뜻깊은 해라고 한 까닭으로 글에 적힌 것은?",
+              "choices": [
+                "「한글 점자의 날」 100주년이고 「점자법」 제정 10년이 되는 해라서",
+                "「한글 점자의 날」 10주년이고 「점자법」 제정 100년이 되는 해라서",
+                "점자 교원 양성과정이 100번째로 열리고 10년째 이어지는 해라서",
+                "점자능력 검정시험이 10번째로 치러지고 100명이 합격한 해라서"
+              ],
+              "answer": 0,
+              "explain": "100년은 한글 점자를, 10년은 2016년 「점자법」 제정을 센 수다. 세는 대상이 서로 다르다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "1급 자격에 대해 글을 근거로 바르게 말한 것은?",
+              "choices": [
+                "2급 자격 없이도 먼저 얻을 수 있는 자격이다",
+                "2급과 1급을 같은 날 함께 받는 자격이다",
+                "2급 자격을 먼저 얻은 뒤에 얻을 수 있다",
+                "1급을 얻으면 2급 자격은 사라지는 자격이다"
+              ],
+              "answer": 2,
+              "explain": "1급 자격은 2급을 취득한 뒤 총 300시간 이상의 경력을 쌓아야 받을 수 있다고 적혀 있다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "점자 교육 경력이 전혀 없는 사람이 2급 자격을 바로 받을 수 있을까?",
+              "choices": [
+                "요건에 경력이 없으니 바로 받을 수 있다고 적혀 있다",
+                "요건에 경력 300시간 이상이 있어 바로는 어렵다",
+                "양성과정만 이수하면 경력은 보지 않는다고 적혀 있다",
+                "1급을 먼저 받으면 경력 없이 2급을 받을 수 있다"
+              ],
+              "answer": 1,
+              "explain": "글에 적힌 요건에 300시간 이상의 점자 교육 경력이 들어 있다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "Braille is a writing system met at the fingertips. Korean braille is 100 years old this year. But the first holders of a licence to teach braille appeared only this year. November 4 is Korean Braille Day. The Ministry of Culture, Sports and Tourism marked the day. So did the National Institute of Korean Language. They said the country's first 20 level 2 braille teachers had got the licence.",
+            "The licence comes from Article 11 of the Braille Act. It is a national licence. It goes to people with expertise in braille education. The Braille Act was revised and took effect last year. The aim is to secure expertise in braille education. It is also to give good braille education to people with visual impairments.",
+            "This year is meaningful in two ways. It is the 100th year of Korean Braille Day. The Braille Act was made in 2016, so it turns 10 this year. The first braille teachers came in such a year. The material says this lays a base for the next 100 years.",
+            "A level 2 licence has requirements like these. One is 300 hours or more of braille teaching experience. One is a level 3 or higher transcriber and proofreader licence. One is a pass at beginner level or above in the braille ability test. The person must also finish an approved braille teacher training course. A level 1 licence comes after a level 2 licence and 300 hours or more of experience.",
+            "The new licence holders had braille teaching experience or a transcriber and proofreader licence. This year a braille teacher training course ran for the first time. They finished 120 hours or more of it. The two bodies plan to train and support more braille teachers. They want an environment where no such person is left out. Every person with visual impairments who needs braille education should get good teaching."
+          ],
+          "enseg": [
+            [
+              "Braille is a writing system ",
+              "met at the fingertips. ",
+              "Korean braille is 100 years old ",
+              "this year. ",
+              "But the first holders of a licence to teach braille ",
+              "appeared only this year. ",
+              "November 4 is Korean Braille Day. ",
+              "The Ministry of Culture, Sports and Tourism ",
+              "marked the day. ",
+              "So did the National Institute of Korean Language. ",
+              "They said the country's first 20 level 2 braille teachers ",
+              "had got the licence."
+            ],
+            [
+              "The licence comes from Article 11 ",
+              "of the Braille Act. ",
+              "It is a national licence. ",
+              "It goes to people ",
+              "with expertise in braille education. ",
+              "The Braille Act was revised ",
+              "and took effect last year. ",
+              "The aim is to secure expertise ",
+              "in braille education. ",
+              "It is also to give good braille education ",
+              "to people with visual impairments."
+            ],
+            [
+              "This year is meaningful in two ways. ",
+              "It is the 100th year of Korean Braille Day. ",
+              "The Braille Act was made in 2016, ",
+              "so it turns 10 this year. ",
+              "The first braille teachers came in such a year. ",
+              "The material says this lays a base ",
+              "for the next 100 years."
+            ],
+            [
+              "A level 2 licence has requirements like these. ",
+              "One is 300 hours or more ",
+              "of braille teaching experience. ",
+              "One is a level 3 or higher ",
+              "transcriber and proofreader licence. ",
+              "One is a pass at beginner level or above ",
+              "in the braille ability test. ",
+              "The person must also finish ",
+              "an approved braille teacher training course. ",
+              "A level 1 licence comes after a level 2 licence ",
+              "and 300 hours or more of experience."
+            ],
+            [
+              "The new licence holders had braille teaching experience ",
+              "or a transcriber and proofreader licence. ",
+              "This year a braille teacher training course ",
+              "ran for the first time. ",
+              "They finished 120 hours or more of it. ",
+              "The two bodies plan to train ",
+              "and support more braille teachers. ",
+              "They want an environment ",
+              "where no such person is left out. ",
+              "Every person with visual impairments ",
+              "who needs braille education ",
+              "should get good teaching."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "fingertips",
+              "ko": "손끝들 (명사 fingertip의 복수)",
+              "base": "fingertip [ˈfɪŋɡərtɪp]"
+            },
+            {
+              "word": "licence",
+              "ko": "자격증, 면허 (명사)",
+              "base": "licence [ˈlaɪsns]"
+            },
+            {
+              "word": "requirements",
+              "ko": "요건들 (명사 requirement의 복수)",
+              "base": "requirement [rɪˈkwaɪərmənt]"
+            },
+            {
+              "word": "expertise",
+              "ko": "전문성 (명사)",
+              "base": "expertise [ˌekspɜːrˈtiːz]"
+            },
+            {
+              "word": "revised",
+              "ko": "개정된 (동사 revise의 과거분사)",
+              "base": "revise [rɪˈvaɪz]"
+            },
+            {
+              "word": "impairments",
+              "ko": "장애들, 손상들 (명사 impairment의 복수)",
+              "base": "impairment [ɪmˈpermənt]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "오래된 문자, 가르칠 자격 첫 취득자",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "점자는 손끝에서 만나는 문자다. ",
+              "한글 점자는 태어난 지 ",
+              "올해로 100년이 되었다. ",
+              "오래된 문자지만, ",
+              "그 문자를 가르치는 국가 자격의 ",
+              "첫 취득자는 올해 나왔다."
+            ],
+            [
+              "문화체육관광부와 국립국어원은 11월 4일 ",
+              "「한글 점자의 날」을 맞아 ",
+              "국내 첫 점자 교원 자격(2급) 취득자 ",
+              "20명을 배출했다고 밝혔다. ",
+              "점자 교원 자격은 ",
+              "「점자법」 제11조에 따라 ",
+              "점자 교육 분야의 전문성을 갖춘 ",
+              "사람에게 부여하는 국가 자격이다."
+            ],
+            [
+              "이번 배출은 지난해 개정·시행된 ",
+              "「점자법」에 따라 추진한 ",
+              "제도 운영의 핵심 성과다. ",
+              "점자 교육의 전문성을 확보하고 ",
+              "시각장애인에게 양질의 ",
+              "점자 교육을 제공하기 위한 제도다."
+            ],
+            [
+              "올해는 두 가지 점에서 뜻깊은 해다. ",
+              "「한글 점자의 날」 100주년이 되는 해이고, ",
+              "2016년에 「점자법」이 제정된 지 ",
+              "10년이 되는 해이기도 하다. ",
+              "자료는 첫 점자 교원이 탄생함으로써 ",
+              "앞으로의 100년을 이끌어갈 ",
+              "점자 교육 기반을 마련했다는 점에서 ",
+              "의미가 크다고 적었다."
+            ],
+            [
+              "2급 자격은 300시간 이상의 점자 교육 경력, ",
+              "점역·교정사 3급 이상 취득, ",
+              "점자능력 검정시험 초급 이상 등급 합격 ",
+              "등의 요건을 갖추고 ",
+              "「적합 판정을 받은 ",
+              "점자 교원 양성과정」을 이수한 ",
+              "사람에게 부여한다. ",
+              "그 위에는 1급 자격이 있다. ",
+              "1급은 2급 자격을 취득한 후 ",
+              "총 300시간 이상의 점자 교육 경력을 ",
+              "쌓은 후에 취득할 수 있다. ",
+              "이때 경력은 연간 120시간을 인정한다."
+            ],
+            [
+              "이번 자격 취득자들은 ",
+              "기존에 점자 교육 경력이 있거나 ",
+              "점역·교정사 자격증을 가진 이들이다. ",
+              "올해 처음 시행한 점자 교원 양성과정을 ",
+              "120시간 이상 추가로 이수했다."
+            ],
+            [
+              "제1호 자격증을 받은 ",
+              "송암점자도서관 김윤미 사무국장은 ",
+              "한글 점자 반포 100주년이라는 뜻깊은 해에 ",
+              "첫 점자 교원이 되어 매우 기쁘다고 밝혔다. ",
+              "앞으로 교육 자료나 교육 방법을 ",
+              "계속 연구하겠다고도 말했다."
+            ],
+            [
+              "두 기관은 앞으로도 ",
+              "점자 교원을 지속적으로 양성하고 지원해 ",
+              "점자 교육이 필요한 ",
+              "모든 시각장애인이 소외되지 않고 ",
+              "양질의 교육을 받을 수 있는 ",
+              "환경을 구축할 계획이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "전문성",
+              "easy": "한 분야를 깊이 아는 능력",
+              "hanja": "專(오로지 전)+門(문 문)+性(성품 성)"
+            },
+            {
+              "word": "제정",
+              "easy": "법이나 제도를 새로 만들어 세우는 일",
+              "hanja": "制(절제할 제)+定(정할 정)"
+            },
+            {
+              "word": "이수",
+              "easy": "정해진 과정을 끝까지 들어 마치는 일",
+              "hanja": "履(밟을 이)+修(닦을 수)"
+            },
+            {
+              "word": "등급",
+              "easy": "높낮이에 따라 나눈 자리",
+              "hanja": "等(무리 등)+級(등급 급)"
+            },
+            {
+              "word": "판정",
+              "easy": "따져서 옳고 그름이나 등급을 정하는 일",
+              "hanja": "判(판단할 판)+定(정할 정)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "점자를 더 빨리 읽게 하는 교육 방법이 처음 개발되었다",
+                "오래된 문자인 점자를 가르칠 국가 자격의 첫 취득자가 나왔다",
+                "점자 도서관이 처음 문을 열어 점자 자료를 펴내기 시작했다",
+                "점자능력 검정시험이 올해 처음으로 치러지기 시작했다"
+              ],
+              "answer": 1,
+              "explain": "한글 점자는 100년이 되었지만, 그 문자를 가르치는 국가 자격의 첫 취득자는 올해 나왔다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "2급 자격의 요건으로 글에 적힌 것이 아닌 것은?",
+              "choices": [
+                "점역·교정사 3급 이상 취득",
+                "점자능력 검정시험 초급 이상 등급 합격",
+                "300시간 이상의 점자 교육 경력",
+                "점자 교원 양성과정 수료 시험 합격"
+              ],
+              "answer": 3,
+              "explain": "양성과정은 「적합 판정을 받은」 과정을 이수하는 것이고, 수료 시험 합격은 글에 없다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "「판정」의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "정해진 교육 과정을 끝까지 들어 마치는 일",
+                "어떤 일을 할 사람을 길러 내는 일",
+                "따져서 옳고 그름이나 등급을 정하는 일",
+                "법이나 제도를 새로 만들어 세우는 일"
+              ],
+              "answer": 2,
+              "explain": "둘째는 이수, 넷째는 제정의 뜻이다. 양성과정은 「적합 판정」을 받은 것이어야 한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "1급 자격에 대한 설명으로 글과 맞는 것은?",
+              "choices": [
+                "2급을 취득한 후 총 300시간 이상의 경력을 쌓아야 한다",
+                "2급을 취득한 후 총 120시간 이상의 경력을 쌓아야 한다",
+                "2급 없이도 양성과정만 이수하면 바로 취득할 수 있다",
+                "2급과 함께 같은 해에 심사를 받아 함께 취득하게 된다"
+              ],
+              "answer": 0,
+              "explain": "1급은 2급 취득 후 총 300시간 이상의 경력을 쌓은 후에 취득할 수 있고, 경력은 연간 120시간을 인정한다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "올해 세는 두 수에 대한 설명으로 가장 알맞은 것은?",
+              "choices": [
+                "100년은 「점자법」 제정을, 10년은 한글 점자를 센다",
+                "100년과 10년은 모두 점자 교원 제도를 센 수다",
+                "100년과 10년은 모두 한글 점자 반포를 센 수다",
+                "100년은 한글 점자를, 10년은 「점자법」 제정을 센다"
+              ],
+              "answer": 3,
+              "explain": "「한글 점자의 날」 100주년과, 2016년 「점자법」 제정 10년은 세는 대상이 서로 다르다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "점자 교육 경력이 250시간인 사람이 2급 요건을 두고 할 수 있는 판단은?",
+              "choices": [
+                "경력 요건은 120시간 이상이라 이미 다 채웠다",
+                "경력 요건은 연간 120시간이라 곧바로 채워진다",
+                "경력 요건은 300시간 이상이라 아직 못 채웠다",
+                "경력은 요건이 아니므로 시간과 상관없이 받는다"
+              ],
+              "answer": 2,
+              "explain": "2급 요건에 적힌 경력은 300시간 이상이다. 연간 120시간 인정은 1급 경력을 셀 때 나온다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "Braille is a script met at the fingertips. Korean braille turns 100 years old this year. It is an old script, but the first holders of the national qualification for teaching it appeared only this year.",
+            "On November 4, Korean Braille Day, the Ministry of Culture, Sports and Tourism and the National Institute of Korean Language announced that the country's first 20 level 2 holders of the braille teacher qualification had been produced. The braille teacher qualification is a national qualification given, under Article 11 of the Braille Act, to people who have expertise in the field of braille education.",
+            "This first group is a core result of a system run under the Braille Act, which was revised and took effect last year. The system is meant to secure expertise in braille education and to offer good braille education to people with visual impairments.",
+            "This year is meaningful in two ways. It is the 100th year of Korean Braille Day, and it is also 10 years since the Braille Act was enacted in 2016. The material says that, because the first braille teachers have appeared in such a year, a foundation has been laid for the braille education of the next 100 years.",
+            "The level 2 qualification is given to a person who meets requirements such as 300 hours or more of braille teaching experience, a level 3 or higher transcriber and proofreader licence, and a pass at beginner level or above in the braille ability test, and who has completed an approved braille teacher training course. Above it sits the level 1 qualification. Level 1 can be taken after the level 2 qualification, once a total of 300 hours or more of braille teaching experience has been built up. Here 120 hours a year are credited.",
+            "The new qualification holders already had braille teaching experience, or held a transcriber and proofreader licence. They completed 120 hours or more of the braille teacher training course, which ran for the first time this year.",
+            "Kim Yun-mi, secretary general of Songam Braille Library, received the first braille teacher certificate. Kim said it was a great joy to become one of the first braille teachers in the meaningful year of the 100th anniversary of the promulgation of Korean braille. Kim also said that teaching materials and teaching methods would be studied further.",
+            "The two bodies plan to keep training and supporting braille teachers, and to build an environment where every person with visual impairments who needs braille education is not left out and can receive good education."
+          ],
+          "enseg": [
+            [
+              "Braille is a script ",
+              "met at the fingertips. ",
+              "Korean braille turns 100 years old this year. ",
+              "It is an old script, ",
+              "but the first holders of the national qualification for teaching it ",
+              "appeared only this year."
+            ],
+            [
+              "On November 4, Korean Braille Day, ",
+              "the Ministry of Culture, Sports and Tourism ",
+              "and the National Institute of Korean Language ",
+              "announced that the country's first 20 level 2 holders ",
+              "of the braille teacher qualification ",
+              "had been produced. ",
+              "The braille teacher qualification is a national qualification ",
+              "given, under Article 11 of the Braille Act, ",
+              "to people who have expertise ",
+              "in the field of braille education."
+            ],
+            [
+              "This first group is a core result ",
+              "of a system run under the Braille Act, ",
+              "which was revised and took effect last year. ",
+              "The system is meant to secure expertise ",
+              "in braille education ",
+              "and to offer good braille education ",
+              "to people with visual impairments."
+            ],
+            [
+              "This year is meaningful in two ways. ",
+              "It is the 100th year of Korean Braille Day, ",
+              "and it is also 10 years ",
+              "since the Braille Act was enacted in 2016. ",
+              "The material says that, ",
+              "because the first braille teachers have appeared in such a year, ",
+              "a foundation has been laid ",
+              "for the braille education of the next 100 years."
+            ],
+            [
+              "The level 2 qualification is given ",
+              "to a person who meets requirements such as ",
+              "300 hours or more of braille teaching experience, ",
+              "a level 3 or higher transcriber and proofreader licence, ",
+              "and a pass at beginner level or above ",
+              "in the braille ability test, ",
+              "and who has completed ",
+              "an approved braille teacher training course. ",
+              "Above it sits the level 1 qualification. ",
+              "Level 1 can be taken after the level 2 qualification, ",
+              "once a total of 300 hours or more ",
+              "of braille teaching experience has been built up. ",
+              "Here 120 hours a year are credited."
+            ],
+            [
+              "The new qualification holders already had ",
+              "braille teaching experience, ",
+              "or held a transcriber and proofreader licence. ",
+              "They completed 120 hours or more ",
+              "of the braille teacher training course, ",
+              "which ran for the first time this year."
+            ],
+            [
+              "Kim Yun-mi, secretary general of Songam Braille Library, ",
+              "received the first braille teacher certificate. ",
+              "Kim said it was a great joy ",
+              "to become one of the first braille teachers ",
+              "in the meaningful year of the 100th anniversary ",
+              "of the promulgation of Korean braille. ",
+              "Kim also said that teaching materials ",
+              "and teaching methods would be studied further."
+            ],
+            [
+              "The two bodies plan to keep training ",
+              "and supporting braille teachers, ",
+              "and to build an environment ",
+              "where every person with visual impairments ",
+              "who needs braille education ",
+              "is not left out ",
+              "and can receive good education."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "qualification",
+              "ko": "자격 (명사)",
+              "base": "qualification [ˌkwɑːlɪfɪˈkeɪʃn]"
+            },
+            {
+              "word": "transcriber",
+              "ko": "점역사, 옮겨 적는 사람 (명사)",
+              "base": "transcriber [trænˈskraɪbər]"
+            },
+            {
+              "word": "experience",
+              "ko": "경력, 경험 (명사)",
+              "base": "experience [ɪkˈspɪriəns]"
+            },
+            {
+              "word": "approved",
+              "ko": "적합 판정을 받은 (동사 approve의 과거분사)",
+              "base": "approve [əˈpruːv]"
+            },
+            {
+              "word": "enacted",
+              "ko": "제정된 (동사 enact의 과거분사)",
+              "base": "enact [ɪˈnækt]"
+            },
+            {
+              "word": "foundation",
+              "ko": "기반, 토대 (명사)",
+              "base": "foundation [faʊnˈdeɪʃn]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "문자를 가르치는 일의 첫 자격자",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "점자는 손끝에서 만나는 문자다. ",
+              "국립국어원 누리집에는 「손끝에서 만난 100년의 문자, ",
+              "점자로 겨루다」라는 문구가 적혀 있다. ",
+              "자료의 제목은 「‘한글 점자’ 탄생 ",
+              "100년」이라고 적었다. ",
+              "오래된 문자지만, ",
+              "그 문자를 가르치는 국가 자격의 ",
+              "첫 취득자는 올해 나왔다."
+            ],
+            [
+              "문화체육관광부와 국립국어원은 11월 4일 ",
+              "「한글 점자의 날」을 맞아 ",
+              "국내 첫 점자 교원 자격(2급) 취득자 ",
+              "20명을 배출했다고 밝혔다. ",
+              "자료의 부제는 점자 교원 자격 심사를 통해 ",
+              "점자 능력과 점자 교육 능력을 모두 갖춘 ",
+              "2급 자격증 취득자를 ",
+              "처음 배출했다고 적었다."
+            ],
+            [
+              "점자 교원 자격은 ",
+              "「점자법」 제11조에 따라 ",
+              "점자 교육 분야의 전문성을 갖춘 ",
+              "사람에게 부여하는 국가 자격이다. ",
+              "이번 배출은 지난해 개정·시행된 「점자법」에 따라 ",
+              "점자 교육의 전문성을 확보하고 ",
+              "시각장애인에게 양질의 점자 교육을 제공하기 위해 ",
+              "추진한 제도 운영의 핵심 성과다."
+            ],
+            [
+              "올해는 두 가지 점에서 뜻깊은 해다. ",
+              "하나는 「한글 점자의 날」 100주년이 ",
+              "되는 해라는 것이고, ",
+              "다른 하나는 2016년에 「점자법」이 제정된 지 ",
+              "10년이 되는 해라는 것이다. ",
+              "100년은 한글 점자를 세고, ",
+              "10년은 「점자법」 제정을 센다."
+            ],
+            [
+              "2급 자격은 300시간 이상의 점자 교육 경력, ",
+              "점역·교정사 3급 이상 취득, ",
+              "점자능력 검정시험 초급 이상 등급 합격 ",
+              "등의 요건을 갖추고 ",
+              "「적합 판정을 받은 점자 교원 양성과정」을 ",
+              "이수한 사람에게 부여한다. ",
+              "글이 든 요건은 세는 단위가 서로 다르다. ",
+              "경력은 시간으로, ",
+              "점역·교정사 자격은 급으로, ",
+              "검정시험은 등급으로 적혀 있다."
+            ],
+            [
+              "그 위에는 1급 자격이 있다. ",
+              "1급은 2급 자격을 취득한 후 ",
+              "총 300시간 이상의 점자 교육 경력을 ",
+              "쌓은 후에 취득할 수 있다. ",
+              "이때 경력은 연간 120시간을 인정한다."
+            ],
+            [
+              "이번 자격 취득자들은 ",
+              "기존에 점자 교육 경력이 있거나 ",
+              "점역·교정사 자격증을 가진 이들이다. ",
+              "올해 처음 시행한 점자 교원 양성과정을 ",
+              "120시간 이상 추가로 이수해 ",
+              "점자 교원으로서의 전문성을 갖추었다."
+            ],
+            [
+              "제1호 점자 교원 자격증을 받은 ",
+              "송암점자도서관 김윤미 사무국장은 ",
+              "한글 점자 반포 100주년이라는 뜻깊은 해에 ",
+              "첫 점자 교원이 되어 매우 기쁘다고 밝혔다. ",
+              "그러면서 앞으로 ",
+              "교육 자료나 교육 방법을 계속 연구해 ",
+              "더욱 많은 시각장애인이 포기하지 않고 ",
+              "점자를 통해 배움의 즐거움을 ",
+              "느낄 수 있도록 ",
+              "최선을 다할 것이라고 말했다."
+            ],
+            [
+              "자료는 첫 점자 교원이 탄생함으로써 ",
+              "앞으로의 100년을 이끌어갈 ",
+              "점자 교육 기반을 마련했다는 점에서 ",
+              "의미가 크다고 적었다. ",
+              "두 기관은 앞으로도 ",
+              "점자 교원을 지속적으로 양성하고 지원해 ",
+              "점자 교육이 필요한 ",
+              "모든 시각장애인이 소외되지 않고 ",
+              "양질의 교육을 받을 수 있는 ",
+              "환경을 구축할 계획이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "심사",
+              "easy": "자세히 살펴 가리고 정하는 일",
+              "hanja": "審(살필 심)+査(조사할 사)"
+            },
+            {
+              "word": "확보",
+              "easy": "확실하게 갖추어 지니는 일",
+              "hanja": "確(굳을 확)+保(지킬 보)"
+            },
+            {
+              "word": "양질",
+              "easy": "바탕이 좋은 성질",
+              "hanja": "良(어질 량)+質(바탕 질)"
+            },
+            {
+              "word": "소외",
+              "easy": "밖으로 밀려나 끼지 못하는 일",
+              "hanja": "疏(소통할 소)+外(바깥 외)"
+            },
+            {
+              "word": "기반",
+              "easy": "어떤 일을 떠받치는 바탕",
+              "hanja": "基(터 기)+盤(소반 반)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "오래된 문자인 점자를 가르칠 국가 자격의 첫 취득자가 나왔다",
+                "점자를 손끝으로 읽는 새로운 방법이 올해 처음으로 개발되었다",
+                "점자 도서관이 늘어나면서 점자 자료의 수가 크게 늘어났다",
+                "점자능력 검정시험의 등급 체계가 올해 처음으로 바뀌었다"
+              ],
+              "answer": 0,
+              "explain": "점자는 100년이 된 문자지만, 그 문자를 가르치는 국가 자격의 첫 취득자는 올해 나왔다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "자격 심사에서 함께 보았다고 자료의 부제가 적은 것은?",
+              "choices": [
+                "점자 능력과 점자 자료 편집 능력",
+                "점자 교육 능력과 외국어 구사 능력",
+                "점자 능력과 점자 교육 능력",
+                "점자 읽기 속도와 점자 쓰기 속도"
+              ],
+              "answer": 2,
+              "explain": "부제는 자격 심사를 통해 점자 능력과 점자 교육 능력을 모두 갖춘 사람이 나왔다고 적었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「확보」의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "자세히 살펴 가리고 정하는 일",
+                "확실하게 갖추어 지니는 일",
+                "밖으로 밀려나 끼지 못하는 일",
+                "어떤 일을 떠받치는 바탕을 뜻하는 말"
+              ],
+              "answer": 1,
+              "explain": "제도의 목적은 점자 교육의 전문성을 확보하는 것이다. 둘째는 심사, 셋째는 소외의 뜻이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "「점자법」 제정 10년과 한글 점자 100년의 관계를 바르게 설명한 것은?",
+              "choices": [
+                "법이 100년 전에 먼저 생기고 문자가 그 뒤에 만들어졌다",
+                "문자와 법이 2016년 같은 해에 나란히 함께 만들어졌다",
+                "문자와 법 모두 올해 처음으로 나란히 함께 만들어졌다",
+                "문자가 100년 전부터 있었고 법은 그 뒤에 만들어졌다"
+              ],
+              "answer": 3,
+              "explain": "100년은 한글 점자를 세고, 10년은 2016년 「점자법」 제정을 센다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "이 글만으로는 판단할 수 없는 것은?",
+              "choices": [
+                "2급 요건에 점자 교육 경력 300시간 이상이 드는지",
+                "1급 자격을 2급 자격 취득 후에 얻을 수 있는지",
+                "점자 교원 자격자가 앞으로 몇 명까지 늘어날지",
+                "제1호 점자 교원 자격증을 누가 받았는지"
+              ],
+              "answer": 2,
+              "explain": "글은 앞으로도 양성하고 지원할 계획이라고만 적었고, 늘어날 인원은 적지 않았다.",
+              "evidencePara": 8
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "「자격자가 20명 나왔으니 점자 교육이 필요한 모든 사람이 교육을 받게 되었다」는 주장을 글로 평가하면?",
+              "choices": [
+                "글은 이미 그런 환경이 모두 구축되었다고 적어 두었다",
+                "글은 그런 환경을 앞으로 구축할 계획이라고만 적었다",
+                "글은 20명이 모든 점자 교육을 맡기로 했다고 적었다",
+                "글은 자격자 수가 더 늘지 않을 것이라고 적어 두었다"
+              ],
+              "answer": 1,
+              "explain": "글은 환경을 「구축할 계획이다」라고 적었다. 이미 이루어졌다는 뜻이 아니다.",
+              "evidencePara": 8
+            },
+            {
+              "type": "apply",
+              "q": "2급 자격을 가진 사람이 1급을 준비한다면 글에 따라 먼저 확인할 것은?",
+              "choices": [
+                "점자능력 검정시험을 초급 이상 등급으로 합격했는지",
+                "점역·교정사 자격을 3급 이상 취득했는지",
+                "점자 교원 양성과정을 다시 이수했는지",
+                "점자 교육 경력이 총 300시간 이상인지"
+              ],
+              "answer": 3,
+              "explain": "1급은 2급 취득 후 총 300시간 이상의 경력을 쌓은 후에 취득할 수 있다. 검정시험과 점역·교정사 자격은 2급 요건이고, 양성과정을 다시 이수한다는 말은 글에 없다.",
+              "evidencePara": 5
+            }
+          ],
+          "en": [
+            "Braille is a script met at the fingertips. On the website of the National Institute of Korean Language stands the line “A 100-year-old script met at the fingertips, competing in braille.” The title of the material reads “100 years since the birth of Korean braille.” The script is old, but the first holders of the national qualification for teaching it appeared only this year.",
+            "On November 4, Korean Braille Day, the Ministry of Culture, Sports and Tourism and the National Institute of Korean Language announced that the country's first 20 level 2 holders of the braille teacher qualification had been produced. The subtitle of the material says that, through the braille teacher qualification screening, level 2 certificate holders with both braille ability and braille teaching ability were produced for the first time.",
+            "The braille teacher qualification is a national qualification given, under Article 11 of the Braille Act, to people who have expertise in the field of braille education. This first group is a core result of a system run under the Braille Act, which was revised and took effect last year, to secure expertise in braille education and to offer good braille education to people with visual impairments.",
+            "This year is meaningful in two ways. One is that it is the 100th year of Korean Braille Day. The other is that it is 10 years since the Braille Act was enacted in 2016. The 100 years count Korean braille; the 10 years count the enactment of the Braille Act.",
+            "The level 2 qualification is given to a person who meets requirements such as 300 hours or more of braille teaching experience, a level 3 or higher transcriber and proofreader licence, and a pass at beginner level or above in the braille ability test, and who has completed an approved braille teacher training course. The unit of counting differs from requirement to requirement. Experience is counted in hours, the transcriber and proofreader licence in levels, and the ability test in grades.",
+            "Above it sits the level 1 qualification. Level 1 can be taken after the level 2 qualification, once a total of 300 hours or more of braille teaching experience has been built up. Here 120 hours a year are credited.",
+            "The new qualification holders already had braille teaching experience, or held a transcriber and proofreader licence. They completed 120 hours or more of the braille teacher training course, which ran for the first time this year, and so gained expertise as braille teachers.",
+            "Kim Yun-mi, secretary general of Songam Braille Library, received the first braille teacher certificate. Kim said it was a great joy to become one of the first braille teachers in the meaningful year of the 100th anniversary of the promulgation of Korean braille. Kim added that teaching materials and teaching methods would be studied further, so that more people with visual impairments would not give up and could feel the joy of learning through braille.",
+            "The material says that, because the first braille teachers have appeared, a foundation has been laid for the braille education of the next 100 years. The ministry and the institute plan to keep training and supporting braille teachers, and to build an environment where every person with visual impairments who needs braille education is not excluded and can receive good education."
+          ],
+          "enseg": [
+            [
+              "Braille is a script ",
+              "met at the fingertips. ",
+              "On the website of the National Institute of Korean Language ",
+              "stands the line “A 100-year-old script met at the fingertips, ",
+              "competing in braille.” ",
+              "The title of the material reads “100 years since ",
+              "the birth of Korean braille.” ",
+              "The script is old, ",
+              "but the first holders of the national qualification for teaching it ",
+              "appeared only this year."
+            ],
+            [
+              "On November 4, Korean Braille Day, ",
+              "the Ministry of Culture, Sports and Tourism ",
+              "and the National Institute of Korean Language ",
+              "announced that the country's first 20 level 2 holders ",
+              "of the braille teacher qualification ",
+              "had been produced. ",
+              "The subtitle of the material says that, ",
+              "through the braille teacher qualification screening, ",
+              "level 2 certificate holders with both braille ability ",
+              "and braille teaching ability ",
+              "were produced for the first time."
+            ],
+            [
+              "The braille teacher qualification is a national qualification ",
+              "given, under Article 11 of the Braille Act, ",
+              "to people who have expertise ",
+              "in the field of braille education. ",
+              "This first group is a core result ",
+              "of a system run under the Braille Act, ",
+              "which was revised and took effect last year, ",
+              "to secure expertise in braille education ",
+              "and to offer good braille education ",
+              "to people with visual impairments."
+            ],
+            [
+              "This year is meaningful in two ways. ",
+              "One is that it is the 100th year ",
+              "of Korean Braille Day. ",
+              "The other is that it is 10 years ",
+              "since the Braille Act was enacted in 2016. ",
+              "The 100 years count Korean braille; ",
+              "the 10 years count the enactment of the Braille Act."
+            ],
+            [
+              "The level 2 qualification is given ",
+              "to a person who meets requirements such as ",
+              "300 hours or more of braille teaching experience, ",
+              "a level 3 or higher transcriber and proofreader licence, ",
+              "and a pass at beginner level or above ",
+              "in the braille ability test, ",
+              "and who has completed ",
+              "an approved braille teacher training course. ",
+              "The unit of counting differs from requirement to requirement. ",
+              "Experience is counted in hours, ",
+              "the transcriber and proofreader licence in levels, ",
+              "and the ability test in grades."
+            ],
+            [
+              "Above it sits the level 1 qualification. ",
+              "Level 1 can be taken after the level 2 qualification, ",
+              "once a total of 300 hours or more ",
+              "of braille teaching experience has been built up. ",
+              "Here 120 hours a year are credited."
+            ],
+            [
+              "The new qualification holders already had ",
+              "braille teaching experience, ",
+              "or held a transcriber and proofreader licence. ",
+              "They completed 120 hours or more ",
+              "of the braille teacher training course, ",
+              "which ran for the first time this year, ",
+              "and so gained expertise as braille teachers."
+            ],
+            [
+              "Kim Yun-mi, secretary general of Songam Braille Library, ",
+              "received the first braille teacher certificate. ",
+              "Kim said it was a great joy ",
+              "to become one of the first braille teachers ",
+              "in the meaningful year of the 100th anniversary ",
+              "of the promulgation of Korean braille. ",
+              "Kim added that teaching materials and teaching methods ",
+              "would be studied further, ",
+              "so that more people with visual impairments ",
+              "would not give up ",
+              "and could feel the joy of learning through braille."
+            ],
+            [
+              "The material says that, ",
+              "because the first braille teachers have appeared, ",
+              "a foundation has been laid ",
+              "for the braille education of the next 100 years. ",
+              "The ministry and the institute plan to keep training ",
+              "and supporting braille teachers, ",
+              "and to build an environment ",
+              "where every person with visual impairments ",
+              "who needs braille education ",
+              "is not excluded ",
+              "and can receive good education."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "screening",
+              "ko": "심사 (명사)",
+              "base": "screening [ˈskriːnɪŋ]"
+            },
+            {
+              "word": "secure",
+              "ko": "확보하다 (동사)",
+              "base": "secure [sɪˈkjʊr]"
+            },
+            {
+              "word": "promulgation",
+              "ko": "반포 (명사)",
+              "base": "promulgation [ˌprɑːməlˈɡeɪʃn]"
+            },
+            {
+              "word": "excluded",
+              "ko": "소외된, 제외된 (동사 exclude의 과거분사)",
+              "base": "exclude [ɪkˈskluːd]"
+            },
+            {
+              "word": "credited",
+              "ko": "인정되는 (동사 credit의 과거분사)",
+              "base": "credit [ˈkredɪt]"
+            },
+            {
+              "word": "impairments",
+              "ko": "장애들, 손상들 (명사 impairment의 복수)",
+              "base": "impairment [ɪmˈpermənt]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "chronic-care-centers",
+      "category": "society",
+      "careers": [
+        "med",
+        "edu",
+        "biz"
+      ],
+      "publishedAt": "2026-11-09",
+      "status": "published",
+      "issue": true,
+      "sources": [
+        {
+          "title": "질병관리청 보도참고자료 — 고혈압‧당뇨병 등 만성질환 관리, 만성질환 통합관리센터로 전국 단계적 확대 (2026.11.05)",
+          "url": "https://www.kdca.go.kr/bbs/kdca/42/313366/artclView.do"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "오래 가는 병을 돌봐 줘요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "몸이 오래 아픈 병이 있어요. ",
+              "이런 병은 ",
+              "한 번에 낫지 않아요. ",
+              "그래서 오래 돌봐야 해요. ",
+              "이런 병을 ",
+              "돌봐 주는 자리가 있어요."
+            ],
+            [
+              "고혈압이나 당뇨병이 ",
+              "그런 병이에요. ",
+              "오래 가는 병을 ",
+              "만성질환이라고 해요. ",
+              "나라는 돌보는 자리를 ",
+              "더 넓히려고 해요. ",
+              "그래도 한꺼번에 바꾸지 않아요. ",
+              "지금 있는 센터는 ",
+              "2027년에 준비를 해요. ",
+              "그동안에는 이름도 그대로 써요. ",
+              "하던 일도 그대로 해요. ",
+              "연말에 얼마나 했는지 살펴봐요. ",
+              "2028년부터 새 이름으로 바뀌어요."
+            ],
+            [
+              "그러면 어떻게 도와주나요? ",
+              "센터에서는 몸을 돌보는 법을 ",
+              "가르쳐 줘요. ",
+              "걱정되는 것을 ",
+              "상담할 수도 있어요. ",
+              "잊지 않게 알려 주기도 해요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "만성질환",
+              "easy": "한 번에 낫지 않고 오래 가는 병이에요."
+            },
+            {
+              "word": "준비",
+              "easy": "어떤 일을 하기 전에 미리 갖추어 두는 일이에요."
+            },
+            {
+              "word": "상담",
+              "easy": "걱정되는 것을 이야기하고 함께 의논하는 일이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "하루 만에 병을 낫게 하는 약을 찾는 일",
+                "센터 이름을 모두 없애기로 정한 일",
+                "오래 가는 병을 돌보는 자리를 넓히는 일",
+                "병원을 한 곳으로 모아 두는 일"
+              ],
+              "answer": 2,
+              "explain": "나라가 오래 가는 병을 돌보는 자리를 더 넓히려고 한다는 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "2027년에 센터 이름은 어떻게 하나요?",
+              "choices": [
+                "새 이름으로 바로 바꿔요",
+                "이름을 그대로 써요",
+                "이름을 아예 쓰지 않아요",
+                "해마다 이름을 새로 지어요"
+              ],
+              "answer": 1,
+              "explain": "2027년은 준비하는 해라서 그동안에는 이름도 그대로 쓴다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「만성질환」은 무슨 뜻인가요?",
+              "choices": [
+                "하루만 아픈 병",
+                "약을 담는 통",
+                "병을 돌봐 주는 자리",
+                "오래 가는 병"
+              ],
+              "answer": 3,
+              "explain": "오래 가는 병을 만성질환이라고 한다고 했어요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "이 글로 보아 알 수 있는 것은?",
+              "choices": [
+                "준비하는 해에 센터 이름이 함께 바뀌어요",
+                "준비하는 해와 이름이 바뀌는 해가 달라요",
+                "센터에서 하던 일은 준비하는 해에 멈춰요",
+                "오래 가는 병은 이제 돌보지 않아도 돼요"
+              ],
+              "answer": 1,
+              "explain": "2027년은 준비하는 해이고 이름은 2028년부터 바뀌니까 두 해가 달라요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "오래 가는 병이 있는 이웃이 센터에 가면 받을 수 있는 도움은?",
+              "choices": [
+                "병이 바로 사라지는 약을 받아요",
+                "센터 이름을 새로 지어 줘요",
+                "몸을 돌보는 법을 배우고 상담해요",
+                "2028년까지 기다리라는 말만 들어요"
+              ],
+              "answer": 2,
+              "explain": "센터에서는 몸을 돌보는 법을 가르쳐 주고 상담도 할 수 있다고 했어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "이름은 그대로 두고 준비한다",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "질병관리청은 고혈압·당뇨병 등 ",
+              "만성질환 관리를 ",
+              "만성질환 통합관리센터로 ",
+              "전국에 단계적으로 확대한다고 밝혔다. ",
+              "지난 9월 30일 발표한 ",
+              "전국 확대 방향과 관련하여 ",
+              "기존 센터의 전환 방식과 ",
+              "환자 안내 등 ",
+              "이행 방안을 적은 자료다."
+            ],
+            [
+              "기존 19개 지역에는 ",
+              "고혈압·당뇨병 등록교육센터가 있다. ",
+              "줄여서 고당센터라고 부른다. ",
+              "자료는 현장 수요와 ",
+              "사업 연속성을 고려하여 ",
+              "2027년을 전환 준비 기간으로 ",
+              "운영한다고 적었다. ",
+              "이 기간에는 ",
+              "센터 명칭을 고당센터 그대로 사용하고 ",
+              "교육·상담, 알림 등 ",
+              "센터의 관리 기능은 유지한다. ",
+              "연말 전환 실적과 ",
+              "사업 추진 실적 등을 평가하여 ",
+              "2028년부터 통합관리센터로 운영한다."
+            ],
+            [
+              "신규 사업 지역은 ",
+              "다른 일정으로 간다. ",
+              "2027년 상반기 공모를 거쳐 선정하며, ",
+              "2027년 7월부터 ",
+              "통합관리센터로 가동할 예정이다. ",
+              "전체 연령 환자를 대상으로 ",
+              "교육·상담, 알림 등 ",
+              "관리 서비스를 제공할 계획이다."
+            ],
+            [
+              "그간 19개 지역, ",
+              "30세 이상 대상 제공되던 건강서비스가 ",
+              "전연령 단계적 전 지역으로 ",
+              "확대될 예정이다. ",
+              "기존 등록환자의 의료비 지원은 ",
+              "건강생활실천지원금 방식으로 전환된다. ",
+              "환자가 불편 없이 전환할 수 있도록 ",
+              "지방자치단체, 고당센터 등과 ",
+              "안내와 지원을 병행한다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "만성질환",
+              "easy": "한 번에 낫지 않고 오래 이어지는 병",
+              "hanja": "慢(게으를 만)+性(성품 성)+疾(병 질)+患(근심 환)"
+            },
+            {
+              "word": "명칭",
+              "easy": "무엇을 부르는 이름",
+              "hanja": "名(이름 명)+稱(일컬을 칭)"
+            },
+            {
+              "word": "전환",
+              "easy": "다른 방식이나 상태로 바꾸어 옮김",
+              "hanja": "轉(구를 전)+換(바꿀 환)"
+            },
+            {
+              "word": "공모",
+              "easy": "널리 알려 신청을 받아 고르는 일",
+              "hanja": "公(공평할 공)+募(모을 모)"
+            }
+          ],
+          "en": [
+            "Korea's disease control agency talked about long illnesses like high blood pressure and diabetes. A new kind of center will take on that care. The centers are called integrated chronic disease centers. The plan is to reach the whole country, step by step. The paper follows a plan from September 30. It tells how old centers will change and how patients will be told.",
+            "Nineteen areas already have a center for high blood pressure and diabetes. People call it the godang center. The paper says 2027 will be a year to get ready. In that year the center keeps the name godang center. It also keeps its work: teaching, counselling and reminders. At the end of the year, the work is checked. From 2028 the centers run as integrated chronic disease centers.",
+            "New areas follow a different timetable. They will be chosen in the first half of 2027. An open call picks them. From July 2027 they are to run as integrated chronic disease centers. They plan to serve patients of every age.",
+            "Until now the service went to 19 areas and people aged 30 and over. The plan is to reach every age and, step by step, every area. Help with medical costs will change for patients already on the list. It becomes a healthy living practice support payment. Local governments and the centers will guide patients through the change."
+          ],
+          "enseg": [
+            [
+              "Korea's disease control agency ",
+              "talked about long illnesses ",
+              "like high blood pressure and diabetes. ",
+              "A new kind of center will take on that care. ",
+              "The centers are called ",
+              "integrated chronic disease centers. ",
+              "The plan is to reach the whole country, ",
+              "step by step. ",
+              "The paper follows a plan from September 30. ",
+              "It tells how old centers will change ",
+              "and how patients will be told."
+            ],
+            [
+              "Nineteen areas already have a center ",
+              "for high blood pressure and diabetes. ",
+              "People call it the godang center. ",
+              "The paper says 2027 ",
+              "will be a year to get ready. ",
+              "In that year the center ",
+              "keeps the name godang center. ",
+              "It also keeps its work: ",
+              "teaching, counselling and reminders. ",
+              "At the end of the year, ",
+              "the work is checked. ",
+              "From 2028 the centers run ",
+              "as integrated chronic disease centers."
+            ],
+            [
+              "New areas follow a different timetable. ",
+              "They will be chosen ",
+              "in the first half of 2027. ",
+              "An open call picks them. ",
+              "From July 2027 they are to run ",
+              "as integrated chronic disease centers. ",
+              "They plan to serve patients of every age."
+            ],
+            [
+              "Until now the service went to 19 areas ",
+              "and people aged 30 and over. ",
+              "The plan is to reach every age ",
+              "and, step by step, every area. ",
+              "Help with medical costs will change ",
+              "for patients already on the list. ",
+              "It becomes a healthy living practice support payment. ",
+              "Local governments and the centers ",
+              "will guide patients through the change."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "chronic",
+              "ko": "오래 가는, 만성의 (형용사)",
+              "base": "chronic [ˈkrɑːnɪk]"
+            },
+            {
+              "word": "diabetes",
+              "ko": "당뇨병 (명사)",
+              "base": "diabetes [ˌdaɪəˈbiːtiːz]"
+            },
+            {
+              "word": "timetable",
+              "ko": "일정, 시간표 (명사)",
+              "base": "timetable [ˈtaɪmteɪbl]"
+            },
+            {
+              "word": "open call",
+              "ko": "공모 (명사구)",
+              "base": "open [ˈoʊpən] + call [kɔːl]"
+            },
+            {
+              "word": "reminders",
+              "ko": "알림 (명사, reminder의 복수)",
+              "base": "reminder [rɪˈmaɪndər]"
+            },
+            {
+              "word": "guide",
+              "ko": "안내하다, 이끌다 (동사)",
+              "base": "guide [ɡaɪd]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "준비 기간 없이 모든 센터를 한 해에 다 바꾼다",
+                "준비 기간을 두고 이름과 관리 기능을 유지한다",
+                "준비 기간에 센터 이름부터 먼저 바꾸어 버린다",
+                "신규 지역만 늘리고 기존 센터는 운영하지 않는다"
+              ],
+              "answer": 1,
+              "explain": "2027년을 전환 준비 기간으로 두고 그 기간에는 명칭과 관리 기능을 유지한다고 적었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "자료가 적은 신규 사업 지역의 일정은?",
+              "choices": [
+                "2027년 상반기에 가동한 뒤 하반기에 공모",
+                "2028년 상반기 공모로 선정해 연말부터 가동",
+                "2027년 상반기 공모로 선정해 7월부터 가동",
+                "2026년 공모로 선정해 2027년 연말부터 가동"
+              ],
+              "answer": 2,
+              "explain": "신규 사업 지역은 2027년 상반기 공모를 거쳐 선정하고 2027년 7월부터 가동할 예정이라고 적었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "전환 준비 기간에 유지한다고 적은 것은?",
+              "choices": [
+                "센터 명칭만 두고 교육·상담은 멈추는 것",
+                "교육·상담만 두고 센터 명칭은 바꾸는 것",
+                "의료비 지원 방식과 센터가 맡는 환자의 나이",
+                "센터 명칭과 교육·상담, 알림 등 관리 기능"
+              ],
+              "answer": 3,
+              "explain": "이 기간에는 명칭을 고당센터 그대로 쓰고 교육·상담, 알림 등 관리 기능은 유지한다고 적었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「명칭」은 무엇을 뜻하나요?",
+              "choices": [
+                "일을 맡기는 권한",
+                "무엇을 부르는 이름",
+                "돈을 대는 방식",
+                "미리 정해 놓은 기간"
+              ],
+              "answer": 1,
+              "explain": "센터 명칭을 고당센터 그대로 사용한다는 말에서 명칭은 부르는 이름을 뜻한다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "자료가 적은 2027년 한 해를 설명한 것으로 알맞은 것은?",
+              "choices": [
+                "기존 센터와 신규 지역이 모두 그해에 가동을 시작한다",
+                "기존 센터는 가동을 시작하고 신규 지역은 준비만 해 둔다",
+                "기존 센터는 준비 기간이고 신규 지역은 가동을 시작한다",
+                "기존 센터와 신규 지역이 모두 그해를 준비 기간으로 쓴다"
+              ],
+              "answer": 2,
+              "explain": "기존 센터는 2027년이 전환 준비 기간이고, 신규 지역은 2027년 7월부터 가동할 예정이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "고당센터에 등록해 다니는 사람이 2027년에 겪을 일로 알맞은 것은?",
+              "choices": [
+                "센터가 문을 닫아 다른 지역 센터로 옮겨야 한다",
+                "의료비 지원이 끊겨 아무 지원도 받지 못하게 된다",
+                "센터 이름이 통합관리센터로 바뀐 뒤에 안내를 받는다",
+                "같은 이름의 센터에서 교육과 상담을 이어 받는다"
+              ],
+              "answer": 3,
+              "explain": "준비 기간에는 명칭이 그대로이고 교육·상담, 알림 등 관리 기능도 유지한다고 적었다.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L3": {
+          "title": "유지할 것과 평가할 것",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "질병관리청은 11월 5일 ",
+              "고혈압·당뇨병 등 만성질환 관리를 ",
+              "만성질환 통합관리센터로 전국에 ",
+              "단계적으로 확대하는 이행 방안을 밝혔다. ",
+              "지난 9월 30일 발표한 ",
+              "만성질환 관리 전국 확대 방향과 관련하여 ",
+              "기존 센터의 전환 방식과 ",
+              "환자 안내 등을 적은 보도참고자료다."
+            ],
+            [
+              "기존 19개 지역에는 ",
+              "고혈압·당뇨병 등록교육센터, ",
+              "이른바 고당센터가 있다. ",
+              "자료는 현장 수요와 사업 연속성을 고려하여 ",
+              "2027년을 통합관리센터 전환 준비 기간으로 ",
+              "운영한다고 적었다. ",
+              "이 기간에는 센터 명칭을 ",
+              "고당센터 그대로 사용하고 ",
+              "교육·상담, 알림 등 ",
+              "센터의 관리 기능은 유지한다. ",
+              "연말 전환 실적과 ",
+              "사업 추진 실적 등을 평가하여 ",
+              "2028년부터 통합관리센터로 ",
+              "개편·운영하는 방향으로 추진한다."
+            ],
+            [
+              "신규 사업 지역은 ",
+              "전환 준비 기간 운영과 별도로 간다. ",
+              "2027년 상반기 공모를 거쳐 선정하며, ",
+              "2027년 7월부터 통합관리센터로 ",
+              "가동할 예정이다. ",
+              "전체 연령 환자를 대상으로 ",
+              "교육·상담, 알림 등 관리 서비스를 ",
+              "제공할 계획이다. ",
+              "같은 2027년이지만 ",
+              "기존 센터와 신규 지역이 ",
+              "하는 일이 다르다."
+            ],
+            [
+              "넓히려는 축은 하나가 아니다. ",
+              "자료는 그간 19개 지역, ",
+              "30세 이상 대상 제공되던 건강서비스가 ",
+              "전연령 단계적 전 지역으로 ",
+              "확대될 예정이라고 적었다. ",
+              "통합관리센터는 현재 30세 이상 ",
+              "고혈압·당뇨병 환자를 중심으로 하는 ",
+              "관리 대상을 전 연령, ",
+              "이상지질혈증 등 질환을 ",
+              "단계적으로 넓혀 나가는 방향으로 추진한다."
+            ],
+            [
+              "이용하는 사람이 겪을 일도 적혀 있다. ",
+              "기존 등록환자의 의료비 지원은 ",
+              "9월 30일 발표한 바와 같이 ",
+              "건강생활실천지원금 방식으로 전환된다. ",
+              "환자가 불편 없이 전환할 수 있도록 ",
+              "지방자치단체, 고당센터 등과 ",
+              "안내와 지원을 병행한다. ",
+              "지자체, 의료기관, 사업 참여자 등을 대상으로 ",
+              "설명회를 개최하여 ",
+              "개편 취지와 환자 전환 절차 등을 ",
+              "안내할 방침이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "이행",
+              "easy": "약속하거나 정한 것을 실제로 실행하는 일",
+              "hanja": "履(밟을 이)+行(다닐 행)"
+            },
+            {
+              "word": "연속성",
+              "easy": "중간에 끊기지 않고 이어지는 성질",
+              "hanja": "連(잇닿을 련)+續(이을 속)+性(성품 성)"
+            },
+            {
+              "word": "명칭",
+              "easy": "무엇을 부르는 이름",
+              "hanja": "名(이름 명)+稱(일컬을 칭)"
+            },
+            {
+              "word": "공모",
+              "easy": "널리 알려 신청을 받아 고르는 일",
+              "hanja": "公(공평할 공)+募(모을 모)"
+            },
+            {
+              "word": "이상지질혈증",
+              "easy": "핏속 지질의 양이 정상 범위를 벗어난 상태",
+              "hanja": "異(다를 이)+常(항상 상)+脂(기름 지)+質(바탕 질)+血(피 혈)+症(증세 증)"
+            }
+          ],
+          "en": [
+            "On November 5 the Korea Disease Control and Prevention Agency set out how it will expand chronic disease care across the country, step by step, through integrated chronic disease centers. The paper is a press reference document. It relates to the direction for nationwide expansion announced on September 30. It describes how existing centers will be converted and how patients will be informed.",
+            "Nineteen areas already run a registration and education center for high blood pressure and diabetes, known as a godang center. The agency wrote that 2027 will be run as a preparation period for conversion into an integrated chronic disease center. It took account of demand in the field and the continuity of the project. During that period the centers keep the name godang center. Their management functions are kept too, such as education, counselling and reminders. Conversion results and project results at the end of the year will then be assessed. From 2028 the centers are to be reorganised and run as integrated chronic disease centers.",
+            "New project areas move separately from the preparation period. They will be selected in the first half of 2027, after an open call. From July 2027 they are to operate as integrated chronic disease centers. They plan to provide management services such as education, counselling and reminders, to patients of all ages. So in the same year, 2027, the existing centers and the new areas are doing different things.",
+            "More than one axis is being widened. The paper wrote about the health service that until now reached 19 areas and people aged 30 and over. It is expected to expand to all ages and, step by step, to all areas. The paper also wrote about the management target of the centers. That target is now centred on patients aged 30 and over with high blood pressure or diabetes. It is to widen to all ages and, step by step, to diseases such as dyslipidaemia.",
+            "The paper also covers what users will experience. Medical cost support for patients already registered will change into a healthy living practice support payment, as announced on September 30. So that patients can make the change without difficulty, guidance and support will be provided together with local governments and the godang centers. The paper says briefing sessions will be held for local governments, medical institutions and project participants. They explain the purpose of the reorganisation and the procedure for patients to switch over."
+          ],
+          "enseg": [
+            [
+              "On November 5 the Korea Disease Control and Prevention Agency ",
+              "set out how it will expand chronic disease care ",
+              "across the country, step by step, ",
+              "through integrated chronic disease centers. ",
+              "The paper is a press reference document. ",
+              "It relates to the direction for nationwide expansion ",
+              "announced on September 30. ",
+              "It describes how existing centers will be converted ",
+              "and how patients will be informed."
+            ],
+            [
+              "Nineteen areas already run ",
+              "a registration and education center ",
+              "for high blood pressure and diabetes, ",
+              "known as a godang center. ",
+              "The agency wrote that 2027 will be run ",
+              "as a preparation period for conversion ",
+              "into an integrated chronic disease center. ",
+              "It took account of demand in the field ",
+              "and the continuity of the project. ",
+              "During that period the centers keep the name godang center. ",
+              "Their management functions are kept too, ",
+              "such as education, counselling and reminders. ",
+              "Conversion results and project results at the end of the year ",
+              "will then be assessed. ",
+              "From 2028 the centers are to be reorganised ",
+              "and run as integrated chronic disease centers."
+            ],
+            [
+              "New project areas move separately ",
+              "from the preparation period. ",
+              "They will be selected in the first half of 2027, ",
+              "after an open call. ",
+              "From July 2027 they are to operate ",
+              "as integrated chronic disease centers. ",
+              "They plan to provide management services ",
+              "such as education, counselling and reminders, ",
+              "to patients of all ages. ",
+              "So in the same year, 2027, ",
+              "the existing centers and the new areas ",
+              "are doing different things."
+            ],
+            [
+              "More than one axis is being widened. ",
+              "The paper wrote about the health service ",
+              "that until now reached 19 areas ",
+              "and people aged 30 and over. ",
+              "It is expected to expand to all ages ",
+              "and, step by step, to all areas. ",
+              "The paper also wrote about the management target of the centers. ",
+              "That target is now centred on patients aged 30 and over ",
+              "with high blood pressure or diabetes. ",
+              "It is to widen to all ages and, step by step, ",
+              "to diseases such as dyslipidaemia."
+            ],
+            [
+              "The paper also covers what users will experience. ",
+              "Medical cost support for patients already registered ",
+              "will change into a healthy living practice support payment, ",
+              "as announced on September 30. ",
+              "So that patients can make the change without difficulty, ",
+              "guidance and support will be provided ",
+              "together with local governments and the godang centers. ",
+              "The paper says briefing sessions will be held ",
+              "for local governments, medical institutions ",
+              "and project participants. ",
+              "They explain the purpose of the reorganisation ",
+              "and the procedure for patients to switch over."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "chronic",
+              "ko": "오래 가는, 만성의 (형용사)",
+              "base": "chronic [ˈkrɑːnɪk]"
+            },
+            {
+              "word": "continuity",
+              "ko": "연속성 (명사)",
+              "base": "continuity [ˌkɑːntəˈnuːəti]"
+            },
+            {
+              "word": "conversion",
+              "ko": "전환 (명사)",
+              "base": "conversion [kənˈvɜːrʒn]"
+            },
+            {
+              "word": "assessed",
+              "ko": "평가되다 (동사 assess의 과거분사)",
+              "base": "assess [əˈses]"
+            },
+            {
+              "word": "dyslipidaemia",
+              "ko": "이상지질혈증 (명사)",
+              "base": "dyslipidaemia [ˌdɪslɪpɪˈdiːmiə]"
+            },
+            {
+              "word": "briefing sessions",
+              "ko": "설명회 (명사구)",
+              "base": "briefing [ˈbriːfɪŋ] + session [ˈseʃn]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 전하는 핵심으로 알맞은 것은?",
+              "choices": [
+                "기존 센터는 2027년에 곧바로 통합관리센터가 된다",
+                "신규 지역과 기존 센터가 같은 달에 함께 가동을 시작한다",
+                "기존 센터는 준비 기간을 거쳐 2028년부터 개편된다",
+                "통합관리센터는 30세 이상 환자만 계속 맡기로 했다"
+              ],
+              "answer": 2,
+              "explain": "2027년이 전환 준비 기간이고, 실적 등을 평가하여 2028년부터 개편·운영한다고 적었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "자료가 2028년의 일로 적은 것은?",
+              "choices": [
+                "신규 사업 지역을 공모를 거쳐 선정해 가동",
+                "통합관리센터로 개편·운영하는 방향으로 추진",
+                "고당센터 명칭을 그대로 쓰는 준비 기간 운영",
+                "의료비 지원을 건강생활실천지원금으로 변경"
+              ],
+              "answer": 1,
+              "explain": "2028년부터 통합관리센터로 개편·운영하는 방향으로 추진한다고 적었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "넓히려는 방향으로 자료가 적은 것은?",
+              "choices": [
+                "30세 이상 당뇨병 환자로만 범위를 좁힌다",
+                "19개 지역 안에서 센터 수만 더 늘려 간다",
+                "고혈압 환자를 빼고 새 질환만 맡기로 한다",
+                "전 연령과 이상지질혈증 등 질환으로 넓힌다"
+              ],
+              "answer": 3,
+              "explain": "관리 대상을 전 연령, 이상지질혈증 등 질환으로 단계적으로 넓혀 나간다고 적었다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「연속성」은 무엇을 뜻하는가?",
+              "choices": [
+                "여러 곳으로 퍼져 가는 성질",
+                "값이 빠르게 오르는 성질",
+                "끊기지 않고 이어지는 성질",
+                "한 번에 끝나 버리는 성질"
+              ],
+              "answer": 2,
+              "explain": "사업 연속성을 고려했다는 말은 하던 사업이 끊기지 않게 한다는 뜻이다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "자료가 2027년을 두고 적은 내용을 종합하면?",
+              "choices": [
+                "그 해에는 어떤 센터도 새로 가동하지 않는다",
+                "한 해 안에 준비와 신규 가동이 함께 들어 있다",
+                "그 해에 기존 센터의 명칭이 모두 바뀌어 있다",
+                "그 해 연말에 신규 지역의 실적을 평가하게 된다"
+              ],
+              "answer": 1,
+              "explain": "기존 센터의 전환 준비 기간과 신규 지역의 7월 가동이 모두 2027년에 들어 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "이 자료의 방식대로 어떤 사업을 바꾼다면 가장 가까운 것은?",
+              "choices": [
+                "바꾸기로 정한 날에 이름과 하는 일을 함께 바꾼다",
+                "새 사업만 먼저 열고 기존 사업은 곧바로 닫아 둔다",
+                "이름과 하던 일을 한동안 두고 실적을 본 뒤 바꾼다",
+                "실적을 보지 않고 해마다 이름을 조금씩 바꿔 간다"
+              ],
+              "answer": 2,
+              "explain": "명칭과 관리 기능을 유지한 채 준비 기간을 두고, 실적 등을 평가한 뒤 개편한다고 적었다.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L4": {
+          "title": "전환 준비 기간이 설계하는 것",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "질병관리청은 11월 5일 ",
+              "고혈압·당뇨병 등 만성질환 관리를 ",
+              "만성질환 통합관리센터로 전국에 단계적으로 확대하는 ",
+              "이행 방안을 밝혔다. ",
+              "지난 9월 30일 발표한 ",
+              "만성질환 관리 전국 확대 방향과 관련하여 ",
+              "기존 센터의 전환 방식과 환자 안내 등을 ",
+              "적은 보도참고자료다. ",
+              "자료는 기존 센터와 신규 지역의 ",
+              "일정을 따로 적었다."
+            ],
+            [
+              "기존 19개 지역에는 고혈압·당뇨병 등록교육센터, ",
+              "이른바 고당센터가 있다. ",
+              "자료는 현장 수요와 사업 연속성을 고려하여 ",
+              "2027년을 통합관리센터 전환 준비 기간으로 ",
+              "운영한다고 적었다. ",
+              "이 기간에는 센터 명칭을 고당센터 그대로 사용하고 ",
+              "교육·상담, 알림 등 센터의 관리 기능은 유지한다. ",
+              "그 뒤 연말 전환 실적과 ",
+              "사업 추진 실적 등을 평가하여 ",
+              "2028년부터 통합관리센터로 개편·운영하는 ",
+              "방향으로 추진한다."
+            ],
+            [
+              "신규 사업 지역은 ",
+              "전환 준비 기간 운영과 별도로 움직인다. ",
+              "2027년 상반기 공모를 거쳐 선정하며, ",
+              "2027년 7월부터 통합관리센터로 가동할 예정이다. ",
+              "전체 연령 환자를 대상으로 ",
+              "교육·상담, 알림 등 관리 서비스를 제공할 계획이다. ",
+              "같은 2027년에 한쪽은 준비 기간을 보내고 ",
+              "다른 쪽은 공모와 가동을 거친다."
+            ],
+            [
+              "넓히려는 축은 하나가 아니다. ",
+              "자료는 그간 19개 지역, ",
+              "30세 이상 대상 제공되던 건강서비스가 ",
+              "전연령 단계적 전 지역으로 확대될 예정이라고 적었다. ",
+              "또 통합관리센터는 현재 30세 이상 ",
+              "고혈압·당뇨병 환자를 중심으로 하는 ",
+              "관리 대상을 전 연령, ",
+              "이상지질혈증 등 질환을 단계적으로 넓혀 나가는 ",
+              "방향으로 추진한다고 적었다."
+            ],
+            [
+              "이용하는 사람이 겪을 일도 적혀 있다. ",
+              "기존 등록환자의 의료비 지원은 ",
+              "9월 30일 발표한 바와 같이 ",
+              "건강생활실천지원금 방식으로 전환되며, ",
+              "환자가 불편 없이 전환할 수 있도록 ",
+              "지방자치단체와 고당센터 등과 ",
+              "안내와 지원을 병행한다. ",
+              "지자체, 의료기관, 사업 참여자 등을 대상으로 ",
+              "설명회를 개최하여 ",
+              "개편 취지, 주요 변경사항, ",
+              "환자 전환 절차, 지원 방식 등을 ",
+              "안내할 방침이다. ",
+              "기존 등록환자와 의료진이 변경사항을 ",
+              "충분히 이해할 수 있도록 ",
+              "홍보와 안내를 강화할 방침이다."
+            ],
+            [
+              "논의하는 자리도 함께 둔다. ",
+              "정부와 민간전문가, 기존 고당센터 관계자 등으로 구성된 ",
+              "가칭 고당사업 개편 추진위원회를 ",
+              "구성하고 운영할 계획이다. ",
+              "보건복지부와는 실무 협의를 정례적으로 실시하여 ",
+              "두 사업의 연계 현황을 점검하고 공유할 계획이다. ",
+              "그 밖의 유관기관과 단체 등과는 ",
+              "필요시 수시로 협의할 계획이다. ",
+              "임승관 질병관리청장은 ",
+              "만성질환은 건강생활실천으로 예방과 조기진단, ",
+              "지속적인 관리가 무엇보다 중요하다고 밝혔다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "이행",
+              "easy": "약속하거나 정한 것을 실제로 실행하는 일",
+              "hanja": "履(밟을 이)+行(다닐 행)"
+            },
+            {
+              "word": "연속성",
+              "easy": "중간에 끊기지 않고 이어지는 성질",
+              "hanja": "連(잇닿을 련)+續(이을 속)+性(성품 성)"
+            },
+            {
+              "word": "이상지질혈증",
+              "easy": "핏속 지질의 양이 정상 범위를 벗어난 상태",
+              "hanja": "異(다를 이)+常(항상 상)+脂(기름 지)+質(바탕 질)+血(피 혈)+症(증세 증)"
+            },
+            {
+              "word": "정례",
+              "easy": "때를 정해 놓고 되풀이하는 것",
+              "hanja": "定(정할 정)+例(법식 례)"
+            },
+            {
+              "word": "유관기관",
+              "easy": "어떤 일과 관계가 있는 기관",
+              "hanja": "有(있을 유)+關(관계할 관)+機(틀 기)+關(관계할 관)"
+            }
+          ],
+          "en": [
+            "On November 5 the Korea Disease Control and Prevention Agency set out an implementation plan. It covers the management of chronic diseases such as high blood pressure and diabetes, and how that care will expand nationwide, step by step, through integrated chronic disease centers. It is a press reference document, written in connection with the direction for nationwide expansion announced on September 30. It covers how existing centers will be converted and how patients will be informed. The paper sets out the timetable for existing centers and for new areas separately.",
+            "Nineteen areas already run registration and education centers for high blood pressure and diabetes, known as godang centers. Taking account of demand in the field and the continuity of the project, the paper says 2027 will be run as a preparation period for conversion into integrated chronic disease centers. During that period the centers keep the name godang center. Management functions such as education, counselling and reminders are kept. After that, conversion results and project results at the end of the year are to be assessed. From 2028 the centers are to be reorganised and run as integrated chronic disease centers.",
+            "New project areas move separately from the preparation period. They will be selected in the first half of 2027, after an open call. From July 2027 they are to operate as integrated chronic disease centers. They plan to provide management services such as education, counselling and reminders, to patients of all ages. In the same year, 2027, one side spends a preparation period while the other goes through an open call and starts operating.",
+            "More than one axis is being widened. The paper wrote about the health service that until now reached 19 areas and people aged 30 and over. It is expected to expand to all ages and, step by step, to all areas. The paper also wrote about the management target of the centers. That target is now centred on patients aged 30 and over with high blood pressure or diabetes. It is to widen to all ages and, step by step, to diseases such as dyslipidaemia.",
+            "What users will experience is written down as well. Medical cost support for patients already registered will change into a healthy living practice support payment, as announced on September 30. Guidance and support will be provided together with local governments and the godang centers, so that patients can make the change without difficulty. Briefing sessions will be held for local governments, medical institutions and project participants. They explain the purpose of the reorganisation, the main changes, the procedure for patients to switch over and the way support is given. The paper says publicity and guidance will be strengthened so that registered patients and medical staff fully understand the changes.",
+            "A place to discuss the work is set up as well. A provisionally named committee for reorganising the godang project is to be formed and run. It is made up of government, private experts and people involved in the existing godang centers. Working consultations with the Ministry of Health and Welfare are to be held regularly, to check and share how the two projects are linked. Other related organisations and bodies are to be consulted whenever necessary. Im Seung-gwan, the commissioner, said that for chronic disease, prevention, early diagnosis and continuous management through healthy living practice matter more than anything."
+          ],
+          "enseg": [
+            [
+              "On November 5 the Korea Disease Control and Prevention Agency ",
+              "set out an implementation plan. ",
+              "It covers the management of chronic diseases ",
+              "such as high blood pressure and diabetes, ",
+              "and how that care will expand nationwide, step by step, ",
+              "through integrated chronic disease centers. ",
+              "It is a press reference document, ",
+              "written in connection with the direction ",
+              "for nationwide expansion announced on September 30. ",
+              "It covers how existing centers will be converted ",
+              "and how patients will be informed. ",
+              "The paper sets out the timetable ",
+              "for existing centers and for new areas separately."
+            ],
+            [
+              "Nineteen areas already run registration and education centers ",
+              "for high blood pressure and diabetes, ",
+              "known as godang centers. ",
+              "Taking account of demand in the field ",
+              "and the continuity of the project, ",
+              "the paper says 2027 will be run as a preparation period ",
+              "for conversion into integrated chronic disease centers. ",
+              "During that period the centers keep the name godang center. ",
+              "Management functions such as education, counselling and reminders are kept. ",
+              "After that, conversion results and project results ",
+              "at the end of the year are to be assessed. ",
+              "From 2028 the centers are to be reorganised ",
+              "and run as integrated chronic disease centers."
+            ],
+            [
+              "New project areas move separately from the preparation period. ",
+              "They will be selected in the first half of 2027, after an open call. ",
+              "From July 2027 they are to operate ",
+              "as integrated chronic disease centers. ",
+              "They plan to provide management services ",
+              "such as education, counselling and reminders, ",
+              "to patients of all ages. ",
+              "In the same year, 2027, ",
+              "one side spends a preparation period ",
+              "while the other goes through an open call ",
+              "and starts operating."
+            ],
+            [
+              "More than one axis is being widened. ",
+              "The paper wrote about the health service ",
+              "that until now reached 19 areas and people aged 30 and over. ",
+              "It is expected to expand to all ages ",
+              "and, step by step, to all areas. ",
+              "The paper also wrote about the management target of the centers. ",
+              "That target is now centred on patients aged 30 and over ",
+              "with high blood pressure or diabetes. ",
+              "It is to widen to all ages and, step by step, ",
+              "to diseases such as dyslipidaemia."
+            ],
+            [
+              "What users will experience is written down as well. ",
+              "Medical cost support for patients already registered ",
+              "will change into a healthy living practice support payment, ",
+              "as announced on September 30. ",
+              "Guidance and support will be provided ",
+              "together with local governments and the godang centers, ",
+              "so that patients can make the change without difficulty. ",
+              "Briefing sessions will be held for local governments, ",
+              "medical institutions and project participants. ",
+              "They explain the purpose of the reorganisation, the main changes, ",
+              "the procedure for patients to switch over and the way support is given. ",
+              "The paper says publicity and guidance will be strengthened ",
+              "so that registered patients and medical staff fully understand the changes."
+            ],
+            [
+              "A place to discuss the work is set up as well. ",
+              "A provisionally named committee for reorganising the godang project ",
+              "is to be formed and run. ",
+              "It is made up of government, private experts ",
+              "and people involved in the existing godang centers. ",
+              "Working consultations with the Ministry of Health and Welfare ",
+              "are to be held regularly, ",
+              "to check and share how the two projects are linked. ",
+              "Other related organisations and bodies are to be consulted whenever necessary. ",
+              "Im Seung-gwan, the commissioner, said that for chronic disease, ",
+              "prevention, early diagnosis and continuous management ",
+              "through healthy living practice matter more than anything."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "implementation",
+              "ko": "이행, 실행 (명사)",
+              "base": "implementation [ˌɪmplɪmenˈteɪʃn]"
+            },
+            {
+              "word": "continuity",
+              "ko": "연속성 (명사)",
+              "base": "continuity [ˌkɑːntəˈnuːəti]"
+            },
+            {
+              "word": "conversion",
+              "ko": "전환 (명사)",
+              "base": "conversion [kənˈvɜːrʒn]"
+            },
+            {
+              "word": "dyslipidaemia",
+              "ko": "이상지질혈증 (명사)",
+              "base": "dyslipidaemia [ˌdɪslɪpɪˈdiːmiə]"
+            },
+            {
+              "word": "provisionally",
+              "ko": "가칭으로, 임시로 (부사)",
+              "base": "provisional [prəˈvɪʒənl]"
+            },
+            {
+              "word": "consultations",
+              "ko": "협의 (명사, consultation의 복수)",
+              "base": "consultation [ˌkɑːnslˈteɪʃn]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 자료의 설계를 가장 잘 요약한 것은?",
+              "choices": [
+                "개편 시점을 먼저 정하고 유지할 것은 적어 두지 않았다",
+                "유지할 것을 정해 두고 평가를 거쳐 개편 시점을 잡았다",
+                "기존 센터와 신규 지역에 같은 일정을 한꺼번에 적용했다",
+                "평가를 빼고 모든 센터를 2027년에 통합관리센터로 바꿨다"
+              ],
+              "answer": 1,
+              "explain": "명칭과 관리 기능을 유지하는 준비 기간을 두고, 실적 등을 평가하여 2028년부터 개편·운영한다고 적었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "기존 고당센터의 일정으로 자료가 적은 것은?",
+              "choices": [
+                "2027년 상반기 공모, 2027년 7월 가동, 2028년 평가",
+                "2026년 준비 기간, 2027년 연말 평가, 2027년 개편",
+                "2027년 준비 기간, 연말 실적 평가, 2028년 개편·운영",
+                "2027년 명칭 변경, 2028년 공모, 2028년 하반기 가동"
+              ],
+              "answer": 2,
+              "explain": "기존 센터는 2027년이 준비 기간이고, 연말 실적 등을 평가하여 2028년부터 개편·운영한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "자료가 적은 협의 틀에 들어가지 않는 것은?",
+              "choices": [
+                "가칭 고당사업 개편 추진위원회의 구성과 운영",
+                "보건복지부와 정례적으로 실시하는 실무 협의",
+                "유관기관·단체와 필요시 수시로 하는 협의",
+                "환자 대표만으로 꾸려 해마다 여는 전체 총회"
+              ],
+              "answer": 3,
+              "explain": "자료가 적은 것은 추진위원회, 보건복지부 정례 실무 협의, 유관기관·단체와의 수시 협의다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "vocab",
+              "q": "「이행 방안」에서 「이행」의 뜻에 가장 가까운 것은?",
+              "choices": [
+                "정할 것을 미리 의논해 두는 일",
+                "정한 것을 실제로 실행하는 일",
+                "맡은 일을 남에게 넘기는 일",
+                "정한 것을 뒤로 미루는 일"
+              ],
+              "answer": 1,
+              "explain": "9월 30일 발표한 방향을 실제로 어떻게 실행할지 적은 자료이므로 이행은 실행을 뜻한다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "critical",
+              "q": "이 자료 본문만으로는 답할 수 없는 것은?",
+              "choices": [
+                "준비 기간에 센터 명칭을 어떻게 쓸지",
+                "기존 등록환자의 지원 방식이 어떻게 바뀔지",
+                "신규 사업 지역이 몇 곳으로 정해질지",
+                "통합관리센터가 어느 나이까지 맡으려 하는지"
+              ],
+              "answer": 2,
+              "explain": "본문은 공모를 거쳐 선정한다는 절차만 적었고, 신규 지역의 수는 이 자료 본문에 적혀 있지 않다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "같은 2027년을 두 갈래로 적은 데서 알 수 있는 것은?",
+              "choices": [
+                "신규 지역도 2027년을 준비 기간으로 보내게 된다",
+                "기존 센터도 2027년 7월부터 새 이름을 쓰게 된다",
+                "두 갈래 모두 2028년에야 서비스를 시작하게 된다",
+                "준비 기간과 신규 가동이 한 해에 나란히 간다"
+              ],
+              "answer": 3,
+              "explain": "기존 센터의 준비 기간과 신규 지역의 7월 가동이 모두 2027년 안에 들어 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "이 자료의 방식대로 제도를 바꾼다면 가장 가까운 순서는?",
+              "choices": [
+                "개편 → 공모 → 유지, 실적 평가는 하지 않는다",
+                "유지 → 실적 평가 → 개편, 신규는 공모 뒤 가동",
+                "공모 → 개편 → 유지, 기존 조직은 곧바로 닫는다",
+                "실적 평가 → 유지 → 공모, 신규 가동은 미룬다"
+              ],
+              "answer": 1,
+              "explain": "기존 센터는 유지·평가·개편 순서이고, 신규 지역은 공모로 선정한 뒤 가동한다.",
+              "evidencePara": 2
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "jongmyo-shrine",
+      "category": "history",
+      "careers": [
+        "art",
+        "hum",
+        "eng"
+      ],
+      "publishedAt": "2026-11-09",
+      "status": "published",
+      "issue": false,
+      "sources": [
+        {
+          "title": "우리역사넷 한국사 연대기 — 종묘",
+          "url": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_r300800&code=kc_age_30"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "옆으로 길어진 집",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "서울 종로에 종묘가 있어요. ",
+              "조선의 임금과 왕비의 ",
+              "신주를 모신 사당이에요. ",
+              "신주는 제사 때 ",
+              "조상의 혼이 내려와 머무는 자리예요."
+            ],
+            [
+              "처음에는 신주를 모실 ",
+              "방을 다섯으로 정해 두었어요. ",
+              "새 신주가 들어오면 ",
+              "가장 윗대 신주를 밖으로 옮겼어요. ",
+              "그런데 덕이 높은 임금의 신주는 ",
+              "옮기지 않고 그대로 모셨어요. ",
+              "그런 자리가 시간이 지날수록 늘어났어요. ",
+              "그래서 종묘는 옆으로 ",
+              "자꾸 늘려 지었어요. ",
+              "종묘가 좌우로 긴 까닭 가운데 하나예요."
+            ],
+            [
+              "전쟁이 밀려오자 사람들은 ",
+              "신주를 모시고 먼 길을 떠났어요. ",
+              "그 뒤 종묘는 불에 탔어요. ",
+              "신주는 이듬해 돌아왔어요. ",
+              "종묘는 한참 뒤에야 다시 세웠어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "종묘",
+              "easy": "조선의 임금과 왕비의 신주를 모시고 제사를 지낸 사당이에요."
+            },
+            {
+              "word": "신주",
+              "easy": "제사 때 조상의 혼이 내려와 머무는 자리예요."
+            },
+            {
+              "word": "사당",
+              "easy": "조상의 신주를 모시고 제사를 지내는 집이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "임금이 새로운 글자를 만든 일",
+                "종묘가 옆으로 길어진 까닭",
+                "바다를 건너는 큰 배를 만든 일",
+                "성을 더 높이 쌓아 올린 일"
+              ],
+              "answer": 1,
+              "explain": "신주를 모실 자리가 늘어나 종묘를 옆으로 늘려 지었다는 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "덕이 높은 임금의 신주는 어떻게 했나요?",
+              "choices": [
+                "제사를 지내지 않고 그냥 두었어요",
+                "다른 사당으로 옮겨서 따로 모셨어요",
+                "방 하나에 여러 신주를 함께 모아 모셨어요",
+                "밖으로 옮기지 않고 그대로 모셨어요"
+              ],
+              "answer": 3,
+              "explain": "글에 덕이 높은 임금의 신주는 옮기지 않고 그대로 모셨다고 적혀 있어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "‘신주’는 무엇인가요?",
+              "choices": [
+                "제사 때 조상의 혼이 내려와 머무는 자리",
+                "제사에 올리는 음식을 담아 두는 나무 그릇",
+                "임금이 제사 때에 입던 옷과 쓰던 모자",
+                "사당 앞에 세워 둔 커다란 나무 문"
+              ],
+              "answer": 0,
+              "explain": "신주는 제사 때 조상의 혼이 내려와 머무는 자리예요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "종묘를 옆으로 늘려 지은 까닭은 무엇인가요?",
+              "choices": [
+                "새 신주가 들어올 때마다 윗대 신주를 옮겼기 때문이에요",
+                "전쟁 때 불에 타서 더 크게 다시 세웠기 때문이에요",
+                "옮기지 않는 신주의 자리가 늘어났기 때문이에요",
+                "신주를 모실 방을 처음부터 다섯으로 정했기 때문이에요"
+              ],
+              "answer": 2,
+              "explain": "옮기지 않는 자리가 시간이 지날수록 늘어나서 옆으로 늘려 지었어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "어느 집에 손님 방이 다섯 개 있어요. 그런데 떠나지 않는 손님이 늘었어요. 이 글의 종묘처럼 하면 어떻게 될까요?",
+              "choices": [
+                "손님을 모두 내보내고 방을 비워 두어요",
+                "방을 더 만들어 집이 옆으로 길어져요",
+                "방 하나에 손님을 여럿 함께 넣어요",
+                "집을 그대로 두고 손님을 돌려보내요"
+              ],
+              "answer": 1,
+              "explain": "종묘도 자리가 모자라자 옆으로 늘려 지었어요.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L2": {
+          "title": "자리가 늘어 건물이 길어졌다",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "종묘는 서울특별시 종로구 종로에 있다. ",
+              "조선 시대 역대 왕과 왕비, ",
+              "추존된 왕과 왕비의 신주를 ",
+              "봉안한 왕실의 사당이다. ",
+              "1963년 1월 18일에 ",
+              "사적 제125호로 지정되었고, ",
+              "1995년에는 유네스코 세계문화유산으로 등재되었다."
+            ],
+            [
+              "조선은 한양 도성을 계획할 때 ",
+              "궁궐이나 성곽보다 종묘를 먼저 구상하였다. ",
+              "자리를 정하는 원칙도 있었다. ",
+              "왼쪽에 종묘를 세우고 ",
+              "오른쪽에 사직을 세운다는 좌묘우사의 원칙이다. ",
+              "태조는 이 원칙에 따라 ",
+              "궁의 왼쪽에 종묘를 배치하였다."
+            ],
+            [
+              "제사를 지낼 때 선조의 혼령이 ",
+              "내려와 의지하는 곳이 신주다. ",
+              "신주는 저마다 독립된 거주공간을 가지며, ",
+              "이를 묘실이라 한다. ",
+              "조선은 제후국의 제도에 따라 오묘제로 정하였다. ",
+              "새로 신주가 들어오면 ",
+              "가장 선대의 신주는 종묘에서 빼도록 하였는데, ",
+              "이를 조천이라 한다."
+            ],
+            [
+              "그런데 덕이 높은 군주의 신주는 ",
+              "옮기지 않고 계속 정전에 모셨다. ",
+              "공업이나 덕이 높은 왕의 신주를 ",
+              "조천하는 것이 불가하다고 하여, ",
+              "옮기지 않는 자리가 시간이 지날수록 늘어갔다. ",
+              "자리가 늘자 종묘도 ",
+              "자꾸 늘려 지어졌다. ",
+              "종묘가 지금처럼 좌우로 긴 건물을 ",
+              "갖게 된 원인 가운데 하나다."
+            ],
+            [
+              "종묘는 임진왜란 때인 ",
+              "1592년 5월 1일에 소실되었다. ",
+              "1608년에야 복구를 시작하여 완료하였다. ",
+              "그 뒤로도 몇 차례 증축되었고, ",
+              "1836년까지의 증축을 거친 ",
+              "모습이 지금 남아 있다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "사당",
+              "easy": "조상의 신주를 모시고 제사를 지내는 집",
+              "hanja": "祠(사당 사)+堂(집 당)"
+            },
+            {
+              "word": "신주",
+              "easy": "제사 때 조상의 혼령이 내려와 의지하는 자리",
+              "hanja": "神(귀신 신)+主(주인 주)"
+            },
+            {
+              "word": "등재",
+              "easy": "목록이나 명부에 올려 적는 일",
+              "hanja": "登(오를 등)+載(실을 재)"
+            },
+            {
+              "word": "조천",
+              "easy": "새 신주가 들어오면 가장 선대의 신주를 종묘에서 빼는 일",
+              "hanja": "祚(복 조)+遷(옮길 천)"
+            }
+          ],
+          "en": [
+            "Jongmyo stands in Jongno, Seoul. It is a royal shrine of the Joseon dynasty. Inside are the spirit tablets of kings and queens. Some of them were honoured only after death. On 18 January 1963 it became Historic Site No. 125. In 1995 it was listed as a UNESCO World Heritage site.",
+            "Joseon planned a new capital at Hanyang. The planners thought of Jongmyo before the palace or the walls. There was also a rule about place. The shrine goes on the left, the state altar on the right. So Taejo put Jongmyo on the left side of the palace.",
+            "A spirit tablet is where an ancestor's spirit comes down and rests. Each tablet has its own room. Joseon followed the rule for a vassal state and kept five rooms. When a new tablet came in, the oldest one had to leave.",
+            "But a king of great virtue was never moved out. His tablet stayed in the main hall. Rooms like that grew in number as time passed. So the building was made longer and longer. That is one reason the shrine is so wide today.",
+            "A war burned Jongmyo down in 1592. Work to rebuild it began only in 1608. More rooms were added a few times after that. What we see today is the result of all the work done up to 1836."
+          ],
+          "enseg": [
+            [
+              "Jongmyo stands in Jongno, Seoul. ",
+              "It is a royal shrine of the Joseon dynasty. ",
+              "Inside are the spirit tablets of kings and queens. ",
+              "Some of them were honoured only after death. ",
+              "On 18 January 1963 it became Historic Site No. 125. ",
+              "In 1995 it was listed as a UNESCO World Heritage site."
+            ],
+            [
+              "Joseon planned a new capital at Hanyang. ",
+              "The planners thought of Jongmyo before the palace or the walls. ",
+              "There was also a rule about place. ",
+              "The shrine goes on the left, the state altar on the right. ",
+              "So Taejo put Jongmyo on the left side of the palace."
+            ],
+            [
+              "A spirit tablet is where an ancestor's spirit comes down and rests. ",
+              "Each tablet has its own room. ",
+              "Joseon followed the rule for a vassal state and kept five rooms. ",
+              "When a new tablet came in, the oldest one had to leave."
+            ],
+            [
+              "But a king of great virtue was never moved out. ",
+              "His tablet stayed in the main hall. ",
+              "Rooms like that grew in number as time passed. ",
+              "So the building was made longer and longer. ",
+              "That is one reason the shrine is so wide today."
+            ],
+            [
+              "A war burned Jongmyo down in 1592. ",
+              "Work to rebuild it began only in 1608. ",
+              "More rooms were added a few times after that. ",
+              "What we see today is the result of all the work done up to 1836."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "shrine",
+              "ko": "사당 (명사)",
+              "base": "shrine [ʃraɪn]"
+            },
+            {
+              "word": "tablets",
+              "ko": "신주 (명사 복수)",
+              "base": "tablet [ˈtæblət]"
+            },
+            {
+              "word": "listed",
+              "ko": "등재된 (과거분사)",
+              "base": "list [lɪst]"
+            },
+            {
+              "word": "vassal",
+              "ko": "제후의 (형용사)",
+              "base": "vassal [ˈvæsl]"
+            },
+            {
+              "word": "virtue",
+              "ko": "덕 (명사)",
+              "base": "virtue [ˈvɜːrtʃuː]"
+            },
+            {
+              "word": "rebuild",
+              "ko": "다시 세우다 (동사)",
+              "base": "rebuild [ˌriːˈbɪld]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 힘주어 설명하는 것은?",
+              "choices": [
+                "임진왜란 때 신주를 옮긴 사람들의 긴 여정",
+                "종묘에서 연주하던 음악과 노래를 되살린 일",
+                "제도를 지키다 보니 건물의 모양이 바뀐 일",
+                "한양 도성의 성곽을 쌓은 순서와 그 방법"
+              ],
+              "answer": 2,
+              "explain": "옮기지 않는 자리가 늘어나 종묘이 좌우로 긴 건물이 되었다는 것이 글의 중심이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "종묘를 궁의 왼쪽에 둔 까닭으로 글에 적힌 것은?",
+              "choices": [
+                "왼쪽에 종묘, 오른쪽에 사직을 둔다는 원칙을 따랐다",
+                "궁궐과 성곽을 모두 세운 뒤에 남은 자리가 거기였다",
+                "조천할 신주를 옮기기에 가장 가까운 자리가 거기였다",
+                "임금이 제사를 지내러 가는 길이 가장 짧은 자리였다"
+              ],
+              "answer": 0,
+              "explain": "글은 좌묘우사의 원칙에 따라 태조가 궁의 왼쪽에 종묘를 배치하였다고 적는다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "글에서 ‘조천’은 어떤 일을 가리키는가?",
+              "choices": [
+                "불에 탄 종묘를 처음 모습 그대로 다시 세우는 일",
+                "제사 때 조상의 혼령이 신주에 내려와 머무르는 일",
+                "덕이 높은 임금의 신주를 옮기지 않고 모시는 일",
+                "새 신주가 들어오면 가장 선대의 신주를 빼는 일"
+              ],
+              "answer": 3,
+              "explain": "새로 신주가 들어오면 가장 선대의 신주를 종묘에서 빼도록 한 것이 조천이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "정전이 좌우로 길어진 과정을 글에 따라 바르게 말한 것은?",
+              "choices": [
+                "세계문화유산으로 등재된 뒤에 건물을 넓게 손보았다",
+                "옮기지 않는 자리가 늘어 건물을 자꾸 늘려 지었다",
+                "소실된 뒤 복구할 때 처음보다 훨씬 넓게 지어 올렸다",
+                "증축을 멈추어 처음 지은 모양이 지금까지 남았다"
+              ],
+              "answer": 1,
+              "explain": "조천하지 않는 자리가 늘자 종묘도 자꾸 늘려 지어졌다고 글에 적혀 있다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글의 설명에 따를 때, 옮기지 않는 자리가 하나도 늘지 않았다면 종묘은 어떠했겠는가?",
+              "choices": [
+                "임진왜란 때 불에 타지 않고 그대로 남았을 것이다",
+                "지금보다 앞뒤로 훨씬 깊은 건물이 되었을 것이다",
+                "사직과 자리를 바꾸어 궁의 오른쪽에 섰을 것이다",
+                "지금보다 좌우로 짧은 건물로 남았을 것이다"
+              ],
+              "answer": 3,
+              "explain": "자리가 늘어난 것이 건물을 늘려 짓게 한 원인이므로, 늘지 않았다면 길어질 이유도 없다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "사물함이 다섯 칸인데 졸업해도 칸을 비우지 않는 학생이 늘었다. 이 글의 종묘와 같은 방식은?",
+              "choices": [
+                "사물함을 옆으로 더 달아 줄을 길게 늘인다",
+                "졸업한 학생의 칸을 모두 비워 다시 나눈다",
+                "한 칸에 여러 학생의 물건을 함께 넣어 둔다",
+                "사물함을 치우고 각자 집에 가져가게 한다"
+              ],
+              "answer": 0,
+              "explain": "종묘도 비우지 않는 자리가 늘자 건물을 옆으로 늘려 지었다.",
+              "evidencePara": 3
+            }
+          ]
+        },
+        "L3": {
+          "title": "규칙을 지키려다 모양이 바뀌었다",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "종묘는 서울 종로구 종로에 ",
+              "위치한 조선 왕실의 사당이다. ",
+              "역대 왕과 왕비, ",
+              "추존된 왕과 왕비의 신주를 ",
+              "봉안한 곳으로 태묘라고도 한다. ",
+              "1963년 1월 18일에 사적 제125호로 지정되었고, ",
+              "1995년에는 유네스코 세계문화유산으로 등재되었다."
+            ],
+            [
+              "조선은 국초 한양 도성을 계획할 때 ",
+              "궁궐과 성곽보다 종묘를 먼저 구상하였다. ",
+              "천자는 7대의 묘를, ",
+              "제후는 5대의 묘를 건립할 수 있다는 ",
+              "천자칠묘 제후오묘와 우사직 좌종묘, ",
+              "좌묘우사의 원칙을 따랐다. ",
+              "태조는 궁의 왼쪽에 종묘를 배치하고 ",
+              "제후국의 제도에 따라 오묘제로 정하였다."
+            ],
+            [
+              "정전은 동당이실 서상제를 따라 세웠다. ",
+              "동당이실이란 한 사당 아래 실만 달리 하여 ",
+              "각각의 신위를 모신 것이고, ",
+              "서상제는 서쪽 끝에 제일 높은 신주를 두고 ",
+              "왼쪽인 동쪽으로 차례대로 ",
+              "신위를 봉안하는 제도다. ",
+              "이 체제는 국조오례의에 그대로 반영되어 명문화되었다."
+            ],
+            [
+              "규칙은 곧 현실에 부딪혔다. ",
+              "제후 5묘는 불천위 태조 1묘와 ",
+              "왕의 4대 선조를 모시는 자리였다. ",
+              "태종은 정종과 형제관계였으므로 ",
+              "조천할 신주가 발생하지 않았고, ",
+              "정종의 신주까지 들어가면 ",
+              "6묘가 되어 제후 5묘에 위배되었다. ",
+              "중국의 선례를 찾다가 ",
+              "송 별묘의 제도를 보고 따르기로 하였다. ",
+              "상왕이던 태종은 대실의 서쪽에 ",
+              "별묘의 전각을 세우고, ",
+              "조종과 자손이 함께 길이 편안하다는 뜻을 지닌 ",
+              "영녕으로 그 이름을 정하였다."
+            ],
+            [
+              "세실이란 대대로 그 실에 ",
+              "신주를 모신다는 뜻이다. ",
+              "덕이 높은 군주의 신주는 옮기지 않고 ",
+              "계속 정전에 모시는 불천지주로 삼았다. ",
+              "본래 세실은 태조 하나였으나 ",
+              "조선 시대에는 시간이 지날수록 늘어갔다. ",
+              "이러한 증가는 종묘가 ",
+              "처음 건립 이후 자꾸 증치되어 ",
+              "현재와 같이 좌우로 긴 건물을 ",
+              "갖게 되는 원인이 되기도 하였다."
+            ],
+            [
+              "종묘는 임진왜란 때인 1592년에 ",
+              "소실되었다가 1608년에 복구되었다. ",
+              "그 뒤 1668년과 1726년, 1836년에 거듭 증축되었다. ",
+              "종묘에서 이루어지는 제례의식이 종묘제례이고, ",
+              "그때 연주하는 음악과 노래, ",
+              "무용이 종묘제례악이다. ",
+              "종묘제례악은 1964년, 종묘제례는 1975년에 무형문화재로 지정되었고, ",
+              "둘은 2001년 유네스코 인류구전 및 무형유산걸작으로 선정되었다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "정전",
+              "easy": "종묘에서 신주를 모신 으뜸 건물",
+              "hanja": "正(바를 정)+殿(전각 전)"
+            },
+            {
+              "word": "동당이실",
+              "easy": "한 사당 아래 실만 달리 하여 각각의 신위를 모신 것",
+              "hanja": "同(한가지 동)+堂(집 당)+異(다를 이)+室(집 실)"
+            },
+            {
+              "word": "세실",
+              "easy": "대대로 그 실에 신주를 모신다는 뜻",
+              "hanja": "世(인간 세)+室(집 실)"
+            },
+            {
+              "word": "봉안",
+              "easy": "신주를 정해진 자리에 받들어 모시는 일",
+              "hanja": "奉(받들 봉)+安(편안할 안)"
+            },
+            {
+              "word": "증축",
+              "easy": "이미 있는 건물에 더 늘려 짓는 일",
+              "hanja": "增(더할 증)+築(쌓을 축)"
+            }
+          ],
+          "en": [
+            "Jongmyo is the royal ancestral shrine of Joseon, in Jongno, Seoul. It holds the spirit tablets of kings and queens, including those honoured after death, and is also called Taemyo. It was designated Historic Site No. 125 on 18 January 1963 and listed as a UNESCO World Heritage site in 1995.",
+            "When Joseon laid out its capital at Hanyang, the shrine was planned before the palace and the city walls. The founders followed old rules: a Son of Heaven might keep seven shrine generations, a feudal lord only five. Another rule fixed the places, putting the ancestral shrine on the left and the altar of soil and grain on the right. Taejo set Jongmyo to the left of the palace and settled on the five-generation system.",
+            "The main hall was one building with separate rooms inside. The highest tablet stood at the west end, and the others were placed eastward in order. This arrangement was written down in the state book of rites.",
+            "The rule soon met reality. Five rooms were meant for Taejo, whose tablet never moved, and four generations of ancestors. Taejong was Jeongjong's brother, so no tablet was due to leave, and adding Jeongjong would have made six. The court searched Chinese precedent, found the separate shrine of Song, and followed it. Taejong built a separate hall west of the great chamber and named it Yeongnyeong, meaning lasting peace for ancestors and descendants alike.",
+            "A sesil was a room that kept its tablet for ever. The tablet of a ruler of high virtue was not moved but kept in the main hall. At first only Taejo had such a room, but in Joseon the number grew with time. That growth was one reason rooms kept being added, and one reason the shrine now stretches from side to side.",
+            "Jongmyo burned in 1592 and was restored in 1608, with more rooms added in 1668, 1726 and 1836. The rite held there is Jongmyo Jerye, and the music, song and dance played with it is Jongmyo Jeryeak. The music was designated in 1964 and the rite in 1975. In 2001 both were chosen as a UNESCO masterpiece of oral and intangible heritage."
+          ],
+          "enseg": [
+            [
+              "Jongmyo is the royal ancestral shrine of Joseon, in Jongno, Seoul. ",
+              "It holds the spirit tablets of kings and queens, including those honoured after death, and is also called Taemyo. ",
+              "It was designated Historic Site No. 125 on 18 January 1963 and listed as a UNESCO World Heritage site in 1995."
+            ],
+            [
+              "When Joseon laid out its capital at Hanyang, the shrine was planned before the palace and the city walls. ",
+              "The founders followed old rules: a Son of Heaven might keep seven shrine generations, a feudal lord only five. ",
+              "Another rule fixed the places, putting the ancestral shrine on the left and the altar of soil and grain on the right. ",
+              "Taejo set Jongmyo to the left of the palace and settled on the five-generation system."
+            ],
+            [
+              "The main hall was one building with separate rooms inside. ",
+              "The highest tablet stood at the west end, and the others were placed eastward in order. ",
+              "This arrangement was written down in the state book of rites."
+            ],
+            [
+              "The rule soon met reality. ",
+              "Five rooms were meant for Taejo, whose tablet never moved, and four generations of ancestors. ",
+              "Taejong was Jeongjong's brother, so no tablet was due to leave, and adding Jeongjong would have made six. ",
+              "The court searched Chinese precedent, found the separate shrine of Song, and followed it. ",
+              "Taejong built a separate hall west of the great chamber and named it Yeongnyeong, meaning lasting peace for ancestors and descendants alike."
+            ],
+            [
+              "A sesil was a room that kept its tablet for ever. ",
+              "The tablet of a ruler of high virtue was not moved but kept in the main hall. ",
+              "At first only Taejo had such a room, but in Joseon the number grew with time. ",
+              "That growth was one reason rooms kept being added, and one reason the shrine now stretches from side to side."
+            ],
+            [
+              "Jongmyo burned in 1592 and was restored in 1608, with more rooms added in 1668, 1726 and 1836. ",
+              "The rite held there is Jongmyo Jerye, and the music, song and dance played with it is Jongmyo Jeryeak. ",
+              "The music was designated in 1964 and the rite in 1975. ",
+              "In 2001 both were chosen as a UNESCO masterpiece of oral and intangible heritage."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "ancestral",
+              "ko": "조상의 (형용사)",
+              "base": "ancestral [ænˈsestrəl]"
+            },
+            {
+              "word": "designated",
+              "ko": "지정된 (과거분사)",
+              "base": "designate [ˈdezɪɡneɪt]"
+            },
+            {
+              "word": "precedent",
+              "ko": "선례 (명사)",
+              "base": "precedent [ˈpresɪdənt]"
+            },
+            {
+              "word": "descendants",
+              "ko": "자손 (명사 복수)",
+              "base": "descendant [dɪˈsendənt]"
+            },
+            {
+              "word": "restored",
+              "ko": "복구된 (과거분사)",
+              "base": "restore [rɪˈstɔːr]"
+            },
+            {
+              "word": "intangible",
+              "ko": "무형의 (형용사)",
+              "base": "intangible [ɪnˈtændʒəbl]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용은?",
+              "choices": [
+                "한양 도성의 궁궐과 성곽을 쌓은 순서를 밝힌 글이다",
+                "종묘제례악이 유네스코 무형유산으로 선정된 과정",
+                "임진왜란과 그 뒤 종묘를 복구한 공사의 기록이다",
+                "제도를 지키려는 선택이 종묘의 모양을 바꾸었다"
+              ],
+              "answer": 3,
+              "explain": "조천하지 않는 세실이 늘어 증치가 이어지고, 그것이 좌우로 긴 건물의 원인이 되었다는 흐름이 글의 뼈대다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "글에 적힌 서상제의 내용은?",
+              "choices": [
+                "동쪽 끝에 제일 높은 신주를 두고 서쪽으로 모신다",
+                "서쪽 끝에 제일 높은 신주를 두고 동쪽으로 모신다",
+                "한 사당 아래 실만 달리 하여 신위를 따로 모신다",
+                "덕이 높은 군주의 신주를 옮기지 않고 정전에 모신다"
+              ],
+              "answer": 1,
+              "explain": "서상제는 서쪽 끝에 제일 높은 신주를 두고 동쪽으로 차례대로 봉안하는 제도다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "글에서 ‘불천지주’에 해당하는 신주는?",
+              "choices": [
+                "별묘인 영녕전으로 옮겨 모시게 된 신주",
+                "새로 들어와 가장 끝자리에 놓이게 된 신주",
+                "옮기지 않고 계속 정전에 모시기로 한 신주",
+                "제후 5묘를 넘겨 종묘에서 빼게 된 신주"
+              ],
+              "answer": 2,
+              "explain": "덕이 높은 군주의 신주를 옮기지 않고 계속 정전에 모시는 것이 불천지주다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "infer",
+              "q": "정종을 부묘할 때 생긴 문제의 성격을 가장 잘 말한 것은?",
+              "choices": [
+                "형제가 왕위를 이어 조천할 신주가 없어 자리가 모자랐다",
+                "태조의 신주를 옮겨야 하는데 옮길 곳이 없어 막혔다",
+                "제후오묘 대신 천자칠묘를 따르기로 하여 자리가 남았다",
+                "서상제를 어기고 동쪽부터 모셔 봉안 순서가 흐트러졌다"
+              ],
+              "answer": 0,
+              "explain": "태종과 정종은 형제였으므로 조천할 신주가 생기지 않았고, 정종까지 들어가면 6묘가 되어 제후 5묘에 위배되었다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "이 글의 논지에 비추어 가장 조심해야 할 해석은?",
+              "choices": [
+                "영녕전은 제후 5묘를 지키려다 새로 만들어 낸 자리다",
+                "조천의 규칙과 세실의 예외는 서로 맞물려 작동하였다",
+                "종묘가 좌우로 긴 것은 처음 설계부터 정해진 모습이다",
+                "정전의 모양은 제도를 지키려는 선택이 쌓인 결과다"
+              ],
+              "answer": 2,
+              "explain": "글은 처음 건립 이후 자꾸 증치되어 현재와 같이 좌우로 긴 건물이 되었다고 적는다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "다음 가운데 글에 나온 영녕전의 해결 방식과 가장 비슷한 것은?",
+              "choices": [
+                "건물을 허물고 처음부터 더 크게 다시 세운다",
+                "정원을 늘려 규정을 고치고 한 건물에 받아들인다",
+                "규정을 어긴 사람을 가려내어 명단에서 지운다",
+                "정원을 늘리지 않으려 별관을 지어 나누어 둔다"
+              ],
+              "answer": 3,
+              "explain": "제후 5묘라는 수를 지키면서 모실 자리를 마련하려고 대실 서쪽에 별묘를 세운 것이 영녕전이다.",
+              "evidencePara": 3
+            }
+          ]
+        },
+        "L4": {
+          "title": "제도가 쌓여 형태가 되었다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "종묘란 조상신을 제사 지내는 ",
+              "공간으로 조상숭배 관념에서 비롯되었고, ",
+              "그 연원은 고대 중국 주나라 때까지 올라간다. ",
+              "종묘는 천명을 받아 국가를 세운 창업자와 ",
+              "그 후손이 이어가는 왕조의 정당성과 ",
+              "정통성을 상징하는 건축물로 자리 잡았다. ",
+              "사직과 더불어 국가를 뜻하는 대명사로 일컬어졌고, ",
+              "나라를 세웠을 때 ",
+              "가장 먼저 건립하는 것이 종묘였다."
+            ],
+            [
+              "조선도 국초 한양 도성을 계획할 때 ",
+              "궁궐과 성곽보다 종묘를 먼저 구상하였다. ",
+              "천자는 7대의 묘를, ",
+              "제후는 5대의 묘를 건립할 수 있다는 ",
+              "천자칠묘 제후오묘와 우사직 좌종묘, ",
+              "좌묘우사의 원칙을 따랐다. ",
+              "태조는 궁의 왼쪽에 종묘를 배치하고 ",
+              "제후국의 제도에 따라 오묘제로 정하였다. ",
+              "정전은 동당이실의 구조에 대실 7간으로, ",
+              "안에 석실 5간을 만들고 ",
+              "좌우의 익랑은 각각 2간씩이며, ",
+              "공신당 5간, 신문 3간, 동문 3간, ",
+              "서문 1간 등의 규모로 건립하였다."
+            ],
+            [
+              "태종 8년 태조가 승하하여 종묘 5실에 부묘되자, ",
+              "다음번에 정종을 부묘할 시점에 문제가 발생한다. ",
+              "제후 5묘는 불천위 태조 1묘와 ",
+              "왕의 4대 선조를 모시는 자리여서, ",
+              "새 신주가 들어오면 ",
+              "가장 선대의 신주는 빼도록 하였고, ",
+              "이를 조천이라 한다. ",
+              "그런데 태종은 정종과 형제관계였으므로 조천할 신주가 없었고, ",
+              "정종을 부묘하면 6묘가 되어 제후 5묘에 위배되었다. ",
+              "중국의 선례를 찾아 논의하다 ",
+              "송 별묘의 제도를 보고 이에 따르기로 한다. ",
+              "상왕이었던 태종은 대실의 서쪽에 별묘의 전각을 세우고, ",
+              "조종과 자손이 함께 길이 편안하다는 뜻을 지닌 ",
+              "영녕으로 그 이름을 정하였다."
+            ],
+            [
+              "세실이란 대대로 그 실에 신주를 모신다는 뜻이다. ",
+              "덕이 높은 군주의 신주는 옮기지 않고 ",
+              "계속 정전에 모시는 불천지주로 삼는다는 내용인데, ",
+              "이는 곧 후대인들이 ",
+              "선대왕을 평가하는 잣대가 되기도 하였다. ",
+              "본래 불천지주를 모시는 세실은 태조 하나였으나, ",
+              "조선 시대에는 공업이나 덕이 높은 왕의 신주를 ",
+              "조천하는 것이 불가하다고 하여 ",
+              "세실이 시간이 지날수록 늘어갔다. ",
+              "이러한 증가는 종묘가 ",
+              "처음 건립 이후 자꾸 증치되어 ",
+              "현재와 같이 좌우로 긴 건물을 ",
+              "갖게 되는 원인이 되기도 하였다."
+            ],
+            [
+              "종묘는 임진왜란 때인 ",
+              "1592년 5월 1일에 왜군에 의해 소실되었다. ",
+              "조정에서는 궁궐의 영건에 앞서 ",
+              "종묘 중건을 먼저 논의하였으나, ",
+              "전란 뒤끝의 어려운 사정으로 ",
+              "1608년에야 복구를 시작하여 완료한다. ",
+              "그 뒤 종묘는 1668년에 영녕전 익실을, ",
+              "1726년에 정전의 신실을, ",
+              "1836년에 정전의 신실과 영녕전 익실을 거듭 증축하였다. ",
+              "현재 남아 있는 종묘는 ",
+              "1836년까지의 증축을 거친 모습이다."
+            ],
+            [
+              "종묘에서 이루어지는 제례의식이 종묘제례이고, ",
+              "종묘제례악은 그때 연주하는 음악과 노래, ",
+              "무용을 아울러 지칭한다. ",
+              "종묘제례악은 1964년 무형문화재 제1호로, ",
+              "종묘제례는 1975년 제56호로 지정되었고, ",
+              "둘은 2001년 유네스코 인류구전 및 무형유산걸작으로 선정되었다. ",
+              "종묘 자체는 1963년에 사적 제125호로 지정되고 ",
+              "1995년에 유네스코 세계문화유산으로 등재되었다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "정통성",
+              "easy": "왕조나 권력이 바르게 이어졌다고 인정받는 성질",
+              "hanja": "正(바를 정)+統(거느릴 통)+性(성품 성)"
+            },
+            {
+              "word": "불천지주",
+              "easy": "옮기지 않고 계속 정전에 모시는 신주",
+              "hanja": "不(아닐 불)+遷(옮길 천)+之(갈 지)+主(주인 주)"
+            },
+            {
+              "word": "익랑",
+              "easy": "본채 좌우로 날개처럼 붙여 낸 긴 채",
+              "hanja": "翼(날개 익)+廊(복도 랑)"
+            },
+            {
+              "word": "증치",
+              "easy": "자리를 더 설치해 늘려 나가는 일",
+              "hanja": "增(더할 증)+置(둘 치)"
+            },
+            {
+              "word": "중건",
+              "easy": "허물어지거나 불탄 건물을 다시 세우는 일",
+              "hanja": "重(무거울 중)+建(세울 건)"
+            }
+          ],
+          "en": [
+            "A royal ancestral shrine was a place for sacrifices to ancestral spirits, and the idea reaches back to the Zhou dynasty of ancient China. As states appeared, the shrine came to stand for the legitimacy of a dynasty founded under the mandate of heaven and carried on by its descendants. With the altar of soil and grain it was spoken of as a byword for the state itself, and it was the first thing built when a kingdom was founded.",
+            "Joseon also planned Jongmyo before the palace and the city walls when it laid out Hanyang. The founders followed the rules that a Son of Heaven might keep seven shrine generations and a feudal lord five, and that the shrine belonged on the left and the altar on the right. Taejo set the shrine to the left of the palace and settled on the five-generation system. The main hall was built as one hall with separate rooms: a great chamber of seven bays with five stone chambers inside, wing corridors of two bays on each side, a hall for merit subjects of five bays, a spirit gate of three bays, an east gate of three bays and a west gate of one bay.",
+            "When Taejo died in the eighth year of Taejong and was enshrined in one of the five rooms, the next enshrinement raised a problem. The five rooms were meant for Taejo, whose tablet never moved, and four generations of ancestors, so a new tablet pushed the oldest one out. Taejong, however, was Jeongjong's brother, so no tablet was due to leave, and adding Jeongjong would have made six. The court searched Chinese precedent, found the separate shrine of Song, and followed it. Taejong built a separate hall west of the great chamber and named it Yeongnyeong, meaning that ancestors and descendants rest at peace together.",
+            "A sesil was a room that held its tablet for ever. The tablet of a ruler of high virtue was not moved but kept in the main hall, and that judgement became a measure by which later generations weighed earlier kings. In the original scheme only Taejo had such a room, but in Joseon it was held wrong to move the tablet of a king of great merit, so the number grew with time. That growth was one reason rooms kept being added and the shrine came to stretch from side to side as it does now.",
+            "Jongmyo burned in the war of 1592. The court debated rebuilding the shrine before rebuilding the palace, yet hardship after the war delayed the work until 1608. The shrine was extended again in 1668, 1726 and 1836, and what stands today is the result of the work done up to 1836.",
+            "The rite performed at Jongmyo is Jongmyo Jerye, and Jongmyo Jeryeak is the music, song and dance performed with it. The music was designated in 1964 and the rite in 1975, and in 2001 both were chosen as a UNESCO masterpiece of oral and intangible heritage. The shrine itself was designated Historic Site No. 125 in 1963 and listed as World Heritage in 1995."
+          ],
+          "enseg": [
+            [
+              "A royal ancestral shrine was a place for sacrifices to ancestral spirits, and the idea reaches back to the Zhou dynasty of ancient China. ",
+              "As states appeared, the shrine came to stand for the legitimacy of a dynasty founded under the mandate of heaven and carried on by its descendants. ",
+              "With the altar of soil and grain it was spoken of as a byword for the state itself, and it was the first thing built when a kingdom was founded."
+            ],
+            [
+              "Joseon also planned Jongmyo before the palace and the city walls when it laid out Hanyang. ",
+              "The founders followed the rules that a Son of Heaven might keep seven shrine generations and a feudal lord five, and that the shrine belonged on the left and the altar on the right. ",
+              "Taejo set the shrine to the left of the palace and settled on the five-generation system. ",
+              "The main hall was built as one hall with separate rooms: a great chamber of seven bays with five stone chambers inside, wing corridors of two bays on each side, a hall for merit subjects of five bays, a spirit gate of three bays, an east gate of three bays and a west gate of one bay."
+            ],
+            [
+              "When Taejo died in the eighth year of Taejong and was enshrined in one of the five rooms, the next enshrinement raised a problem. ",
+              "The five rooms were meant for Taejo, whose tablet never moved, and four generations of ancestors, so a new tablet pushed the oldest one out. ",
+              "Taejong, however, was Jeongjong's brother, so no tablet was due to leave, and adding Jeongjong would have made six. ",
+              "The court searched Chinese precedent, found the separate shrine of Song, and followed it. ",
+              "Taejong built a separate hall west of the great chamber and named it Yeongnyeong, meaning that ancestors and descendants rest at peace together."
+            ],
+            [
+              "A sesil was a room that held its tablet for ever. ",
+              "The tablet of a ruler of high virtue was not moved but kept in the main hall, and that judgement became a measure by which later generations weighed earlier kings. ",
+              "In the original scheme only Taejo had such a room, but in Joseon it was held wrong to move the tablet of a king of great merit, so the number grew with time. ",
+              "That growth was one reason rooms kept being added and the shrine came to stretch from side to side as it does now."
+            ],
+            [
+              "Jongmyo burned in the war of 1592. ",
+              "The court debated rebuilding the shrine before rebuilding the palace, yet hardship after the war delayed the work until 1608. ",
+              "The shrine was extended again in 1668, 1726 and 1836, and what stands today is the result of the work done up to 1836."
+            ],
+            [
+              "The rite performed at Jongmyo is Jongmyo Jerye, and Jongmyo Jeryeak is the music, song and dance performed with it. ",
+              "The music was designated in 1964 and the rite in 1975, and in 2001 both were chosen as a UNESCO masterpiece of oral and intangible heritage. ",
+              "The shrine itself was designated Historic Site No. 125 in 1963 and listed as World Heritage in 1995."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "legitimacy",
+              "ko": "정당성 (명사)",
+              "base": "legitimacy [lɪˈdʒɪtɪməsi]"
+            },
+            {
+              "word": "precedent",
+              "ko": "선례 (명사)",
+              "base": "precedent [ˈpresɪdənt]"
+            },
+            {
+              "word": "enshrined",
+              "ko": "사당에 모셔진 (과거분사)",
+              "base": "enshrine [ɪnˈʃraɪn]"
+            },
+            {
+              "word": "bays",
+              "ko": "간, 기둥 사이 (명사 복수)",
+              "base": "bay [beɪ]"
+            },
+            {
+              "word": "extended",
+              "ko": "증축된 (과거분사)",
+              "base": "extend [ɪkˈstend]"
+            },
+            {
+              "word": "intangible",
+              "ko": "무형의 (형용사)",
+              "base": "intangible [ɪnˈtændʒəbl]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 논지는?",
+              "choices": [
+                "왕조의 정통성은 건축의 규모로만 드러낼 수 있었다",
+                "제도를 지키려는 판단이 쌓여 건물의 형태를 만들었다",
+                "전란의 피해가 종묘 제도의 틀을 처음부터 다시 세웠다",
+                "제례악의 가치가 인정되면서 종묘의 위상이 결정되었다"
+              ],
+              "answer": 1,
+              "explain": "불천지주의 세실이 늘어난 것이 증치의 원인이 되고 그것이 좌우로 긴 건물을 낳았다는 인과가 글의 뼈대다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "글에 적힌 종묘 정전의 규모로 맞는 것은?",
+              "choices": [
+                "대실 7간에 석실 5간, 좌우 익랑은 각각 5간이다",
+                "대실 5간에 석실 7간, 좌우 익랑은 각각 3간이다",
+                "대실 7간에 석실 5간, 좌우 익랑은 각각 2간이다",
+                "대실 5간에 석실 5간, 좌우 익랑은 각각 2간이다"
+              ],
+              "answer": 2,
+              "explain": "정전은 동당이실의 구조에 대실 7간으로, 안에 석실 5간을 만들고 좌우의 익랑은 각각 2간씩이었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "글에서 ‘증치’가 뜻하는 것은?",
+              "choices": [
+                "건물에 자리를 더 설치해 늘려 나가는 일",
+                "신주를 윗대부터 차례로 옮겨 내보내는 일",
+                "전각의 이름을 새로 정하여 붙여 주는 일",
+                "불에 탄 건물을 본래 모습대로 되살리는 일"
+              ],
+              "answer": 0,
+              "explain": "세실이 늘면서 종묘가 처음 건립 이후 자꾸 증치되었다고 글은 적는다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "영녕전을 세운 선택을 글에 따라 가장 잘 설명한 것은?",
+              "choices": [
+                "정전을 좌우로 늘려 모실 방을 더 만들어 낸 것",
+                "오묘를 일곱으로 늘려 천자의 제도를 따르기로 한 것",
+                "조천의 규칙을 버리고 신주를 정전에 함께 모신 것",
+                "오묘의 수를 지키면서 모실 자리를 따로 마련한 것"
+              ],
+              "answer": 3,
+              "explain": "제후 5묘를 어기지 않으려고 중국의 선례를 찾아 대실 서쪽에 별묘를 세운 것이 영녕전이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 논지에 비추어 가장 조심해야 할 해석은?",
+              "choices": [
+                "선대왕에 대한 평가가 건물의 자리 수로 나타나기도 했다",
+                "불천지주가 늘어난 것은 제도의 실패이자 격의 추락이다",
+                "제후오묘라는 수를 지키려는 노력이 별묘의 형식을 낳았다",
+                "지금의 종묘 모습은 여러 차례의 선택이 겹쳐 쌓인 결과다"
+              ],
+              "answer": 1,
+              "explain": "글은 세실의 증가를 평가하지 않고, 그것이 선대왕을 평가하는 잣대가 되었고 증치의 원인이 되었다고만 적는다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "이 글의 방식으로 볼 때 ‘규칙을 지키려다 형태가 바뀐’ 사례에 가장 가까운 것은?",
+              "choices": [
+                "좌석 수를 못 늘리게 하여 옆 건물에 보조석을 둔 극장",
+                "관객이 줄어 좌석을 떼어 내고 로비를 더 넓게 고친 극장",
+                "낡은 의자를 같은 자리에 같은 수로 바꾸어 놓은 극장",
+                "불이 나 무대가 타자 설계를 바꾸어 새로 지어 올린 극장"
+              ],
+              "answer": 0,
+              "explain": "제후 5묘라는 수를 넘기지 않으려고 대실 서쪽에 별묘를 세운 것과 같은 구조다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "글이 쓰는 ‘지정·등재·선정’에 대한 설명으로 적절하지 않은 것은?",
+              "choices": [
+                "종묘가 세계문화유산으로 등재된 해는 사적 지정보다 뒤다",
+                "종묘제례악과 종묘제례는 서로 다른 해에 지정되었다",
+                "셋은 모두 2001년 유네스코가 한꺼번에 처리한 절차다",
+                "두 무형유산이 유네스코 걸작으로 선정된 해는 2001년이다"
+              ],
+              "answer": 2,
+              "explain": "지정은 1963년·1964년·1975년에, 등재는 1995년에, 선정은 2001년에 각각 따로 이루어졌다.",
+              "evidencePara": 5
             }
           ]
         }

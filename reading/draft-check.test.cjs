@@ -277,5 +277,44 @@ function sample() {
   for (const c of C.CAREERS) ok(src.includes("'" + c + "'"), 'CAREERS 의 ' + c + ' 가 정본에 없다');
 }
 
+{   /* 정답 번호가 한 자리에 쏠리면 경고 ──
+       집필 기본값이 「근거를 담은 선지를 맨 앞에」라서 손대지 않으면 전부 0번이 된다(W46) */
+  const a = sample();
+  a.levels.L2.questions.forEach((q) => { const r = q.choices[q.answer]; q.choices = [r, '가', '나', '다']; q.answer = 0; });
+  a.levels.L2.challenge.forEach((q) => { const r = q.choices[q.answer]; q.choices = [r, '가', '나', '다']; q.answer = 0; });
+  const r = C.checkDraft(a);
+  has(r.warns, '정답 번호가', '정답 자리 쏠림');
+  hasNot(r.errors, '정답 번호가', '쏠림은 경고일 뿐 오류가 아니다');
+  ok(r.stats.L2.answerPos[0] === r.stats.L2.qCount,
+     '쏠림 집계 — ' + r.stats.L2.answerPos.join('·'));
+}
+{   /* content.test 의 「모두 같음」은 통과하는 6문항 중 5개 쏠림도 잡는다 ──
+       여기서 더 좁게 재는 까닭이 그것이다 */
+  const a = sample();
+  const qs = a.levels.L3.questions.concat(a.levels.L3.challenge);
+  qs.forEach((q, i) => {
+    const right = q.choices[q.answer];
+    const at = i === qs.length - 1 ? 3 : 0;      /* 마지막 하나만 다른 자리 */
+    const rest = q.choices.filter((_, j) => j !== q.answer);
+    q.choices = rest.slice(0, at).concat([right], rest.slice(at));
+    q.answer = at;
+  });
+  const r = C.checkDraft(a);
+  has(r.warns, 'L3: 정답 번호가', '하나만 다른 자리여도 쏠림으로 본다');
+}
+{   /* 골고루 흩어 두면 조용하다 */
+  const a = sample();
+  const qs = a.levels.L4.questions.concat(a.levels.L4.challenge);
+  qs.forEach((q, i) => {
+    const right = q.choices[q.answer];
+    const at = i % 4;
+    const rest = q.choices.filter((_, j) => j !== q.answer);
+    q.choices = rest.slice(0, at).concat([right], rest.slice(at));
+    q.answer = at;
+  });
+  const r = C.checkDraft(a);
+  hasNot(r.warns, 'L4: 정답 번호가', '흩어 두면 경고 없음');
+}
+
 if (fail) { console.error(`\nFAIL — ${fail}건`); process.exit(1); }
 console.log('OK — draft-check 검사 통과');
