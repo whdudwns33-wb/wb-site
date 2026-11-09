@@ -2219,6 +2219,9 @@ async function handleExchange(env, app, body, origin) {
     return json({ ok: false, code: 'LINK_INVALID', error: '접근할 수 없는 개인 링크입니다' }, 401, origin);
   }
 
+  // 같은 브라우저의 기존 bearer를 증명한 재연결만 기존 슬롯을 교체한다.
+  const previousToken = app === 'task' && SAFE_BOOTSTRAP_CODE.test(String(body.previousToken || '')) ? String(body.previousToken) : '';
+  const previousHash = previousToken ? tokenStorageValue(await sha256Hex(previousToken)) : '';
   const consumedAt = Date.now();
   const cutoff = deviceCutoff(env, app, consumedAt);
   const markerBytes = new Uint32Array(1);
@@ -2231,8 +2234,8 @@ async function handleExchange(env, app, body, origin) {
       'UPDATE bootstrap_codes SET consumed_at=? ' +
       'WHERE app=? AND code_hash=? AND staff_id=? AND revoked=0 AND consumed_at IS NULL AND expires_at>=? ' +
       'AND (?<>? OR (SELECT COUNT(*) FROM tokens WHERE app=? AND staff_id=? AND revoked=0 ' +
-      'AND (created_at>=? OR substr(token,1,7)<>?))<3)'
-    ).bind(consumeMarker, app, codeHash, staffId, consumedAt, app, 'task', app, staffId, cutoff, 'sha256:'),
+      'AND (created_at>=? OR substr(token,1,7)<>?) AND token<>?)<3)'
+    ).bind(consumeMarker, app, codeHash, staffId, consumedAt, app, 'task', app, staffId, cutoff, 'sha256:', previousHash),
     env.DB.prepare(
       'INSERT INTO tokens(app,token,staff_id,created_at,revoked) ' +
       'SELECT ?,?,?,?,0 WHERE EXISTS (' +
@@ -2254,7 +2257,11 @@ async function handleExchange(env, app, body, origin) {
     ).bind(app, staffId, storedHash, app, staffId, storedHash, app, codeHash, staffId, consumeMarker),
     env.DB.prepare(
       'UPDATE bootstrap_codes SET consumed_at=? WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?'
-    ).bind(consumedAt, app, codeHash, staffId, consumeMarker)
+    ).bind(consumedAt, app, codeHash, staffId, consumeMarker),
+    env.DB.prepare(
+      'UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND token=? AND revoked=0 ' +
+      'AND EXISTS (SELECT 1 FROM tokens WHERE app=? AND staff_id=? AND token=? AND revoked=0)'
+    ).bind(app, staffId, previousHash, app, staffId, storedHash)
   ]);
   const changed = index => Number(results[index] && results[index].meta && results[index].meta.changes || 0);
   if (changed(0) !== 1 || changed(1) !== 1 || changed(4) !== 1) {
