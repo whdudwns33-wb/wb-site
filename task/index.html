@@ -6553,17 +6553,31 @@ function taskMemoEditorHtml(t, date, c, editable) {
 }
 
 function previousTaskMemos(taskId, beforeDate) {
-  return Object.values(state.checks || {}).filter(row => row && row.taskId === taskId &&
-    /^\d{4}-\d{2}-\d{2}$/.test(String(row.date || '')) && row.date < beforeDate && String(row.note || '').trim())
-    .sort((a, b) => String(b.date).localeCompare(String(a.date)))
-    .slice(0, 3);
+  const task = (state.tasks || []).find(row => row.id === taskId);
+  const inherited = task && task.inheritedLessonMemos;
+  // 서버에서 확인해 연결한 같은 학생·원수업의 메모만 읽기 전용으로 보여준다.
+  const archived = inherited && inherited.studentId === task.studentId &&
+    inherited.sourceTaskId === task.predecessorTaskId && Array.isArray(inherited.records)
+    ? inherited.records.filter(row => row && (row.taskId === inherited.sourceTaskId ||
+        (Array.isArray(inherited.sourceTaskIds) && inherited.sourceTaskIds.includes(row.taskId))) && row.date < task.start) : [];
+  const rows = Object.values(state.checks || {}).filter(row => row && row.taskId === taskId).concat(archived);
+  const seen = new Set();
+  return rows.filter(row => {
+    const key = row.taskId + '|' + row.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(row.date || '')) || row.date >= beforeDate ||
+        !String(row.note || '').trim() || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 3);
 }
 
 function previousTaskMemosProgressHtml(taskId, beforeDate) {
   const rows = previousTaskMemos(taskId, beforeDate);
   return '<details class="lesson-progress-section previous-memos"><summary>이전 수업 메모</summary>' +
     '<div class="previous-memos-body"><div class="card-sub">' + esc(beforeDate) + ' 이전 기록 · 최신순 3개</div>' +
-    (rows.length ? rows.map(row => '<div class="guide mb8"><b>' + esc(row.date) + '</b><br>' + esc(String(row.note).trim()) + '</div>').join('') :
+    (rows.length ? rows.map(row => '<div class="guide mb8"><b>' + esc(row.date) + '</b>' +
+      (row.sourceStaffName ? ' · ' + esc(row.sourceStaffName) + ' 선생님' : '') +
+      '<br>' + esc(String(row.note).trim()) + '</div>').join('') :
       '<div class="empty"><b>📝</b>이전에 작성한 수업 메모가 없습니다.</div>') + '</div></details>';
 }
 
