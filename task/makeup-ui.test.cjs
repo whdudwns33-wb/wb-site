@@ -640,3 +640,16 @@ test('makeup UI stores no guardian contact and only has the bounded internal ins
   assert.match(source, /id="muInstruction" rows="4" maxlength="1500"/);
   assert.match(source, /정해진 운영 사유만 기록합니다/);
 });
+
+test('makeup attendance cards distinguish attendance from completion and expired missing checks',()=>{
+ const source=block('function makeupAttendanceHtml(row)', 'function makeupScheduleHtml(row)');
+ const render=new Function('makeupScheduledAttendance','makeupAttendanceLabel','esc',source+';return makeupAttendanceHtml;')(
+ row=>({value:row.att||''}),v=>({P:'출석',L:'지각',E:'조퇴'})[v],String);
+ for(const [att,label] of [['P','출석'],['L','지각'],['E','조퇴']]) assert.match(render({status:'confirmed',att}),new RegExp(label+' · 완료 처리 전'));
+ assert.match(render({status:'confirmed',att:'A'}),/결석 · 재보강 필요/);
+ assert.match(render({status:'confirmed',confirmedDate:'2000-01-01',confirmedEndTime:'10:00'}),/출결 미입력 · 확인 필요/);
+ assert.match(render({status:'confirmed',confirmedDate:'2099-01-01',confirmedEndTime:'10:00'}),/보강 예정/);
+ assert.match(render({status:'completed',att:'A'}),/보강완료/);
+ assert.equal(render({status:'review_pending'}),'');
+ assert.equal(render({status:'cancelled'}),'');
+});
