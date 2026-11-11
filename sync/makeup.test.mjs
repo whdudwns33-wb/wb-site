@@ -2943,3 +2943,20 @@ test('assigned teacher can change record-free makeup time but cannot reassign it
  const later=await handleMakeup(env,'task',{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-11-12'},'*',own('teacher-a'),responseJson);
  assert.notEqual((await later.json()).code,'MAKEUP_LEGACY_ARCHIVED');
  });
+
+test('admin completes an absent scheduled makeup on its actual date without erasing absence', async()=>{
+ const db=new TestD1();seed(db);
+ const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ const id=scheduled.body.lessonTask.id;makeupAttendance(db,created.body.case.caseId,'teacher-a','2026-08-12','A');
+ const payload={action:'complete',caseId:created.body.case.caseId,revision:scheduled.body.case.revision,date:'2026-08-13',startTime:'19:00',endTime:'20:00',attendanceStatus:'P'};
+ assert.equal((await callAt(db,all,{...payload,date:'2026-08-12'},'2026-08-14T12:00:00+09:00')).status,409);
+ assert.equal((await callAt(db,own('teacher-a'),payload,'2026-08-14T12:00:00+09:00')).status,409);
+ const done=await callAt(db,all,payload,'2026-08-14T12:00:00+09:00');
+ assert.equal(done.status,200,JSON.stringify(done.body));assert.equal(done.body.case.completedDate,'2026-08-13');
+ assert.equal(done.body.case.status,'completed');
+ const read=date=>JSON.parse(db.database.prepare('SELECT data FROM checks WHERE k=?').get(id+'|'+date).data);
+ assert.equal(read('2026-08-12').att,'A');assert.equal(read('2026-08-13').att,'P');
+ assert.equal(JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE id=?').get(id).data).start,'2026-08-13');
+ assert.equal((await callAt(db,all,payload,'2026-08-14T12:00:00+09:00')).status,409);
+});
