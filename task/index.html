@@ -851,6 +851,12 @@
   /* ─── 보강 관리 ─── */
   .makeup-hero { border-color: #B9DDF0; background: linear-gradient(135deg, #F0F9FF 0%, var(--white) 72%); }
   .makeup-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .makeup-group > summary { cursor:pointer; display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:10px 0; font-size:16px; font-weight:700; }
+  .makeup-group > summary::before { content:'▶'; font-size:12px; }
+  .makeup-group[open] > summary::before { content:'▼'; }
+  .makeup-group .makeup-grid { margin-top:10px; }
+  .makeup-group-controls { display:flex; flex-wrap:wrap; align-items:end; gap:10px; margin-top:14px; }
+  .makeup-group-controls .field { flex:1 1 180px; margin:0; }
   .makeup-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(285px, 1fr)); gap: 9px; }
   .makeup-card { min-width: 0; margin-bottom: 0; }
   .makeup-card.is-overdue { border-left: 4px solid var(--coral); background: #FFF9F7; }
@@ -1435,6 +1441,7 @@
 <script src="./private-chat.js?v=2026-10-22.1"></script>
 <script src="./self-identity.js?v=2026-10-22.1"></script>
 <script src="./staff-attendance-history-core.js?v=2026-10-22.1"></script>
+<script src="./makeup-groups.js?v=2026-10-22.1"></script>
 <script src="./makeup-recovery-core.js?v=2026-10-22.1"></script>
 <script>
 "use strict";
@@ -3098,6 +3105,8 @@ let sessionPackRows = [], sessionPackLoaded = false, sessionPackLoading = false,
 let sessionPackRestoreFocus = null;
 let session4LedgerRows = new Map(), session4LedgerLoadedSignature = '', session4LedgerLoading = false, session4LedgerError = '';
 let makeupArchiveThrough = '';
+let makeupGroupMode = 'teacher', makeupStudentQuery = '', makeupViewDate = '', makeupDatePickerOpen = false;
+const makeupGroupOpen = new Set();
 let makeupRows = [], makeupLoaded = false, makeupLoading = false, makeupError = '';
 let makeupRestoreFocus = null, makeupLiveMessage = '';
 let manualMakeupRequestId = '';
@@ -12661,6 +12670,30 @@ function makeupKpis(rows) {
     '<div class="ops-kpi"><b>' + counts.completed + '</b><span>보강 완료</span></div></div>';
 }
 
+function makeupGroupedHtml(rows, archived) {
+  const groups = WBMakeupGroups.group(rows, {mode:makeupGroupMode, query:makeupStudentQuery, date:makeupViewDate, archived,
+    teacherLabel:id => makeupTeacherLabel(id, '담당 확인 필요'),
+    studentLabel:row => staffStudentCompactLabelById(row.studentId, row.studentName || '이름 미입력', row.grade),
+    needsSchedule:makeupNeedsSchedule});
+  if (!groups.length) return '<div class="card empty">' + (makeupStudentQuery ? '조건에 맞는 학생의 보강 기록이 없습니다.' : (makeupViewDate ? '선택한 날짜에 예정된 보강이 없습니다.' : '처리할 보강 건이 없습니다.')) + '</div>';
+  return groups.map(group => {
+    const key = makeupGroupMode + ':' + (archived ? 'archive:' : 'active:') + group.id;
+    return '<details class="card makeup-group" data-makeup-group="' + esc(key) + '"' + (makeupGroupOpen.has(key) ? ' open' : '') + '><summary><span>' + esc(group.label) +
+      '</span><span class="pill">' + group.rows.length + '건</span>' + (archived ? '' : '<span class="pill warn">보강 필요 ' + group.needed + '</span><span class="pill doing">보강 예정 ' + group.scheduled + '</span>') +
+      '</summary><div class="makeup-grid">' + group.rows.map(makeupCard).join('') + '</div></details>';
+  }).join('');
+}
+
+function makeupAdminResultsHtml() {
+  const rows = makeupRows.filter(row => row.hiddenByAttendanceCorrection !== true);
+  const matches = row => !makeupStudentQuery || WBMakeupGroups.normalize(row.studentName).includes(WBMakeupGroups.normalize(makeupStudentQuery));
+  const active = rows.filter(row => !['completed','cancelled'].includes(row.status));
+  const archived = rows.filter(row => ['completed','cancelled'].includes(row.status) && matches(row) && (!makeupViewDate || (row.completedDate || row.confirmedDate) === makeupViewDate));
+  const missing = makeupViewDate ? [] : makeupMissingAbsenceRows().filter(item => matches({studentName:item.task.studentName || studentOf(item.task)}));
+  return makeupRecoveryHtml(missing) + makeupGroupedHtml(active, false) + (archived.length ?
+    '<details class="card makeup-archive"><summary>지난 보강 기록 ' + archived.length + '건</summary>' + makeupGroupedHtml(archived, true) + '</details>' : '');
+}
+
 function viewMakeups() {
   if (!makeupLoaded && !makeupLoading) setTimeout(() => loadMakeups(false), 0);
   if ((session.isAdmin || (session.isStaffLink && session.staffId)) &&
@@ -12686,6 +12719,18 @@ function viewMakeups() {
   if (makeupError) h += '<div class="card alert" role="alert"><div class="card-title">보강 현황을 불러오지 못했습니다</div><div class="small">' + esc(makeupError) + '</div>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="murefresh" autofocus>다시 시도</button></div>';
   h += makeupKpis(rows);
+  if (session.isAdmin) {
+    h += '<section class="card" aria-label="보강 보기 및 검색"><div class="row wraprow" role="group" aria-label="보강 날짜 필터">' +
+      '<button class="btn ' + (!makeupViewDate ? 'btn-primary' : 'btn-ghost') + '" data-act="mudateall" aria-pressed="' + !makeupViewDate + '">전체</button>' +
+      '<button class="btn ' + (makeupViewDate === today() ? 'btn-primary' : 'btn-ghost') + '" data-act="mudatetoday" aria-pressed="' + (makeupViewDate === today()) + '">오늘</button>' +
+      '<button class="btn btn-ghost" data-act="mudatepicker" aria-expanded="' + makeupDatePickerOpen + '">날짜 선택</button>' +
+      (makeupDatePickerOpen ? '<label class="field"><span class="fl">보강 날짜</span><input class="in" type="date" data-makeup-view-date value="' + esc(makeupViewDate || today()) + '"></label>' : '') +
+      '<span class="pill">' + esc(makeupViewDate || '전체 날짜') + '</span></div><div class="makeup-group-controls"><div class="row" role="group" aria-label="보강 분류">' +
+      ['teacher','student'].map(mode => '<button class="btn ' + (makeupGroupMode === mode ? 'btn-primary' : 'btn-ghost') + '" data-act="mugroupmode" data-mode="' + mode + '" aria-pressed="' + (makeupGroupMode === mode) + '">' + (mode === 'teacher' ? '선생님별' : '학생별') + '</button>').join('') +
+      '</div><label class="field"><span class="fl">학생 이름 검색</span><input class="in" type="search" data-makeup-student-search placeholder="학생 이름 입력" value="' + esc(makeupStudentQuery) + '"></label></div></section>' +
+      '<div class="small muted mt8">전체 현황은 위에 표시됩니다. 아래 목록은 선택한 날짜·학생 기준입니다. 일정이 없는 보강 필요는 전체에서 확인하세요.</div><div id="makeupGroupResults" aria-live="polite">' + makeupAdminResultsHtml() + '</div>';
+    return h;
+  }
   h += makeupRecoveryHtml(missingAbsences);
   if (!rows.length) return h + '<div class="card"><div class="empty"><b>🗓️</b>등록된 보강 건이 없습니다.<br><span class="muted">위 보강생성(수업무관) 버튼을 사용하거나 수업 카드에서 결석을 기록해 주세요.</span></div></div>';
   h += active.length
@@ -24273,6 +24318,10 @@ document.addEventListener('click', async ev => {
     case 'opssessionnotice': requestGuardianOpsSend(opsSessionTarget(String(el.dataset.pack || ''))); break;
 
     /* 보강 */
+    case 'mudateall': if (session.isAdmin) { makeupViewDate = ''; makeupDatePickerOpen = false; makeupGroupOpen.clear(); render(); } break;
+    case 'mudatetoday': if (session.isAdmin) { makeupViewDate = today(); makeupDatePickerOpen = false; makeupGroupOpen.clear(); render(); } break;
+    case 'mudatepicker': if (session.isAdmin) { makeupDatePickerOpen = !makeupDatePickerOpen; render(); } break;
+    case 'mugroupmode': if (session.isAdmin) { makeupGroupMode = el.dataset.mode === 'student' ? 'student' : 'teacher'; makeupGroupOpen.clear(); render(); } break;
     case 'murefresh': makeupLoaded = false; loadMakeups(true); break;
     case 'mumanualopen': openManualMakeupModal(); break;
     case 'mumanualsubmit': submitManualMakeup(el); break;
@@ -25935,6 +25984,18 @@ function captureTransportDraftFromEvent(target) {
 /* 메모 · 수량 직접 입력 */
 let inputTimer = null;
 document.addEventListener('input', ev => {
+  if (session.isAdmin && ev.target.matches('[data-makeup-view-date]')) {
+    makeupViewDate = /^\d{4}-\d{2}-\d{2}$/.test(ev.target.value) ? ev.target.value : '';
+    makeupGroupOpen.clear();
+    render();
+    return;
+  }
+  if (session.isAdmin && ev.target.matches('[data-makeup-student-search]')) {
+    makeupStudentQuery = ev.target.value;
+    const results = $('#makeupGroupResults');
+    if (results) results.innerHTML = makeupAdminResultsHtml();
+    return;
+  }
   if (ev.target.matches('[data-roster-search]')) {
     rosterSearchQuery = ev.target.value;
     const results = document.querySelector('.roster-search-results');
@@ -26441,6 +26502,10 @@ document.addEventListener('toggle', ev => {
   if (ev.target && ev.target.matches && ev.target.matches('.lesson-next-lesson-details') && ev.target.open) {
     const summary = ev.target.querySelector('[data-act="nextlessonload"]');
     if (summary) loadStudentNextLesson(summary.dataset.id, summary.dataset.date, false);
+  }
+  if (ev.target && ev.target.matches && ev.target.matches('[data-makeup-group]') && ev.target.isConnected) {
+    const key = ev.target.dataset.makeupGroup;
+    if (ev.target.open) makeupGroupOpen.add(key); else makeupGroupOpen.delete(key);
   }
 }, true);
 
