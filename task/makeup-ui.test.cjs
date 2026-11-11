@@ -287,7 +287,10 @@ test('cards expose direct scheduling and completion actions', () => {
  assert.match(actions({status:'review_pending'}),/보강완료/);
  assert.match(actions({status:'confirmed'}),/일정 변경/);
  assert.match(actions({status:'confirmed',absent:true}),/보강일정 잡기/);
- assert.doesNotMatch(actions({status:'confirmed',absent:true}),/보강완료/);
+ assert.match(actions({status:'confirmed',absent:true}),/보강완료/);
+ const teacherActions = new Function('session','esc','makeupCanSchedule','makeupCanComplete','makeupNeedsSchedule',source+';return makeupActions;')(
+ {isAdmin:false},String,()=>false,()=>true,row=>row.absent);
+ assert.doesNotMatch(teacherActions({status:'confirmed',absent:true}),/보강완료/);
  assert.equal(actions({status:'completed'}),'');
 });
 
@@ -331,7 +334,7 @@ test('schedule, completion, and no-makeup modals use the three-action API contra
   assert.match(source, /원 수업 담당 선생님/);
   assert.match(source, /id="muStaff"/);
   assert.match(source, /makeupStaffOptionsHtml\(assignedStaffId\)/);
-  assert.match(source, /scheduled && !retrying \? row\.confirmedDate/);
+  assert.match(source, /scheduled && !retrying && !absentCompletion \? row\.confirmedDate/);
   assert.match(source, /기존 예정일의 출결·메모는 그대로 보존됩니다/);
   assert.match(source, /mode === 'restore' \? ' disabled'/);
   assert.match(source, /action: 'schedule'[\s\S]*?\.\.\.slot, staffId: staffId/);
