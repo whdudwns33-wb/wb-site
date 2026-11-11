@@ -2960,3 +2960,18 @@ test('admin completes an absent scheduled makeup on its actual date without eras
  assert.equal(JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE id=?').get(id).data).start,'2026-08-13');
  assert.equal((await callAt(db,all,payload,'2026-08-14T12:00:00+09:00')).status,409);
 });
+
+test('makeup list exposes only the scheduled lesson attendance for its confirmed date',async()=>{
+ const db=new TestD1();seed(db);
+ const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ makeupAttendance(db,created.body.case.caseId,'teacher-a','2026-08-12','L');
+ const result=await call(db,all,{action:'list',caseId:created.body.case.caseId});
+ assert.equal(result.status,200);assert.equal(result.body.cases[0].scheduledAttendance.value,'L');
+ assert.equal(result.body.cases[0].scheduledAttendance.date,'2026-08-12');
+ makeupAttendance(db,created.body.case.caseId,'teacher-a','2026-08-13','A');
+ const again=await call(db,all,{action:'list',caseId:created.body.case.caseId});
+ assert.equal(again.body.cases[0].scheduledAttendance.value,'L');
+ const forbidden=await call(db,own('teacher-b'),{action:'list',caseId:created.body.case.caseId});
+ assert.equal(forbidden.body.cases.length,0);
+});
