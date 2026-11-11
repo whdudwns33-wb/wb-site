@@ -26,6 +26,7 @@ function makeupScheduleSubmitHarness(options = {}) {
     makeupRows: options.rows || [{ caseId: 'makeup-8', status: 'confirmed' }],
     makeupInstructionInput: () => ({}),
     makeupCanSchedule: () => !!(!options.session || options.session.isAdmin),
+    makeupCanComplete: () => !!(!options.session || options.session.isAdmin),
     mutateMakeup: async payload => calls.push({ payload })
   };
   const source = block('function makeupDateTimeInput()', 'async function restoreMakeupSchedule');
@@ -54,7 +55,7 @@ test('today absence still creates one stable case after sync and today loads mak
 
   assert.match(todayView, /!makeupLoaded && !makeupLoading/);
   assert.match(todayView, /loadMakeups\(false\)/);
-  assert.match(panel, /isScheduledMakeupTask\(t\) \? '' : makeupRequestHtml\(t, date, c\)/);
+  assert.match(panel, /isScheduledMakeupTask\(t\) \? makeupLessonCompleteButton\(t\) : makeupRequestHtml\(t, date, c\)/);
   assert.match(request, /check\.att !== 'A'/);
   assert.match(request, /makeupCaseForSource\(task\.id, date\)/);
   assert.ok(create.indexOf('await settleSync()') < create.indexOf("sync.post('/makeup'"));
@@ -86,7 +87,7 @@ test('generated makeup lessons are never allowed to recursively create another m
     assert.match(helpers, new RegExp(marker));
   }
   assert.match(helpers, /&& !isScheduledMakeupTask\(t\)/);
-  assert.match(panel, /isScheduledMakeupTask\(t\) \? ''/);
+  assert.match(panel, /isScheduledMakeupTask\(t\) \? makeupLessonCompleteButton\(t\)/);
   assert.match(click, /next === 'A' && isScheduledMakeupTask\(t\)/);
   assert.match(click, /promptAfterMakeupAbsence\(t, date, savedCheck.updatedAt\)/);
 });
@@ -226,7 +227,7 @@ test('attendance reconciliation blocks duplicate calls and keeps a precise 409 r
 
 test('KPI counts only the simplified needed, scheduled, today, delayed, and completed states', () => {
   const source = block('function makeupIsDelayed(row, date)', 'function makeupAttentionCount()');
-  const api = new Function(`${source}\nreturn { makeupIsDelayed, makeupKpiCounts };`)();
+  const api = new Function('makeupNeedsSchedule', `${source}\nreturn { makeupIsDelayed, makeupKpiCounts };`)(row => row.status !== 'confirmed');
   const rows = [
     { status: 'review_pending', sourceDate: '2026-08-10' },
     { status: 'reviewed', sourceDate: '2026-08-11' },
@@ -240,7 +241,7 @@ test('KPI counts only the simplified needed, scheduled, today, delayed, and comp
     needed: 3, scheduled: 2, today: 1, overdue: 1, completed: 1
   });
   const output = block('function makeupKpis(rows)', 'function viewMakeups()');
-  for (const label of ['일정 미생성', '보강 예정', '오늘 / 지연', '보강 완료']) {
+  for (const label of ['보강 필요', '보강 예정', '오늘 / 지연', '보강 완료']) {
     assert.match(output, new RegExp(label.replace('/', '\\/')));
   }
   assert.doesNotMatch(output, /보호자 응답 대기|알림 필요/);
@@ -278,25 +279,16 @@ test('makeup assignee choices use stable staff ids and keep original and actual 
   assert.match(card, />대체 담당 제안</);
 });
 
-test('active admin card has one processing action plus no-makeup and staff can only process their own case', () => {
-  const actions = block('function makeupActions(row)', 'function makeupCard(row)');
-
-  for (const [act, label] of [['muprocessadminopen', '보강 처리'], ['munone', '보강없음']]) {
-    assert.match(actions, new RegExp(`data-act="${act}"[\\s\\S]*?>${label}<`));
-  }
-  assert.match(actions, /function openMakeupAdminProcessModal\(button\)/);
-  assert.match(actions, /data-act="muschedule"[\s\S]*?>보강 일정 생성</);
-  assert.match(actions, /data-act="mureschedule"[\s\S]*?>담당자·일정 수정</);
-  assert.match(actions, /data-act="muretryafteropen"[\s\S]*?>새 보강 날짜 정하기</);
-  assert.match(actions, /if \(session\.isAdmin\)/);
-  assert.match(actions, /const assignedStaffId = row\.confirmedStaffId/);
-  assert.match(actions, /row\.status === 'confirmed' && session\.isStaffLink/);
-  const staffBranch = actions.slice(actions.indexOf('const own'), actions.indexOf('function openMakeupAdminProcessModal'));
-  assert.match(staffBranch, /data-act="muprocessopen"/);
-  assert.doesNotMatch(staffBranch, /data-act="muschedule"|data-act="mureschedule"|data-act="munone"/);
-  for (const oldAction of ['mureviewrequired', 'mupropose', 'muconfirm', 'mucancel']) {
-    assert.doesNotMatch(actions, new RegExp(oldAction));
-  }
+test('cards expose direct scheduling and completion actions', () => {
+ const source = block('function makeupActions(row)', 'function openMakeupAdminProcessModal');
+ const actions = new Function('session','esc','makeupCanSchedule','makeupCanComplete','makeupNeedsSchedule',source+';return makeupActions;')(
+ {isAdmin:true},String,row=>row.status==='review_pending',()=>true,row=>row.status!=='confirmed'||row.absent);
+ assert.match(actions({status:'review_pending'}),/보강일정 잡기/);
+ assert.match(actions({status:'review_pending'}),/보강완료/);
+ assert.match(actions({status:'confirmed'}),/일정 변경/);
+ assert.match(actions({status:'confirmed',absent:true}),/보강일정 잡기/);
+ assert.doesNotMatch(actions({status:'confirmed',absent:true}),/보강완료/);
+ assert.equal(actions({status:'completed'}),'');
 });
 
 test('보강없음 확인창은 학생·수업·결석일·원수업일을 보여주고 확인 전 제출을 막는다', () => {
@@ -340,8 +332,8 @@ test('schedule, completion, and no-makeup modals use the three-action API contra
   assert.match(source, /id="muStaff"/);
   assert.match(source, /makeupStaffOptionsHtml\(assignedStaffId\)/);
   assert.match(source, /scheduled && !retrying \? row\.confirmedDate/);
-  assert.match(source, /날짜 변경은 출결·메모를 입력하기 전에 보강 수정에서 처리해 주세요/);
-  assert.match(source, /mode === 'restore' \|\| scheduledCompletion/);
+  assert.match(source, /기존 예정일의 출결·메모는 그대로 보존됩니다/);
+  assert.match(source, /mode === 'restore' \? ' disabled'/);
   assert.match(source, /action: 'schedule'[\s\S]*?\.\.\.slot, staffId: staffId/);
   assert.match(source, /action: 'reschedule'[\s\S]*?\.\.\.slot, staffId: staffId/);
   assert.match(source, /action: 'reschedule_after_absence'[\s\S]*?\.\.\.slot, staffId: staffId/);
@@ -351,7 +343,7 @@ test('schedule, completion, and no-makeup modals use the three-action API contra
   assert.match(source, /action: 'no_makeup'[\s\S]*?reason: reason/);
   assert.doesNotMatch(source, /slot\.date < today\(\)/, 'past dates remain available for scheduling and rescheduling');
   assert.match(source, /endAt > Date\.now\(\)/);
-  assert.match(source, /서버에 출석·지각·조퇴가 없으면 완료되지 않고 정확한 사유가 표시됩니다/);
+  assert.match(source, /실제 날짜·시작시간·종료시간과 출결을 입력해 주세요/);
   assert.match(source, /makeupModalErrorHtml\(\)/);
 });
 
@@ -428,7 +420,8 @@ test('rendered schedule dates have no minimum and direct completion retains the 
   open(pending, 'complete');
   assert.match(dateInput(), /max="2026-09-08"/);
   open(scheduled, 'complete');
-  assert.match(dateInput(), /value="2026-08-14"[^>]*\bdisabled\b/);
+  assert.match(dateInput(), /value="2026-08-14"/);
+  assert.doesNotMatch(dateInput(), /\bdisabled\b/);
   open(scheduled, 'restore');
   assert.match(dateInput(), /value="2026-08-14"[^>]*\bdisabled\b/);
 
@@ -486,7 +479,7 @@ test('scheduled completion syncs first and lets the server judge P/L/E while dir
   })({ dataset: { case: 'mu-1', rev: '2' }, disabled: false, isConnected: true });
   assert.deepEqual(scheduledCalls, [
     { clear: true }, { settle: true },
-    { payload: { action: 'complete', caseId: 'mu-1', revision: 2, date: '2020-01-01', startTime: '10:00', endTime: '10:50' } }
+    { payload: { action: 'complete', attendanceStatus: 'P', caseId: 'mu-1', revision: 2, date: '2020-01-01', startTime: '10:00', endTime: '10:50' } }
   ]);
 
   const syncFailureCalls = [];
