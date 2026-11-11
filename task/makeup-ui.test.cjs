@@ -104,13 +104,13 @@ test('makeup auto-create never posts after sync failure and preserves retry stat
   const createStates = new Map();
   const attendance = { att: 'A', updatedAt: 10 };
   const runCreate = new Function('state', 'getCheck', 'sync', 'isMakeupLessonTask', 'toast', 'makeupCreateStates',
-    'makeupCreateKey', 'uid', 'settleSync', 'replaceMakeup', 'renderAfterSync', 'refreshMakeupsAfterConflict',
+    'makeupCreateKey', 'uid', 'settleSync', 'replaceMakeup', 'renderAfterSync', 'refreshMakeupsAfterConflict', 'taskExcludedFromMakeupNeeds',
     `let makeupLiveMessage = '';\n${create}\nreturn createMakeupFromAbsence;`)(
       { tasks: [{ id: 'lesson-1', studentId: 'student-1' }] },
       () => attendance,
       { auth: () => ({ mode: 'person' }), post: async () => { postCalls++; return {}; } },
       () => true, () => {}, createStates, (taskId, date) => taskId + '|' + date, () => 'operation-1',
-      async () => { throw new Error('SYNC_FAILED'); }, () => {}, () => {}, async () => {}
+      async () => { throw new Error('SYNC_FAILED'); }, () => {}, () => {}, async () => {}, () => false
     );
   const result = await runCreate('lesson-1', '2026-08-12', null, { automatic: true, expectedUpdatedAt: 10 });
   assert.equal(result, false);
