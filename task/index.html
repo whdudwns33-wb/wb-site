@@ -12247,6 +12247,13 @@ function taskUsesSession4Billing(task, referenceDate) {
     (!cycleStartDate || (/^\d{4}-\d{2}-\d{2}$/.test(cycleStartDate) && date >= cycleStartDate));
 }
 
+function taskExcludedFromMakeupNeeds(task) {
+  const student = rosterStudentByStableId(task && task.studentId);
+  return !!task && ([task.subject, task.className, task.lessonRole].some(v => String(v || '').trim() === '클리닉') ||
+    !!student && student.billingMode === 'session4' &&
+      (!student.sessionBillingSubject || student.sessionBillingSubject === task.subject));
+}
+
 function makeupRequestHtml(task, date, check) {
   if (!check || check.att !== 'A') return '';
   if (!isMakeupLessonTask(task)) return '';
@@ -12257,10 +12264,8 @@ function makeupRequestHtml(task, date, check) {
   if (linked) return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-ghost makeup-request" data-go="makeup">보강 · ' +
     esc(MAKEUP_STATUS_LABELS[linked.status] || linked.status) + '</button></div>';
   if (!task.studentId) return '<div class="small muted mt8">결석 출결은 저장됩니다. 학생 ID를 이 수업에 연결하면 보강 필요를 만들 수 있습니다.</div>';
-  if (taskUsesSession4Billing(task, date)) {
-    return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-primary makeup-request" data-act="mucreate" data-id="' +
-      esc(task.id) + '" data-date="' + esc(date) + '">보강 필요 생성</button>' +
-      '<span class="small muted">회차제 결석은 자동 생성하지 않습니다. 필요한 경우에만 직접 생성해 주세요.</span></div>';
+  if (taskExcludedFromMakeupNeeds(task)) {
+    return '<div class="small muted mt8">회차제·클리닉 수업은 보강 필요를 자동 생성하지 않습니다.</div>';
   }
   const creating = makeupCreateStates.get(makeupCreateKey(task.id, date));
   if (creating && creating.status === 'pending') {
@@ -12622,7 +12627,7 @@ function makeupMissingAbsenceRows() {
     const taskId = key.slice(0, split), date = String(check.date || key.slice(split + 1));
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today() || existing.has(taskId + '|' + date)) return;
     const task = taskById.get(taskId);
-    if (!task || !isRegularLessonTask(task) || !String(task.studentId || '') || isTestTeacherTask(task)) return;
+    if (!task || !isRegularLessonTask(task) || !String(task.studentId || '') || isTestTeacherTask(task) || taskExcludedFromMakeupNeeds(task)) return;
     rows.push({ task, date, check });
   });
   return rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) ||
@@ -12929,9 +12934,9 @@ async function createMakeupFromAbsence(taskId, date, button, options) {
     toast('학생 ID가 연결된 수업의 결석 출결을 먼저 기록해 주세요');
     return false;
   }
-  if (automatic && typeof taskUsesSession4Billing === 'function' && taskUsesSession4Billing(task, date)) {
+  if (taskExcludedFromMakeupNeeds(task)) {
     makeupCreateStates.delete(sourceKey);
-    toast('결석 저장됨 · 회차제는 보강을 자동 생성하지 않습니다');
+    toast('회차제·클리닉 수업은 보강 필요 대상이 아닙니다');
     renderAfterSync();
     return false;
   }
@@ -12985,10 +12990,10 @@ async function createMakeupFromAbsence(taskId, date, button, options) {
   } catch (error) {
     const current = getCheck(taskId, date);
     const currentState = makeupCreateStates.get(sourceKey);
-    const sessionAutomaticBlocked = automatic && String(error && error.code || '') === 'SESSION4_AUTOMATIC_MAKEUP_DISABLED';
+    const sessionAutomaticBlocked = automatic && ['SESSION4_AUTOMATIC_MAKEUP_DISABLED', 'CLINIC_AUTOMATIC_MAKEUP_DISABLED'].includes(String(error && error.code || ''));
     if (sessionAutomaticBlocked) {
       makeupCreateStates.delete(sourceKey);
-      toast('결석 저장됨 · 회차제는 보강을 자동 생성하지 않습니다');
+      toast('결석 저장됨 · 회차제·클리닉은 보강을 자동 생성하지 않습니다');
       renderAfterSync();
       return false;
     }
@@ -25228,8 +25233,8 @@ document.addEventListener('click', async ev => {
         toast('결석 출결 저장됨 · 상담 업무는 보강 대상이 아닙니다');
       } else if (next === 'A' && !t.studentId) {
         toast('결석 출결 저장됨 · 학생 ID가 연결되지 않아 보강 필요는 자동 생성되지 않습니다');
-      } else if (next === 'A' && taskUsesSession4Billing(t, date)) {
-        toast('결석 저장됨 · 회차제는 보강을 자동 생성하지 않습니다');
+      } else if (next === 'A' && taskExcludedFromMakeupNeeds(t)) {
+        toast('결석 저장됨 · 회차제·클리닉은 보강을 자동 생성하지 않습니다');
       } else if (next === 'A') {
         toast('결석 출결 저장 중 · 보강 필요를 자동 생성합니다');
         createMakeupFromAbsence(id, date, null, { automatic: true, expectedUpdatedAt: savedCheck.updatedAt });
