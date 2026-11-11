@@ -5,6 +5,8 @@ compatibility_date = "2026-08-01"
 # 학생 개인 링크와 원장 화면이 GitHub Pages에서 열리므로 그 출처만 허용한다.
 # 비우면 모든 출처를 허용하니 운영에서는 반드시 채운다.
 [vars]
+# 기존 미예정 보강 정리 기준일. 직접 보강생성 및 이후 결석 자동 생성은 유지한다.
+WB_MAKEUP_ARCHIVE_THROUGH = "2026-11-11"
 ALLOW_ORIGIN = "https://whdudwns33-wb.github.io,https://wb-sync.whdudwns33.workers.dev"
 WB_PARENT_PORTAL_BASE_URL = "https://wb-sync.whdudwns33.workers.dev/"
 WB_STUDENT_PORTAL_BASE_URL = "https://wb-student.whdudwns33.workers.dev/"

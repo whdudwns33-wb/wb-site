@@ -3097,6 +3097,7 @@ let transportGuardianTarget = null;
 let sessionPackRows = [], sessionPackLoaded = false, sessionPackLoading = false, sessionPackError = '';
 let sessionPackRestoreFocus = null;
 let session4LedgerRows = new Map(), session4LedgerLoadedSignature = '', session4LedgerLoading = false, session4LedgerError = '';
+let makeupArchiveThrough = '';
 let makeupRows = [], makeupLoaded = false, makeupLoading = false, makeupError = '';
 let makeupRestoreFocus = null, makeupLiveMessage = '';
 let manualMakeupRequestId = '';
@@ -12488,6 +12489,7 @@ async function loadMakeups(force) {
   if (route === 'makeup') render();
   try {
     const result = await sync.post('/makeup', { app: SYNC_APP, auth: auth, action: 'list', limit: 500 });
+    makeupArchiveThrough = String(result.archiveThrough || '');
     makeupRows = Array.isArray(result.cases) ? result.cases : [];
     const revocations = Array.isArray(result.revocations) ? result.revocations : [];
     reconcilePersonalMakeupLessonTasks(makeupRows, revocations);
@@ -12581,7 +12583,7 @@ function makeupCard(row) {
   const unrelatedCreation = row.creationType === 'manual' && row.sourceMode === 'unrelated';
   const differentTeacher = !unrelatedCreation && !!(sourceStaffId && actualStaffId && sourceStaffId !== actualStaffId);
   const differentProposal = !unrelatedCreation && !!(!actualStaffId && sourceStaffId && proposedStaffId && sourceStaffId !== proposedStaffId);
-  const reason = MAKEUP_REASON_LABELS[row.reason] || '';
+  const reason = (row.history || []).some(event => event.action === 'legacy_archive') ? '기존 건 정리 · 기록 보관' : (MAKEUP_REASON_LABELS[row.reason] || '');
   const manualCreation = row.creationType === 'manual';
   const manualReason = MANUAL_MAKEUP_REASON_LABELS[row.manualReason] || '';
   const sourceDateTag = unrelatedCreation
@@ -12623,6 +12625,7 @@ function makeupMissingAbsenceRows() {
     if (split <= 0) return;
     const taskId = key.slice(0, split), date = String(check.date || key.slice(split + 1));
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today() || existing.has(taskId + '|' + date)) return;
+    if (typeof makeupArchiveThrough !== 'undefined' && makeupArchiveThrough && date <= makeupArchiveThrough) return;
     const task = taskById.get(taskId);
     if (!task || !isRegularLessonTask(task) || !String(task.studentId || '') || isTestTeacherTask(task) || taskExcludedFromMakeupNeeds(task)) return;
     rows.push({ task, date, check });
@@ -12969,6 +12972,10 @@ async function createMakeupFromAbsence(taskId, date, button, options) {
       app: SYNC_APP, auth: auth, action: 'create_from_absence', sourceTaskId: taskId, sourceDate: date,
       creationMode: automatic ? 'automatic' : 'manual'
     });
+    if (result && result.skipped && result.code === 'MAKEUP_LEGACY_ARCHIVED') {
+      makeupCreateStates.delete(sourceKey);
+      return false;
+    }
     if (result && result.skipped && result.code === 'TEST_STAFF_MAKEUP_DISABLED') {
       makeupCreateStates.delete(sourceKey);
       makeupLiveMessage = '테스트쌤 수업은 보강을 생성하지 않습니다.';
