@@ -1694,7 +1694,7 @@ async function listCases(env, app, body, auth, json, origin) {
   const responses = await latestParentResponses(env, app);
   return json({ ok: true, cases: visible.map(row => publicCase(row, students.get(String(row.student_id)),
     sourceForCase(row, tasks.get(String(row.source_task_id))), responses.get(String(row.case_id)),
-    lessonTasks.get(String(row.case_id)))), revocations }, 200, origin);
+    lessonTasks.get(String(row.case_id)))), revocations, archiveThrough: makeupArchiveThrough(env) }, 200, origin);
 }
 
 // 완료된 수업을 기존 미처리 보강에 연결한다. 출결·회차 원장은 다시 쓰지 않고,
@@ -2021,6 +2021,11 @@ async function createManual(env, app, body, auth, json, origin) {
     case: publicCase(saved, student, sourceForCase(saved, source.task), null, lessonTask), lessonTask }, 200, origin);
 }
 
+export function makeupArchiveThrough(env) {
+  const value = String(env.WB_MAKEUP_ARCHIVE_THROUGH || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+}
+
 async function createFromAbsence(env, app, body, auth, json, origin) {
   exactBody(body, ['sourceTaskId', 'sourceDate', 'creationMode']);
   const sourceTaskId = cleanId(body.sourceTaskId, 'sourceTaskId');
@@ -2028,6 +2033,10 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
   const creationMode = body.creationMode == null ? 'automatic' : String(body.creationMode || '');
   if (!['automatic', 'manual'].includes(creationMode)) {
     problem('보강 생성 방식을 확인해 주세요', 400, 'MAKEUP_CREATION_MODE_INVALID');
+  }
+  if (creationMode === 'automatic' && makeupArchiveThrough(env) && sourceDate <= makeupArchiveThrough(env)) {
+    return json({ ok: true, skipped: true, code: 'MAKEUP_LEGACY_ARCHIVED',
+      reason: '기존 결석 보강은 정리되었습니다. 필요하면 보강생성으로 직접 추가해 주세요' }, 200, origin);
   }
   const source = await sourceTask(env, app, sourceTaskId, sourceDate);
   const studentId = cleanId(source.task.studentId, 'studentId');
