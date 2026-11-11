@@ -409,7 +409,7 @@ test('pending session4 start suppresses only the scoped subject automatic makeup
   }
 });
 
-test('session4 automatic makeup keeps the prior policy for absences before the configured cycle start', async () => {
+test('session4 automatic makeup is excluded even before the configured cycle start', async () => {
   const db = new TestD1(); seed(db);
   const document = roster();
   document.roster.students[0].billingMode = 'session4';
@@ -420,8 +420,33 @@ test('session4 automatic makeup keeps the prior policy for absences before the c
     action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10',
     creationMode: 'automatic'
   });
-  assert.equal(prior.status, 200, JSON.stringify(prior.body));
-  assert.equal(prior.body.case.history[0].creationMode, 'automatic');
+  assert.equal(prior.status, 409);
+  assert.equal(prior.body.code, 'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
+});
+
+test('clinic automatic creation is blocked and pending list hides newly excluded cases but keeps scheduled ones', async () => {
+  for (const mode of ['clinic', 'session4']) {
+    const db = new TestD1(); seed(db);
+    const made = await call(db, own('teacher-a'), { action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10' });
+    assert.equal(made.status, 200);
+    if (mode === 'clinic') {
+      const t = JSON.parse(db.database.prepare("SELECT data FROM tasks WHERE id='lesson-a'").get().data);
+      t.lessonRole = '클리닉';
+      db.prepare("UPDATE tasks SET data=? WHERE id='lesson-a'").bind(JSON.stringify(t)).run();
+    } else {
+      const r = roster(); r.roster.students[0].billingMode = 'session4';
+      db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(r)).run();
+    }
+    const blocked = await call(db, own('teacher-a'), {action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+    assert.equal(blocked.status,409);
+    assert.equal(blocked.body.code,mode==='clinic'?'CLINIC_AUTOMATIC_MAKEUP_DISABLED':'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
+    const list = await call(db, manager('director'), {action:'list'});
+    assert(!list.body.cases.some(c=>c.caseId===made.body.case.caseId));
+    const scheduled = await call(db, manager('director'), {action:'schedule',caseId:made.body.case.caseId,revision:made.body.case.revision,date:'2026-08-12',startTime:'19:00',endTime:'19:50'});
+    assert.equal(scheduled.status,200,JSON.stringify(scheduled.body));
+    const after = await call(db, manager('director'), {action:'list'});
+    assert(after.body.cases.some(c=>c.caseId===made.body.case.caseId&&c.status==='confirmed'));
+  }
 });
 
 test('D1 trigger-inclusive commit reports success and a repeated manual creation does not duplicate the lesson', async () => {

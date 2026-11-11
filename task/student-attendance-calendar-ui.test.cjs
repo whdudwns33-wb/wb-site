@@ -95,20 +95,20 @@ test('관리자와 담당 선생님 학생 정보 진입점 모두 stable studen
   assert.match(html, /querySelectorAll\('\[data-student-attendance-calendar\]:not\(\[data-loaded="true"\]\)'\)/);
 });
 
-test('회차제 결석은 자동 보강을 건너뛰고 직접 요청은 manual 모드로 유지한다', () => {
+test('회차제·클리닉은 보강 필요 생성을 건너뛴다', () => {
   const request = block('function makeupCreateKey(taskId, date)', 'function makeupIsDelayed(row, date)');
   const create = block('async function createMakeupFromAbsence(taskId, date, button, options)', 'function manualMakeupStudents()');
   const click = block('/* 보강 */', '/* 날짜 */');
   const attendanceClick = block("case 'latt':", "case 'fbtext':");
 
-  assert.match(request, /taskUsesSession4Billing\(task, date\)/);
-  assert.match(request, /회차제 결석은 자동 생성하지 않습니다/);
-  assert.match(create, /automatic && typeof taskUsesSession4Billing === 'function' && taskUsesSession4Billing\(task, date\)/);
+  assert.match(request, /taskExcludedFromMakeupNeeds\(task\)/);
+  assert.match(request, /회차제·클리닉 수업은 보강 필요를 자동 생성하지 않습니다/);
+  assert.match(create, /taskExcludedFromMakeupNeeds\(task\)/);
   assert.match(create, /creationMode: automatic \? 'automatic' : 'manual'/);
   assert.match(create, /SESSION4_AUTOMATIC_MAKEUP_DISABLED/);
   assert.match(click, /\{ automatic: false \}/);
-  assert.match(attendanceClick, /next === 'A' && taskUsesSession4Billing\(t, date\)/);
-  assert.match(attendanceClick, /회차제는 보강을 자동 생성하지 않습니다/);
+  assert.match(attendanceClick, /next === 'A' && taskExcludedFromMakeupNeeds\(t\)/);
+  assert.match(attendanceClick, /회차제·클리닉은 보강을 자동 생성하지 않습니다/);
 });
 
 test('회차 탭 최상단 원장은 roster에서 회차제로 분류된 학생만 표시하고 기존 수업별 원장을 보존한다', () => {

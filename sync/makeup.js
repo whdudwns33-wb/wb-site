@@ -1585,6 +1585,12 @@ async function historicalRevocationRows(env, app, staffId) {
   return result.results || [];
 }
 
+export function excludedFromMakeupNeeds(student, task) {
+  return !!task && ([task.subject, task.className, task.lessonRole].some(v => String(v || '').trim() === '클리닉') ||
+    !!student && student.billingMode === 'session4' &&
+      (!student.sessionBillingSubject || student.sessionBillingSubject === task.subject));
+}
+
 async function listCases(env, app, body, auth, json, origin) {
   exactBody(body, ['status', 'studentId', 'fromDate', 'toDate', 'limit', 'caseId']);
   const clauses = ['app=?'];
@@ -1636,6 +1642,7 @@ async function listCases(env, app, body, auth, json, origin) {
     const student = students.get(String(row.student_id));
     const taskId = String(row.source_task_id);
     const task = tasks.get(taskId);
+    if (['review_pending', 'reviewed', 'awaiting_parent'].includes(row.status) && excludedFromMakeupNeeds(student, task)) return false;
     const unrelated = manualSourceMode(row) === 'unrelated';
     if (!student || (!unrelated && (!task || String(task.studentId || '') !== String(row.student_id)))) return false;
     const visibleStaffIds = [unrelated ? null : currentOwners.get(taskId), row.source_teacher_id, row.confirmed_staff_id];
@@ -2000,16 +2007,12 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
   const sourceTeacherId = cleanId(source.row.owner, '수업 담당자');
   const document = await loadRoster(env, app);
   const student = rosterStudent(document, studentId, sourceDate);
-  // 구형 화면은 creationMode를 보내지 않으므로 automatic으로 닫는다. 회차제 결석은
-  // 해당 과목의 시작일 대기 중이거나 유효한 회차 시작일 이후부터 자동 생성하지 않는다. 시작일 이전 결석은
-  // 당시 월제였던 기존 운영 규칙을 보존하고, 사용자가 보강 버튼을 직접 누른 경우는 허용한다.
-  const cycleStartDate = String(student.sessionCycleStartDate || '');
-  const parsedCycleStart = new Date(cycleStartDate + 'T00:00:00Z');
-  const validCycleStart = ISO_DATE.test(cycleStartDate) && !Number.isNaN(parsedCycleStart.getTime()) &&
-    parsedCycleStart.toISOString().slice(0, 10) === cycleStartDate;
-  if (String(student.billingMode || 'monthly') === 'session4' &&
-      (!student.sessionBillingSubject || source.task.subject === student.sessionBillingSubject) &&
-      (!cycleStartDate || (validCycleStart && sourceDate >= cycleStartDate)) && creationMode !== 'manual') {
+  // 현재 회차제 해당 과목·클리닉은 과거 결석도 필요 목록에서 제외한다.
+  // 구형 화면의 자동 요청도 차단하되 기존 직접 생성 API와 확정·완료 이력은 유지한다.
+  if (excludedFromMakeupNeeds(student, source.task) && creationMode !== 'manual') {
+    if ([source.task.subject, source.task.className, source.task.lessonRole].some(v => String(v || '').trim() === '클리닉')) {
+      problem('클리닉 수업은 결석 보강을 자동 생성하지 않습니다', 409, 'CLINIC_AUTOMATIC_MAKEUP_DISABLED');
+    }
     problem('회차제 학생의 결석 보강은 자동 생성되지 않습니다. 필요하면 보강 버튼에서 직접 생성해 주세요',
       409, 'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
   }
