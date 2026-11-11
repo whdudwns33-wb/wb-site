@@ -12575,7 +12575,7 @@ function makeupActions(row) {
   else if (makeupCanComplete(row) && row.status === 'confirmed') actions += '<button class="btn btn-sm btn-primary" data-act="' +
     (makeupNeedsSchedule(row) ? 'muretryafteropen' : 'mureschedule') + '"' + key + '>' +
     (makeupNeedsSchedule(row) ? '보강일정 잡기' : '일정 변경') + '</button>';
-  if (makeupCanComplete(row) && !(row.status === 'confirmed' && makeupNeedsSchedule(row)))
+  if (makeupCanComplete(row) && (session.isAdmin || !(row.status === 'confirmed' && makeupNeedsSchedule(row))))
     actions += '<button class="btn btn-sm btn-primary" data-act="mucompleteopen"' + key + '>보강완료</button>';
   if (session.isAdmin) actions += '<button class="btn btn-sm btn-ghost" data-act="munone"' + key + '>보강없음</button>';
   return actions;
@@ -13346,9 +13346,10 @@ function makeupDateTimeModal(row, mode) {
   if (rescheduling && (!makeupCanComplete(row) || row.status !== 'confirmed')) return;
   if (retrying && (row.status !== 'confirmed' || !makeupCanComplete(row))) return;
   if (directCompletion && !makeupCanComplete(row)) return;
-  const date = scheduled && !retrying ? row.confirmedDate : '';
-  const startTime = scheduled && !retrying ? row.confirmedStartTime : '';
-  const endTime = scheduled && !retrying ? row.confirmedEndTime : '';
+  const absentCompletion = scheduledCompletion && session.isAdmin && makeupScheduledAttendance(row).value === 'A';
+  const date = scheduled && !retrying && !absentCompletion ? row.confirmedDate : '';
+  const startTime = scheduled && !retrying && !absentCompletion ? row.confirmedStartTime : '';
+  const endTime = scheduled && !retrying && !absentCompletion ? row.confirmedEndTime : '';
   const originalStaffId = makeupOriginalStaffId(row);
   const assignedStaffId = scheduled ? String(row.confirmedStaffId || '') : makeupDefaultStaffId(row);
   const title = mode === 'schedule' || mode === 'restore' ? '보강생성' : retrying ? '결석 후 재보강' : rescheduling ? '보강 수정' : '보강완료';
@@ -13378,6 +13379,7 @@ function makeupDateTimeModal(row, mode) {
       ? '출결·메모·피드백 기록이 생기기 전까지만 담당 선생님과 일시를 수정할 수 있습니다.'
       : mode === 'schedule'
         ? '지난 날짜도 선택할 수 있습니다. 확인하면 선택한 선생님의 해당 날짜·시간에 보강수업이 생성됩니다. 출석·보강완료는 따로 기록해 주세요.'
+        : absentCompletion ? '결석했던 날짜와 다른 실제 진행 날짜·시간을 입력해 주세요. 기존 결석 기록은 보존하고 진행한 보강을 완료 처리합니다.'
         : directCompletion ? ''
           : '실제 진행한 날짜·시간을 확인해 주세요. 기존 예정일의 출결·메모는 그대로 보존됩니다.';
   const submitAction = mode === 'restore' ? 'murestoreschedulesubmit' : mode === 'schedule' ? 'muschedulesubmit' :

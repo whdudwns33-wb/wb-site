@@ -1458,8 +1458,11 @@ async function scheduledCompletionAttestation(env, app, row, staffId, attendance
 async function saveCompletion(env, app, row, next, event, document, source, student, staffId, range,
   direct, currentSourceTeacherId, sourceIdentity, json, origin, now, forcedImpact = null,
   directAttendanceStatus = '') {
-  const taskWrite = await prepareMakeupLessonWrite(env, app, row, source, student, staffId,
-    !direct && event.explicitCompletion ? confirmedMakeupRange(row) : range, now, true);
+  const retryCompletion = !!event.adminAbsentCompletion;
+  const taskWrite = retryCompletion
+    ? await prepareMakeupLessonRescheduleAfterAbsence(env, app, row, source, student, staffId, range, now, event.actorId)
+    : await prepareMakeupLessonWrite(env, app, row, source, student, staffId,
+      !direct && event.explicitCompletion ? confirmedMakeupRange(row) : range, now, true);
   const planned = forcedImpact ? { impact: forcedImpact } :
     await completionImpact(env, app, row, document, currentSourceTeacherId);
   const impact = planned.impact;
@@ -1472,6 +1475,23 @@ async function saveCompletion(env, app, row, next, event, document, source, stud
   statements.push(await casGuard(env, app, 'makeup_complete_conflict', row, now));
   let completionRow = row;
   let completionNext = next;
+
+  if (retryCompletion) {
+    const retryNext = { ...row, confirmed_start_at: range.startAt, confirmed_end_at: range.endAt,
+      confirmed_staff_id: staffId, notification_needed: 0 };
+    const retryEvent = { action: 'reschedule_after_absence', from: row.status, to: row.status,
+      actorId: event.actorId, previousDate: taskWrite.retry.previousDate, previousAttendance: 'A',
+      date: range.date, startTime: range.startTime, endTime: range.endTime, staffId, notificationNeeded: false };
+    statements.push(taskWrite.retryEvent);
+    statements.push(await casGuard(env, app, 'makeup_complete_retry_event', row, now));
+    statements.push(transitionStatement(env, app, row, retryNext, retryEvent, now));
+    statements.push(await casGuard(env, app, 'makeup_complete_retry_case', row, now));
+    statements.push(taskWrite.statement);
+    statements.push(await casGuard(env, app, 'makeup_complete_retry_task', row, now));
+    taskWrite.statement = null;
+    completionRow = transitionSnapshot(row, retryNext, retryEvent, now);
+    completionNext = { ...completionRow, status: 'completed', completed_at: now, completed_by: staffId };
+  }
 
   if (direct) {
     let scheduleBase = row;
@@ -1526,12 +1546,12 @@ async function saveCompletion(env, app, row, next, event, document, source, stud
         statements.push(await casGuard(env, app, 'makeup_complete_restore', row, now));
         taskWrite.statement = null;
       }
-      statements.push(await scheduledCompletionAttestation(env, app, row, staffId, event.attendanceStatus, now));
+      statements.push(await scheduledCompletionAttestation(env, app, completionRow, staffId, event.attendanceStatus, now));
       statements.push(await casGuard(env, app, 'makeup_complete_attest', row, now));
     }
-    statements.push(scheduledCompletionAttendanceGuardStatement(env, app, row, staffId));
+    statements.push(scheduledCompletionAttendanceGuardStatement(env, app, completionRow, staffId));
     statements.push(await casGuard(env, app, 'makeup_complete_attendance', row, now));
-    statements.push(transitionStatement(env, app, row, completionNext,
+    statements.push(transitionStatement(env, app, completionRow, completionNext,
       { ...event, sessionPackImpact: impact }, now));
     statements.push(await casGuard(env, app, 'makeup_complete_case', row, now));
     if (taskWrite.statement) {
@@ -2606,6 +2626,16 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       if (!timeUnrecorded) await assertNoConflict(env, app, caseId, String(row.student_id), range);
       if (!direct && !body.attendanceStatus) await scheduledCompletionAttendance(env, app, row, staffId);
       if (!direct && body.attendanceStatus) cleanCompletedAttendance(body.attendanceStatus);
+      let adminAbsentCompletion = false;
+      if (!direct && body.attendanceStatus && auth.scope === 'all') {
+        const key = makeupLessonId(caseId) + '|' + confirmedRange.date;
+        const prior = await env.DB.prepare('SELECT data FROM checks WHERE app=? AND k=? LIMIT 1').bind(app, key).first();
+        if (prior && parseJson(prior.data)?.att === 'A') {
+          if (range.date === confirmedRange.date) problem('결석했던 날짜와 다른 실제 진행 날짜를 입력해 주세요', 409, 'MAKEUP_RETRY_DATE_REQUIRED');
+          if (requestNow < Date.parse(range.endAt)) problem('실제 종료시간이 지난 뒤 완료해 주세요', 409, 'MAKEUP_NOT_ENDED');
+          adminAbsentCompletion = true;
+        }
+      }
       next.status = 'completed';
       next.completed_at = requestNow;
       // DB trigger는 완료 수업의 담당자를 completed_by로 강제하고, 실제 조작자는 history에 별도로 남긴다.
@@ -2616,6 +2646,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         date: timeUnrecorded ? null : range.date,
         startTime: timeUnrecorded ? null : range.startTime,
         endTime: timeUnrecorded ? null : range.endTime, staffId, direct,
+        ...(adminAbsentCompletion ? { adminAbsentCompletion: true } : {}),
         ...(direct ? { attendanceStatus: directAttendanceStatus } : body.attendanceStatus ? { attendanceStatus: cleanCompletedAttendance(body.attendanceStatus), explicitCompletion: true } : {}),
         ...(legacyDefaults.length ? { legacyDefaults } : {}), notificationNeeded: false
       };
