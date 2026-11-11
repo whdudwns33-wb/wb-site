@@ -13,11 +13,11 @@ test('teacher processing separates future scheduling from past completion', asyn
   assert.equal(can({ ...row, status: 'completed' }), false);
   const process = source.slice(source.indexOf('async function openMakeupProcessModal('), source.indexOf('async function openMakeupLinkModal('));
   let buttons;
-  const open = new Function('makeupRows', 'makeupCanSchedule', 'esc', 'makeupScheduleHtml', 'modal', process + ';return openMakeupProcessModal;')(
-    [row], can, String, () => '', (title, body, actions) => { buttons = actions; });
+  const open = new Function('makeupRows', 'makeupCanSchedule', 'esc', 'makeupScheduleHtml', 'makeupModalErrorHtml', 'makeupActions', 'modal', process + ';return openMakeupProcessModal;')(
+    [row], can, String, () => '', () => '', () => '<button data-act="muschedule"></button><button data-act="mucompleteopen"></button>', (title, body, actions) => { buttons = actions; });
   await open({ dataset: { case: 'case' } });
   assert.match(buttons, /data-act="muschedule"/);
-  assert.match(buttons, /data-act="mudirectcompleteopen"/);
-  assert.match(source, /directCompletion \? ' max="'/);
+  assert.match(buttons, /data-act="mucompleteopen"/);
+  assert.match(source, /directCompletion \|\| scheduledCompletion/);
   assert.match(source, /mode === 'schedule' \? !makeupCanSchedule\(row\)/);
 });

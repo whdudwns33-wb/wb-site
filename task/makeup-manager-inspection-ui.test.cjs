@@ -11,8 +11,8 @@ test('관리자 점검 모드에서 일정 없는 보강의 직접 완료 입력
   assert.ok(start >= 0 && end > start);
   const block = source.slice(start, end);
   assert.match(block, /session\.isAdmin\s*\|\|\s*\(typeof managerInspectionActive === 'function'\s*&&\s*managerInspectionActive\(\)\s*&&\s*!row\.confirmedDate\s*&&\s*!row\.proposedDate\)/);
-  assert.match(source, /showDirectCompletion\s*&&\s*makeupCanComplete\(row\)/);
-  assert.match(source, /mudirectcompleteopen/);
+  assert.match(source, /if \(makeupCanComplete\(row\)/);
+  assert.match(source, /mucompleteopen/);
   const modalStart = source.indexOf('function makeupDateTimeModal');
   const modalEnd = source.indexOf('function makeupNoMakeupModal', modalStart);
   assert.ok(modalStart >= 0 && modalEnd > modalStart);
@@ -41,14 +41,14 @@ test('일정 없는 본인 보강은 후보 조회 없이 생성·완료 선택�
   const fnEnd = source.indexOf('async function openMakeupLinkModal', fnStart);
   row.caseId = 'case-a';
   const open = Function('makeupRows', 'makeupCanComplete', 'makeupDateTimeModal', 'openMakeupLinkModal',
-    'makeupCanSchedule', 'modal', 'esc', 'makeupScheduleHtml',
+    'makeupCanSchedule', 'modal', 'esc', 'makeupScheduleHtml', 'makeupModalErrorHtml', 'makeupActions',
     source.slice(fnStart, fnEnd) + '; return openMakeupProcessModal;')([row], can,
     (selected, mode) => calls.push(mode), () => assert.fail('후보 조회가 완료 입력을 막으면 안 된다'),
-    can, (title, body, buttons) => calls.push(buttons), String, () => '');
+    can, (title, body, buttons) => calls.push(buttons), String, () => '', () => '', () => '<button data-act="muschedule"></button><button data-act="mucompleteopen"></button>');
   await open({ dataset: { case: 'case-a' } });
   assert.equal(calls.length, 1);
   assert.match(calls[0], /data-act="muschedule"/);
-  assert.match(calls[0], /data-act="mudirectcompleteopen"/);
+  assert.match(calls[0], /data-act="mucompleteopen"/);
 });
 
 test('일정 없는 직접 완료는 날짜·시간을 비워 둔 상태로 전송할 수 있다', () => {

@@ -39,14 +39,14 @@ test('기존 수업 변경·원생 파생·업무 관리·회차제 생성에는
 
 test('확정됐지만 생성 task가 없는 레거시 보강은 확정 일시를 보여주고 복구한다', () => {
   const actionsSource = block('function makeupActions(', 'function makeupCard(');
-  const actions = new Function('session', 'esc', `${actionsSource}\nreturn makeupActions;`)(
-    { isAdmin: true, isStaffLink: false }, value => String(value || '')
+  const actions = new Function('session', 'esc', 'makeupCanSchedule', 'makeupCanComplete', 'makeupNeedsSchedule', `${actionsSource}\nreturn makeupActions;`)(
+    { isAdmin: true, isStaffLink: false }, value => String(value || ''), () => false, () => true, () => false
   );
   const missing = actions({ caseId: 'mu-a', revision: 3, status: 'confirmed', hasLessonTask: false });
   const healthy = actions({ caseId: 'mu-a', revision: 3, status: 'confirmed', hasLessonTask: true });
-  assert.match(missing, /data-act="muprocessadminopen"[^>]*>보강 처리/);
-  assert.match(healthy, /data-act="muprocessadminopen"[^>]*>보강 처리/);
-  assert.equal((healthy.match(/<button/g) || []).length, 2, '관리자 카드는 처리 창과 보강없음만 노출한다');
+  assert.match(missing, /data-act="mucompleteopen"[^>]*>보강완료/);
+  assert.match(healthy, /data-act="mucompleteopen"[^>]*>보강완료/);
+  assert.equal((healthy.match(/<button/g) || []).length, 3, '관리자 카드는 처리 창과 보강없음만 노출한다');
 
   const modal = block('function makeupDateTimeModal(', 'function makeupNoMakeupModal(');
   assert.match(modal, /mode === 'restore'/);

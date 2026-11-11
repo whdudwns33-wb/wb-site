@@ -2890,3 +2890,44 @@ test('reset reconciliation cannot cancel makeup if attendance becomes absent con
   assert.equal(result.status,409);assert.equal(result.body.code,'ATTENDANCE_CORRECTION_REQUIRED');
   assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?').get(created.body.case.caseId).status,'review_pending');
 });
+
+test('simple completion records actual date and preserves scheduled memo and attendance', async () => {
+ const db=new TestD1();seed(db);
+ const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ const id=scheduled.body.lessonTask.id;
+ db.prepare('INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)').bind('task',id+'|2026-08-12','teacher-a',JSON.stringify({taskId:id,date:'2026-08-12',note:'보존할 수업 메모',att:'',steps:{first:true}}),2,2).run();
+ const done=await callAt(db,own('teacher-a'),{action:'complete',caseId:created.body.case.caseId,revision:scheduled.body.case.revision,date:'2026-08-13',startTime:'19:00',endTime:'20:00',attendanceStatus:'P'},'2026-08-14T12:00:00+09:00');
+ assert.equal(done.status,200,JSON.stringify(done.body));assert.equal(done.body.case.completedDate,'2026-08-13');
+ const record=JSON.parse(db.database.prepare('SELECT data FROM checks WHERE k=?').get(id+'|2026-08-12').data);
+ assert.equal(record.note,'보존할 수업 메모');assert.equal(record.steps.first,true);assert.equal(record.att,'P');
+ assert.equal(JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE id=?').get(id).data).start,'2026-08-12');
+});
+test('simple completion restores missing generated lesson and forbids absent or unrelated teacher completion',async()=>{
+ for(const scenario of ['missing','absent','other']) {
+ const db=new TestD1();seed(db);const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ if(scenario==='missing'){db.database.exec('DROP TRIGGER trg_tasks_capture_revocation_delete');db.database.prepare('DELETE FROM tasks WHERE id=?').run(scheduled.body.lessonTask.id);}
+ if(scenario==='absent')makeupAttendance(db,created.body.case.caseId,'teacher-a','2026-08-12','A');
+ const result=await callAt(db,own(scenario==='other'?'teacher-b':'teacher-a'),{action:'complete',caseId:created.body.case.caseId,revision:scheduled.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00',attendanceStatus:'P'},'2026-08-14T12:00:00+09:00');
+ assert.equal(result.status,scenario==='missing'?200:scenario==='other'?403:409,JSON.stringify(result.body));
+ }
+});
+
+test('explicit completion does not overwrite a concurrent absence',async()=>{
+ const db=new TestD1();seed(db);const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ const id=scheduled.body.lessonTask.id;makeupAttendance(db,created.body.case.caseId,'teacher-a','2026-08-12','P');
+ db.beforeBatch=()=>db.database.prepare("UPDATE checks SET data=json_set(data,'$.att','A'),updated_at=updated_at+1 WHERE k=?").run(id+'|2026-08-12');
+ const result=await callAt(db,all,{action:'complete',caseId:created.body.case.caseId,revision:scheduled.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00',attendanceStatus:'P'},'2026-08-14T12:00:00+09:00');
+ assert.equal(result.status,409);assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?').get(created.body.case.caseId).status,'confirmed');
+ assert.equal(JSON.parse(db.database.prepare('SELECT data FROM checks WHERE k=?').get(id+'|2026-08-12').data).att,'A');
+});
+test('assigned teacher can change record-free makeup time but cannot reassign it',async()=>{
+ const db=new TestD1();seed(db);const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ const request={action:'reschedule',caseId:created.body.case.caseId,revision:scheduled.body.case.revision,date:'2026-08-13',startTime:'19:00',endTime:'20:00',staffId:'teacher-a'};
+ assert.equal((await call(db,own('teacher-b'),request)).status,403);
+ assert.equal((await call(db,own('teacher-a'),{...request,staffId:'teacher-b'})).status,403);
+ assert.equal((await call(db,own('teacher-a'),request)).status,200);
+});
