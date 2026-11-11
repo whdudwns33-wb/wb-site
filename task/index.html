@@ -12525,6 +12525,21 @@ function makeupStatusPill(row) {
   return '<span class="pill ' + cls + '">' + esc(MAKEUP_STATUS_LABELS[row.status] || row.status) + '</span>';
 }
 
+function makeupAttendanceHtml(row) {
+  if (row.status === 'cancelled' && !row.resolvedByCompletion) return '';
+  let label = '', cls = 'doing';
+  const value = makeupScheduledAttendance(row).value;
+  if (row.status === 'completed' || row.resolvedByCompletion) { label = '보강완료'; cls = 'ok'; }
+  else if (['P','L','E'].includes(value)) { label = makeupAttendanceLabel(value) + ' · 완료 처리 전'; cls = 'ok'; }
+  else if (value === 'A') { label = '결석 · 재보강 필요'; cls = 'warn'; }
+  else if (row.confirmedDate) {
+    const end = Date.parse(row.confirmedDate + 'T' + (row.confirmedEndTime || '23:59') + ':00+09:00');
+    label = end < Date.now() ? '출결 미입력 · 확인 필요' : '보강 예정';
+    if (end < Date.now()) cls = 'warn';
+  } else return '';
+  return '<div class="mt8" aria-label="보강 수업 출결"><span class="pill ' + cls + '">' + esc(label) + '</span></div>';
+}
+
 function makeupScheduleHtml(row) {
   const completed = row.status === 'completed' && row.completedDate && row.completedStartTime && row.completedEndTime;
   const linked = row.resolvedByCompletion && row.linkedCompletionDate && row.linkedCompletionStartTime && row.linkedCompletionEndTime;
@@ -12617,7 +12632,7 @@ function makeupCard(row) {
       (differentProposal ? '<span class="tag makeup-lesson">대체 담당 제안</span>' : '') +
       (delayed ? '<span class="tag blk">지연</span>' : scheduledToday ? '<span class="tag time">오늘</span>' : '') +
       (reason ? '<span class="tag">' + esc(reason) + '</span>' : '') + '</div>' +
-    makeupScheduleHtml(row) + makeupInstructionHtml(row) +
+    makeupScheduleHtml(row) + makeupAttendanceHtml(row) + makeupInstructionHtml(row) +
     (actions ? '<div class="makeup-actions">' + actions + '</div>' : '') + '</article>';
 }
 
@@ -13327,7 +13342,9 @@ function makeupScheduledAttendance(row) {
   const task = makeupLessonTaskForCase(row);
   const date = String(row && row.confirmedDate || '');
   const check = task && date ? getCheck(task.id, date) : null;
-  return { task: task, check: check, value: String(check && check.att || '') };
+  const server = row && row.scheduledAttendance;
+  const useServer = server && server.date === date && (!check || Number(server.updatedAt || 0) >= Number(check.updatedAt || 0));
+  return { task: task, check: check, value: String(useServer ? server.value : check && check.att || '') };
 }
 
 function makeupAttendanceLabel(value) {
@@ -13363,11 +13380,13 @@ function makeupDateTimeModal(row, mode) {
           makeupStaffOptionsHtml(assignedStaffId) + '</select></label>')
     : '<div class="makeup-schedule"><b>실제 보강 담당 선생님</b><br>' +
         esc(makeupTeacherLabel(assignedStaffId, '담당 확인 필요')) + '</div>';
+  const recordedAttendance = scheduledCompletion ? makeupScheduledAttendance(row).value : '';
+  const selectedAttendance = ['P','L','E'].includes(recordedAttendance) ? recordedAttendance : 'P';
   let attendanceField = '';
   if (directCompletion || scheduledCompletion) {
     attendanceField = '<label class="field"><span class="fl">실제 출결</span><select class="in" id="muAttendanceStatus">' +
-      '<option value="P" selected>출석</option>' + MAKEUP_COMPLETION_ATTENDANCE_OPTIONS.filter(item => item[0] !== 'P').map(item =>
-        '<option value="' + item[0] + '">' + item[1] + '</option>').join('') + '</select></label>' +
+      MAKEUP_COMPLETION_ATTENDANCE_OPTIONS.map(item =>
+        '<option value="' + item[0] + '"' + (item[0] === selectedAttendance ? ' selected' : '') + '>' + item[1] + '</option>').join('') + '</select></label>' +
       '<div class="hint">이미 완료된 보강의 실제 날짜·시작시간·종료시간과 출결을 입력해 주세요.' +
       (directCompletion && (session.isAdmin || inspection) ? ' 관리자는 날짜·시작시간·종료시간을 비워 두면 실제 일시 미기록으로 완료할 수 있습니다.' : '') + '</div>';
   }

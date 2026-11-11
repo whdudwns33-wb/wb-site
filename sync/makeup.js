@@ -306,6 +306,7 @@ function publicCase(row, student, task, parentResponse, lessonTask) {
   const manual = creationType === 'manual' ? history[0] : null;
   const linked = history.slice().reverse().find(item => item && item.action === 'link_completed');
   return {
+    ...(row.scheduledAttendance ? { scheduledAttendance: row.scheduledAttendance } : {}),
     caseId: String(row.case_id), studentId: String(row.student_id),
     studentName: student ? String(student.name || '') : '', grade: student ? String(student.grade || '') : '',
     sourceTaskId: String(row.source_task_id), sourceDate: String(row.source_date),
@@ -1700,6 +1701,22 @@ async function listCases(env, app, body, auth, json, origin) {
       .some(staffId => String(staffId || '') === String(auth.id || '')));
   };
   const visible = candidates.filter(normalVisibility);
+  // 목록 권한 검사 후 해당 보강·확정일의 출결만 묶어서 읽는다. 과거 날짜 화면을 열 필요가 없다.
+  const attendance = new Map();
+  const scheduled = visible.filter(row => row.confirmed_start_at && lessonTasks.has(String(row.case_id)));
+  for (let offset = 0; offset < scheduled.length; offset += 80) {
+    const chunk = scheduled.slice(offset, offset + 80);
+    const keys = chunk.map(row => makeupLessonId(String(row.case_id)) + '|' + String(row.confirmed_start_at).slice(0,10));
+    const records = await env.DB.prepare('SELECT k,owner,data,updated_at FROM checks WHERE app=? AND k IN (' + keys.map(() => '?').join(',') + ')').bind(app, ...keys).all();
+    for (const record of records.results || []) attendance.set(record.k, record);
+  }
+  for (const row of visible) {
+    const date = String(row.confirmed_start_at || '').slice(0,10), taskId = makeupLessonId(String(row.case_id));
+    const record = attendance.get(taskId + '|' + date), data = record && parseJson(record.data);
+    row.scheduledAttendance = { value: record && record.owner === row.confirmed_staff_id && data &&
+      data.taskId === taskId && data.date === date && ['P','A','L','E'].includes(data.att) ? data.att : '',
+      updatedAt: Number(record && record.updated_at || 0), date };
+  }
   const notes = await instructionRows(env, app, visible.map(row => String(row.case_id)));
   for (const row of visible) row.instructionRecord = notes.get(String(row.case_id));
   // 중간 과거 담당자에게 학생 표시 정보와 history를 다시 노출하지 않는다. 태블릿에서
