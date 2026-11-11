@@ -2931,3 +2931,15 @@ test('assigned teacher can change record-free makeup time but cannot reassign it
  assert.equal((await call(db,own('teacher-a'),{...request,staffId:'teacher-b'})).status,403);
  assert.equal((await call(db,own('teacher-a'),request)).status,200);
 });
+
+ test('archive cutoff skips old automatic requests but retains explicit creation and later absences', async()=>{
+ const db=new TestD1();seed(db);
+ const env={DB:db,WB_MAKEUP_ARCHIVE_THROUGH:'2026-11-11'};
+ const old=await handleMakeup(env,'task',{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'},'*',own('teacher-a'),responseJson);
+ assert.equal((await old.json()).code,'MAKEUP_LEGACY_ARCHIVED');
+ assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n,0);
+ const manual=await handleMakeup(env,'task',{action:'create_from_absence',creationMode:'manual',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'},'*',own('teacher-a'),responseJson);
+ assert.equal(manual.status,200);assert.ok((await manual.json()).case);
+ const later=await handleMakeup(env,'task',{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-11-12'},'*',own('teacher-a'),responseJson);
+ assert.notEqual((await later.json()).code,'MAKEUP_LEGACY_ARCHIVED');
+ });
