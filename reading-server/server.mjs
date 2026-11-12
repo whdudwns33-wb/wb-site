@@ -237,7 +237,10 @@ const naesinTgStore = {
   listStateCodes: () => Object.keys(naesinTgRoot().states),
   getExam: (s) => naesinTgRoot().exams[s] || null,
   putExam: (s, rec) => { naesinTgRoot().exams[s] = rec; persist(); },
+  getTasks: () => naesinTgRoot().tasks || null,
+  putTasks: (v) => { naesinTgRoot().tasks = v; persist(); },
   getStudent: (c) => db.students[c] || null,
+  listStudentCodes: () => Object.keys(db.students),
 };
 
 /* 국어브레인 저장소 어댑터 — db.naesinKo만 사용.

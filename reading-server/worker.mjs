@@ -266,7 +266,9 @@ function naesinTgStore(env) {
     getState: (c) => get('naesintg:state:' + c), putState: (c, rec) => put('naesintg:state:' + c, rec),
     listStateCodes: async () => (await kvListAll(env, 'naesintg:state:')).map((k) => k.slice('naesintg:state:'.length)),
     getExam: (s) => get('naesintg:exam:' + s), putExam: (s, rec) => put('naesintg:exam:' + s, rec),
+    getTasks: () => get('naesintg:tasks'), putTasks: (v) => put('naesintg:tasks', v),
     getStudent: (c) => get('student:' + c),
+    listStudentCodes: async () => (await kvListAll(env, 'student:')).map((k) => k.slice('student:'.length)),
   };
 }
 
