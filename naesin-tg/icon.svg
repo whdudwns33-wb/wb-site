@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="탐구브레인">
+  <rect width="128" height="128" rx="26" fill="#2A3B2E"/>
+  <rect x="30" y="26" width="68" height="76" rx="6" fill="#F4F2EE"/>
+  <circle cx="50" cy="48" r="7" fill="none" stroke="#2A3B2E" stroke-width="4"/>
+  <circle cx="50" cy="66" r="7" fill="#3E6B4A"/>
+  <circle cx="50" cy="84" r="7" fill="none" stroke="#2A3B2E" stroke-width="4"/>
+  <rect x="64" y="45" width="24" height="6" rx="3" fill="#2A3B2E"/>
+  <rect x="64" y="63" width="24" height="6" rx="3" fill="#2A3B2E"/>
+  <rect x="64" y="81" width="16" height="6" rx="3" fill="#B4482F"/>
+</svg>

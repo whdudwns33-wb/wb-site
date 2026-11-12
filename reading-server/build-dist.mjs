@@ -29,6 +29,7 @@ fs.copyFileSync(path.join(ROOT, 'public', 'naesin-studio.html'), path.join(DIST,
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-live.html'), path.join(DIST, 'admin', 'naesin-live.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'haru-admin.html'), path.join(DIST, 'admin', 'haru-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-ko-admin.html'), path.join(DIST, 'admin', 'naesin-ko-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'naesin-tg-admin.html'), path.join(DIST, 'admin', 'naesin-tg-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'hanja-admin.html'), path.join(DIST, 'admin', 'hanja-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'hanja-print.html'), path.join(DIST, 'admin', 'hanja-print.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'chunk-admin.html'), path.join(DIST, 'admin', 'chunk-admin.html'));
@@ -75,6 +76,10 @@ const NAESINKO_FILES = ['index.html', 'engine.js', 'grade.js', 'gen.js', 'pack-c
   'readiness.js', 'render.js', 'concepts.json', 'pack-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of NAESINKO_FILES) fs.copyFileSync(path.join(NAESINKO, f), path.join(DIST, 'naesin-ko', f));
 fs.copyFileSync(SHARED, path.join(DIST, 'naesin-ko', 'voice.js'));
+/* 탐구브레인 (naesin-tg/) — 화면 껍데기뿐이다. 문제지·쪽 그림·정답은 KV 에만 있고 서버가 채점한다.
+   서비스 워커가 없다: 지면을 기기에 쌓아 두지 않으려고 일부러 뺐다. */
+fs.mkdirSync(path.join(DIST, 'naesin-tg'), { recursive: true });
+for (const f of ['index.html', 'icon.svg']) fs.copyFileSync(path.join(ROOT, '..', 'naesin-tg', f), path.join(DIST, 'naesin-tg', f));
 /* 하루브레인 (haru/) — 같은 오리진 /haru/ 에서 서빙해야 학생 코드·API가 공유된다.
    앱 껍데기·순수 로직·atoms.json·공개 준비 안내와 검토용 자체 샘플(preview.js)만 싣는다. 운영 팩·대응표·플랜·시험지는 dist 에 없다(설계안 §5-0). */
 const HARU = path.join(ROOT, '..', 'haru');
