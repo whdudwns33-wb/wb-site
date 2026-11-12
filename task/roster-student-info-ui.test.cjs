@@ -149,7 +149,8 @@ test('이름만 등록한 원생도 운영 연결이 없으면 관리자 완전 
   const canDelete = block('function rosterStudentCanDelete(student)', 'function rosterStudentEditorHtml');
   assert.match(canDelete, /if \(!String\(student && student\.name \|\| ''\)\.trim\(\)\) return false/);
   assert.doesNotMatch(canDelete, /student && student\.school[\s\S]*return false/);
-  assert.match(editor, /rosterStudentLessonTasks\(student\.id\)\.length \|\| rosterStudentSubjects\(student\)\.length/);
+  assert.match(canDelete, /readLessonTasks\(\)[\s\S]*some\(task => isRegularLessonTask\(task\)/);
+  assert.match(canDelete, /rosterStudentSubjects\(student\)\.length/);
   assert.doesNotMatch(canDelete, /teacherIds|student\.teacher/);
   assert.match(editor, /data-act="rosterstudentdelete">원생 완전 삭제/);
   assert.match(editor, /action: 'student_delete'/);
@@ -283,4 +284,27 @@ test('팝업은 이름 추측 없이 현재 권한 범위의 stable studentId만
   assert.match(source, /\.student-info-name \{[^}]*min-height: 44px/);
   assert.match(source, /\.student-info-name:focus-visible/);
   assert.match(source, /@media\(max-width:430px\) \{[\s\S]*\.student-info-grid \{ grid-template-columns: 1fr; \}/);
+});
+
+test('종료 수업은 숨기고 미래·미정 수업과 원본 기록은 보존한다', () => {
+  const code = block('function rosterStudentLessonTasks(', 'function rosterStudentInfoHtml(');
+  const tasks = [
+    {id:'ended',studentId:'s',end:'2026-11-11'},
+    {id:'old-slot',studentId:'s',scheduleSlots:[{days:[6],validTo:'2026-11-11'}]},
+    {id:'active',studentId:'s',scheduleSlots:[{days:[6],validFrom:'2026-11-12'}]},
+    {id:'future',studentId:'s',start:'2026-12-01',scheduleSlots:[{days:[6],validFrom:'2026-12-01'}]},
+    {id:'unscheduled',studentId:'s'},
+    {id:'last-day',studentId:'s',end:'2026-11-12'},
+    {id:'gap',studentId:'s',scheduleSlots:[{days:[1],validTo:'2026-11-01'},{days:[1],validFrom:'2026-12-03'}]},
+    {id:'invalid-range',studentId:'s',start:'2026-12-01',scheduleSlots:[{days:[6],validTo:'2026-11-30'}]},
+    {id:'outside-end',studentId:'s',end:'2026-11-20',scheduleSlots:[{days:[6],validFrom:'2026-12-01'}]},
+    {id:'alias-ended',studentId:'s',scheduleSlots:[{days:[6],endDate:'2026-11-11'}]},
+    {id:'deleted',studentId:'s',deleted:true},
+    {id:'other-student',studentId:'other'}
+  ];
+  const before = JSON.stringify(tasks);
+  const collect = new Function('readLessonTasks','isRegularLessonTask','staffById','today',code+'; return rosterStudentLessonTasks;')(
+    () => tasks, t => !t.deleted, () => null, () => '2026-11-12');
+  assert.deepEqual(collect('s').map(t=>t.id).sort(), ['active','future','gap','last-day','unscheduled'].sort());
+  assert.equal(JSON.stringify(tasks),before);
 });
