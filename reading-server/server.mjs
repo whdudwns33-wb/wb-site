@@ -14,6 +14,7 @@ import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from 
 import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru } from './haru-api.mjs';
 import { handleNaesinKo, naesinKoBodyLimit } from './naesin-ko-api.mjs';
+import { handleNaesinTg, naesinTgBodyLimit } from './naesin-tg-api.mjs';
 import { handleHanja, hanjaBodyLimit, dropStudentHanja } from './hanja-api.mjs';
 import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, pushDueIssues } from './letter-api.mjs';
@@ -32,6 +33,7 @@ const AGE_DIR = path.join(ROOT, '..', 'vocab-age'); // 어휘 나이 진단(로�
 const NAESIN_DIR = path.join(ROOT, '..', 'naesin');    // 내신브레인 앱 정적 파일
 const HARU_DIR = path.join(ROOT, '..', 'haru');        // 하루브레인 앱 정적 파일 (팩·대응표·플랜은 여기 없다 — db.haru 전용)
 const NAESIN_KO_DIR = path.join(ROOT, '..', 'naesin-ko'); // 국어브레인 앱 정적 파일
+const NAESIN_TG_DIR = path.join(ROOT, '..', 'naesin-tg'); // 탐구브레인 앱 정적 파일
 const HANJA_DIR = path.join(ROOT, '..', 'hanja');      // 어휘브레인 앱 정적 파일 (단어장은 여기 없다 — db.hanja 전용)
 const LETTER_DIR = path.join(ROOT, '..', 'letter');     // 브레인레터 앱 정적 파일 (호 본문은 여기 없다 — db.letter 전용, 체험 호는 자체 창작)
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
@@ -218,6 +220,26 @@ const haruAtomsFallback = async () => {
   if (!HARU_ATOMS_CACHE) { try { HARU_ATOMS_CACHE = JSON.parse(fs.readFileSync(path.join(HARU_DIR, 'atoms.json'), 'utf8')); } catch (e) { return null; } }
   return HARU_ATOMS_CACHE;
 };
+/* 탐구브레인 저장소 어댑터 — db.naesinTg만 사용.
+   ponytail: 쪽 그림(base64)까지 db.json 한 파일에 둔다. 로컬 개발용으로는 충분하고, 문제지가 수백 건이 되면 쪽 그림만 파일로 뺀다. */
+const naesinTgRoot = () => (db.naesinTg = db.naesinTg || { sheets: {}, sheetIds: null, pages: {}, states: {}, exams: {} });
+const naesinTgStore = {
+  getSheet: (id) => naesinTgRoot().sheets[id] || null,
+  putSheet: (id, rec) => { naesinTgRoot().sheets[id] = rec; persist(); },
+  delSheet: (id) => { delete naesinTgRoot().sheets[id]; persist(); },
+  getSheetIds: () => naesinTgRoot().sheetIds,
+  putSheetIds: (ids) => { naesinTgRoot().sheetIds = ids; persist(); },
+  getPage: (id, n) => naesinTgRoot().pages[id + ':' + n] || null,
+  putPage: (id, n, data) => { naesinTgRoot().pages[id + ':' + n] = data; persist(); },
+  delPage: (id, n) => { if (naesinTgRoot().pages[id + ':' + n]) { delete naesinTgRoot().pages[id + ':' + n]; persist(); } },
+  getState: (c) => naesinTgRoot().states[c] || null,
+  putState: (c, rec) => { naesinTgRoot().states[c] = rec; persist(); },
+  listStateCodes: () => Object.keys(naesinTgRoot().states),
+  getExam: (s) => naesinTgRoot().exams[s] || null,
+  putExam: (s, rec) => { naesinTgRoot().exams[s] = rec; persist(); },
+  getStudent: (c) => db.students[c] || null,
+};
+
 /* 국어브레인 저장소 어댑터 — db.naesinKo만 사용.
    요약·서술형·오버레이를 state에서 분리해 둔다(국어 기획서 §8 저장 예산). */
 const naesinKoRoot = () => {
@@ -335,7 +357,7 @@ const json = (res, code, obj) => {
    남은 몸통은 resume() 으로 흘려보내야 응답이 정상으로 나간다 — 안 읽고 응답하면 큰 몸통은 RST 로 끝난다. */
 const BODY_LIMIT_DEFAULT = 2_000_000;
 const BODY_LIMIT_TEXTBOOK = 5_500_000;
-const bodyLimit = (p) => (p.startsWith('/api/naesin-ko/') ? naesinKoBodyLimit(p) : p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/hanja/') ? hanjaBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
+const bodyLimit = (p) => (p.startsWith('/api/naesin-tg/') ? naesinTgBodyLimit(p) : p.startsWith('/api/naesin-ko/') ? naesinKoBodyLimit(p) : p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/hanja/') ? hanjaBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
 const tooLarge = () => { const e = new Error('too large'); e.status = 413; return e; };
 const readBody = (req, limit = BODY_LIMIT_DEFAULT) => new Promise((resolve, reject) => {
   /* 조각을 Buffer 로 모아 한 번에 디코딩한다 — 조각마다 문자열로 바꾸면 조각 경계에 걸린 한글(3바이트)이 깨진다.
@@ -639,6 +661,16 @@ const server = http.createServer(async (req, res) => {
         return json(res, out.status, out.body);
       }
 
+      /* 탐구브레인 (/api/naesin-tg/*) — 사회·과학 내신. 저장소만 db.naesinTg. */
+      if (p.startsWith('/api/naesin-tg/')) {
+        if (Number(req.headers['content-length'] || 0) > naesinTgBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const out = await handleNaesinTg({
+          path: p, method: req.method, who, query: url.searchParams,
+          getBody: () => readBody(req, naesinTgBodyLimit(p)), store: naesinTgStore,
+        });
+        return json(res, out.status, out.body);
+      }
+
       /* 국어브레인 (/api/naesin-ko/*) — 영어와 같은 격리 원칙, 저장소만 db.naesinKo.
          /api/naesin/ 보다 먼저 본다 — 접두어가 겹치지는 않지만 순서를 명시해 둔다. */
       if (p.startsWith('/api/naesin-ko/')) {
@@ -914,6 +946,9 @@ const server = http.createServer(async (req, res) => {
         drop(ko.reviews, c);
         drop(ko.exams, c);
         drop(ko.overlays, c);
+        /* 탐구브레인 — 풀이 기록과 이 학생만의 시험 배정(워커와 동일) */
+        drop(naesinTgRoot().states, c);
+        drop(naesinTgRoot().exams, c);
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표는 남긴다(워커와 동일) */
         await dropStudentHaru(haruStore, c); removed += 3;
         /* 어휘브레인 — 기록·요약·배정·알림 구독. 단어장·획순 사전은 학생 것이 아니라 둔다(워커와 동일) */
@@ -977,6 +1012,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/naesin/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
     if (p === '/naesin' || p === '/naesin/') return serveFile(res, NAESIN_DIR, 'index.html');
     if (p.startsWith('/naesin/')) return serveFile(res, NAESIN_DIR, p.slice('/naesin/'.length));
+
+    /* 탐구브레인 앱 — 문제지·쪽 그림은 여기 없다(/api/naesin-tg/*, KV·db 전용) */
+    if (p === '/naesin-tg' || p === '/naesin-tg/') return serveFile(res, NAESIN_TG_DIR, 'index.html');
+    if (p.startsWith('/naesin-tg/')) return serveFile(res, NAESIN_TG_DIR, p.slice('/naesin-tg/'.length));
 
     /* 국어브레인 앱 — 팩 콘텐츠는 여기 없다(/api/naesin-ko/pack, KV·db 전용) */
     if (p === '/naesin-ko/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');

@@ -18,6 +18,7 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `vocab/` | 워드브레인 — 어휘 SRS 앱 (`srs.js`·`quiz.js`는 순수 로직 모듈) |
 | `naesin/` | 내신브레인 — 영어 내신 시험대비 앱. **상세: `naesin/README.md`** |
 | `naesin-ko/` | 국어브레인 — 국어 내신 시험대비 앱. **상세: `naesin-ko/README.md`** |
+| `naesin-tg/` | 탐구브레인 — 사회·과학 내신 시험대비 앱. 족보닷컴 문제지를 **지면 그대로**(쪽 그림) 보여 주고 답만 받는다. 채점은 서버가 하고 정답·해설 쪽은 제출 전에 나가지 않는다. 문제지·쪽 그림은 KV 전용(`naesintg:*`), 저장소에는 자체 창작 체험 문제지 `sheet-sample.json` 뿐. **상세: `naesin-tg/README.md`**, 기획 `docs/탐구내신-학습웹앱-기획서-v0.md` |
 | `haru/` | 하루브레인 — 삼육중 대비 3년 학습 앱(학생 `/haru/`·부모 `parent.html`) + 순수 로직(좌표·SRS·원인·페이스·생성기·리포트) + `atoms.json`(원자 목록, 문항 0). 팩·대응표·플랜·시험지는 저장소에 없다(KV·관리 웹 업로드). **상세: `haru/README.md`**, 인수인계·고칠 때 깨지는 자리: `haru/AGENTS.md` |
 | `reading-server/` | Cloudflare Worker(운영) + Node 로컬 서버 + 관리 웹(`public/`) + dist 조립 |
 | `shared/` | 공용 모듈 (voice.js TTS, qr.js) |
@@ -54,6 +55,7 @@ PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 로�
 WB_ADMIN_ONLY=1 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 터널로 외부 공개할 때(결정 A — 학생 로그인을 내주지 않는다. 기동 로그에 [관리 전용] 이 뜨는지 눈으로 확인)
 node naesin/pack-validate.mjs <팩 디렉터리>     # 영어 레슨 팩 검증
 node naesin-ko/pack-validate.mjs <팩 디렉터리>  # 국어 단원 팩 검증
+node naesin-tg/extract/build-sheet.mjs <PDF> --id <id>   # 탐구: PDF → 올릴 문제지 파일(쪽 그림, 저장소 밖에서. poppler 필요)
 node naesin-ko/extract/build-pack.mjs <단원 폴더>       # 국어: 폴더 하나 → 팩 초안 (시리즈 자동 판별)
 python3 naesin-ko/extract/pdf-spans.py <PDF> --colors  # 새 출판사 자료 색 팔레트 점검
 for f in haru/*.test.cjs haru/*.test.mjs; do node $f; done   # 하루브레인 순수 로직·달력·조판기
@@ -148,11 +150,12 @@ GitHub Pages는 `main/root`를 서비스하므로 main에 합친 정적 파일�
 - 학원 운영: Pages `/task/`·`/consult/` → `wb-sync` API. 보호자 `/`·`/consult-guardian/`는 `wb-sync`,
   학생 `/`는 별도 `wb-student` origin에서 제공한다. 정확한 배포 주소와 포털 활성 조건은 `sync/wrangler*.toml`·`sync/README.md`를 읽는다.
 
-- 학생: `/` 진로독서 · `/vocab/` 워드브레인 · `/naesin/` 내신브레인(영어) · `/naesin-ko/` 국어브레인 · `/haru/` 하루브레인(부모 `/haru/parent.html?t=`) · `/chunk/` 청크브레인(교재 `/chunk/print.html`, 화면 수업 `/chunk/class.html`, 가족 `/chunk/?t=` — 브레인레터와 같은 학부모 토큰) ·
+- 학생: `/` 진로독서 · `/vocab/` 워드브레인 · `/naesin/` 내신브레인(영어) · `/naesin-ko/` 국어브레인 · `/naesin-tg/` 탐구브레인(사회·과학) · `/haru/` 하루브레인(부모 `/haru/parent.html?t=`) · `/chunk/` 청크브레인(교재 `/chunk/print.html`, 화면 수업 `/chunk/class.html`, 가족 `/chunk/?t=` — 브레인레터와 같은 학부모 토큰) ·
   `/letter/` 브레인레터(가족 `/letter/?t=`) · `/hanja/` 어휘브레인
 - 관리: `/admin/` 진로독서(+교재 코칭 원문 업로드) · `/admin/naesin-admin.html` 내신브레인
   (팩 업로드·시험 등록·반 성취도) · `/admin/naesin-ko-admin.html` 국어브레인
   (팩 업로드·시험 등록·과제 배정·학교 오버레이·서술형 검토·서술형 루브릭 저작·주석 복원 시험지 인쇄) ·
+  `/admin/naesin-tg-admin.html` 탐구브레인(문제지 올리기·정답 확인·시험 배정·현황·서술형 확정) ·
   `/admin/haru-admin.html` 하루브레인(코치 보드·등록·팩/대응표/플랜·종이 회수·파기) ·
   `/admin/chunk-admin.html` 청크브레인(반 현황[주의 순·미완료 CSV]·학생 상세·약한 규칙·단계/과제 지정·반 단위 과제·글 저작[선생님 지문·진로독서 가져오기]·가족 링크·교재 출력) ·
   `/admin/letter-admin.html` 브레인레터(호 목록·편집·AI 초안·발행·발송 문구·열람 현황·학년대 지정·인쇄) ·
