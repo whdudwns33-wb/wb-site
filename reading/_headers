@@ -74,6 +74,8 @@
   Cache-Control: no-store
 /naesin-ko/*
   Cache-Control: no-store
+/naesin-tg/*
+  Cache-Control: no-store
 /vocab/*
   Cache-Control: no-store
 /haru/*

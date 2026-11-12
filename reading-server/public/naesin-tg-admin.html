@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>WB 탐구브레인 · 관리</title>
+  <style>
+    :root{--green:#2A3B2E;--acc:#3E6B4A;--soft:#e9f1ea;--bg:#f4f6f3;--line:#dde5dc;--muted:#6b7268;--ink:#222a24;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--green);color:#fff;flex-wrap:wrap}
+    header b{font-size:17px}header small{opacity:.75}header .sp{flex:1}
+    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
+    main{max-width:1080px;margin:auto;padding:18px 14px 60px}
+    .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    h2{margin:0 0 6px;color:var(--green);font-size:17px}
+    button{font:inherit;cursor:pointer}
+    input,select{font:inherit;min-height:42px;padding:8px 10px;border:1.5px solid #c6d5c4;border-radius:10px;background:#fff;color:var(--ink);width:100%}
+    label{display:block;font-size:13px;font-weight:700;color:var(--muted)}
+    .btn{min-height:42px;padding:6px 16px;border:0;border-radius:10px;background:var(--acc);color:#fff;font-weight:900}
+    .btn.ghost{background:#fff;border:1.5px solid #c6d5c4;color:var(--green)}
+    .btn.sm{min-height:34px;padding:4px 12px;font-size:13px}
+    .btn:disabled{opacity:.45;cursor:default}
+    .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--soft);color:var(--acc);font-size:12px;font-weight:800}
+    .tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:#fff4e6;color:var(--warn)}.tag.muted{background:#eef2ee;color:var(--muted)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:8px 0}
+    table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+    th{font-size:12.5px;color:var(--muted)}
+    .thumbs{display:flex;gap:8px;overflow-x:auto;padding:6px 0}.thumbs figure{margin:0;text-align:center;font-size:12px;color:var(--muted)}
+    .thumbs img{height:170px;border:1px solid var(--line);display:block}
+    .thumbs figure.ans img{outline:3px solid var(--warn)}
+    .qrow input,.qrow select{min-height:36px;padding:4px 8px}
+    .msg{margin:8px 0;padding:9px 12px;border-radius:10px;background:var(--soft);font-size:14px}.msg.bad{background:#fff0ef;color:var(--bad)}
+    .muted{color:var(--muted);font-size:13px}
+    #loginCard{max-width:380px;margin:60px auto}
+  </style>
+</head>
+<body>
+<header><b>WB 탐구브레인 · 관리</b><small>사회·과학 내신 — 원내 전용</small><span class="sp"></span><button class="hbtn" id="btnLogout">로그아웃</button></header>
+<main id="app"></main>
+<script src="/admin/admin-login.js"></script>
+<script>
+/* WB 탐구브레인 관리 웹 — 문제지 올리기·정답 확인·시험 배정·현황.
+   문제지 파일은 `node naesin-tg/extract/build-sheet.mjs <PDF>` 가 만든 JSON 이다(쪽 그림 포함).
+   정답은 여기서 강사가 번호별로 넣고, 다 찬 뒤에만 학생에게 열 수 있다(서버가 같은 규칙으로 막는다). */
+let TOKEN = localStorage.getItem('wbr.admin.token') || null;
+let SHEETS = [], UP = null, MSG = '', OV = null, DETAIL = null;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const SUBJ = { science: '과학', social: '사회', history: '역사', ethics: '도덕' };
+
+async function api(path, opt) {
+  const r = await fetch('/api/naesin-tg' + path, Object.assign({ headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) } }, opt || {}));
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401) { TOKEN = null; localStorage.removeItem('wbr.admin.token'); renderLogin('다시 로그인해 주세요.'); throw new Error('auth'); }
+  if (!r.ok) throw new Error(j.error || ('오류 ' + r.status));
+  return j;
+}
+const post = (path, body) => api(path, { method: 'POST', body: JSON.stringify(body) });
+
+function renderLogin(msg) {
+  $('#app').innerHTML = '<div class="card" id="loginCard"><h2>강사 로그인</h2><div id="loginHost"></div></div>';
+  WBAdminLogin.mount({ host: '#loginHost', message: msg || '', classes: { btn: 'btn' }, onToken: (t) => { TOKEN = t; try { localStorage.setItem('wbr.admin.token', t); } catch (e) {} refresh(); } });
+}
+
+async function refresh() {
+  if (!TOKEN) return renderLogin();
+  try { SHEETS = (await api('/admin/sheets')).sheets; OV = await api('/admin/overview'); } catch (e) { if (e.message !== 'auth') MSG = e.message; else return; }
+  render();
+}
+
+function upForm() {
+  if (!UP) return '<p class="muted">PDF 를 <code>build-sheet.mjs</code> 로 바꾼 JSON 파일을 고르세요. 이미 올린 문제지를 고치려면 아래 목록에서 [고치기]를 누르세요.</p><input type="file" id="file" accept=".json,application/json">';
+  const s = UP.sheet;
+  const opt = (v, cur, label) => '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>';
+  return '<div class="grid">'
+    + '<label>문제지 id<input id="f_id" value="' + esc(UP.id) + '"' + (UP.edit ? ' disabled' : '') + '></label>'
+    + '<label>제목<input id="f_title" value="' + esc(s.title) + '"></label>'
+    + '<label>과목<select id="f_subject">' + Object.keys(SUBJ).map((k) => opt(k, s.subject, SUBJ[k])).join('') + '</select></label>'
+    + '<label>학년<input id="f_grade" value="' + esc(s.grade || '') + '" placeholder="중2"></label>'
+    + '<label>단원<input id="f_unit" value="' + esc(s.unit || '') + '" placeholder="7-1 전기"></label>'
+    + '<label>단계<select id="f_step">' + [[1, '1 개념학습'], [2, '2 단원별 학습'], [3, '3 실전대비'], [4, '4 직전대비']].map((x) => opt(x[0], s.step, x[1])).join('') + '</select></label>'
+    + '<label>종류<select id="f_kind">' + opt('test', s.kind, '문제지') + opt('note', s.kind, '읽기 자료(요점정리·노트)') + '</select></label>'
+    + '<label>정답·해설 시작 쪽<input id="f_answerFrom" type="number" min="0" max="' + s.pages + '" value="' + (s.answerFrom || 0) + '"></label>'
+    + '<label>문항 수<input id="f_count" type="number" min="0" max="100" value="' + s.questions.length + '"></label>'
+    + '</div>'
+    + (UP.pages ? '<div class="thumbs">' + UP.pages.map((d, i) => '<figure class="' + (s.answerFrom && i + 1 >= s.answerFrom ? 'ans' : '') + '"><img src="' + d + '" alt="' + (i + 1) + '쪽">' + (i + 1) + '쪽' + (s.answerFrom && i + 1 >= s.answerFrom ? ' · 잠김' : '') + '</figure>').join('') + '</div>'
+      + '<p class="muted">주황 테두리 쪽은 학생이 제출한 뒤에만 보입니다. 정답·해설이 시작하는 쪽 번호가 맞는지 확인하세요.</p>' : '<p class="muted">쪽 그림은 이미 올라가 있습니다. 정보와 정답만 고칩니다.</p>')
+    + (s.kind === 'test' ? '<table><thead><tr><th style="width:70px">번호</th><th style="width:130px">유형</th><th style="width:90px">있는 쪽</th><th>정답 (객관식 3 또는 1,3 · 단답은 | 로 여러 개 · 서술형은 비움)</th></tr></thead><tbody>'
+      + s.questions.map((q, i) => '<tr class="qrow"><td>' + q.no + '</td><td><select data-q="' + i + '" data-k="type">' + opt('choice', q.type, '객관식') + opt('short', q.type, '단답') + opt('essay', q.type, '서술형') + '</select></td>'
+        + '<td><input data-q="' + i + '" data-k="page" type="number" min="1" max="' + s.pages + '" value="' + q.page + '"></td>'
+        + '<td><input data-q="' + i + '" data-k="answer" value="' + esc(q.answer) + '" aria-label="' + q.no + '번 정답"></td></tr>').join('') + '</tbody></table>' : '')
+    + '<div class="grid" style="margin-top:12px"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="f_open" style="width:auto;min-height:0"' + (s.open ? ' checked' : '') + '> 정답을 확인했고 학생에게 엽니다</label>'
+    + '<button class="btn" id="save">저장</button><button class="btn ghost" id="cancel">취소</button></div>';
+}
+
+function render() {
+  const cell = (st, id) => { const p = st.sheets[id]; return p ? '<button class="btn sm ghost" data-code="' + esc(st.code) + '" data-id="' + esc(id) + '">' + p.score + '/' + p.total + (p.wrongOpen ? ' · 오답 ' + p.wrongOpen : '') + (p.essayHold ? ' · 서술 ' + p.essayHold : '') + '</button>' : '<span class="muted">–</span>'; };
+  const tests = SHEETS.filter((s) => s.kind === 'test');
+  $('#app').innerHTML = (MSG ? '<div class="msg' + (MSG.startsWith('!') ? ' bad' : '') + '" role="status">' + esc(MSG.replace(/^!/, '')) + '</div>' : '')
+    + '<div class="card"><h2>문제지 올리기</h2>' + upForm() + '</div>'
+    + '<div class="card"><h2>올린 자료 ' + SHEETS.length + '건</h2><table><thead><tr><th></th><th>제목</th><th>과목·학년·단원</th><th>단계</th><th>쪽·문항</th><th>상태</th><th></th></tr></thead><tbody>'
+    + SHEETS.map((s) => '<tr><td><input type="checkbox" class="pick" value="' + esc(s.id) + '" style="width:auto;min-height:0" aria-label="' + esc(s.title) + ' 배정"></td><td><b>' + esc(s.title) + '</b><br><span class="muted">' + esc(s.id) + '</span></td><td>' + esc([SUBJ[s.subject], s.grade, s.unit].filter(Boolean).join(' · ')) + '</td><td>' + s.step + '</td><td>' + s.pages + '쪽' + (s.kind === 'test' ? ' · ' + s.count + '문항' : '') + '</td>'
+      + '<td>' + (s.open ? '<span class="tag">학생에게 열림</span>' : '<span class="tag warn">닫힘</span>') + '</td>'
+      + '<td><button class="btn sm ghost" data-edit="' + esc(s.id) + '">고치기</button> <button class="btn sm ghost" data-del="' + esc(s.id) + '">지우기</button></td></tr>').join('')
+    + '</tbody></table>'
+    + '<h2 style="margin-top:16px">시험 배정</h2><p class="muted">위에서 고른 자료를 시험 범위로 줍니다. 대상을 비우면 반 공통입니다. 저장하면 이전 배정을 바꿉니다.</p>'
+    + '<div class="grid"><label>대상(학생 코드, 비우면 반 공통)<input id="x_scope"></label><label>시험 이름<input id="x_title" placeholder="2학기 기말"></label><label>시험일<input id="x_date" type="date"></label><button class="btn" id="assign" style="align-self:end">배정 저장</button></div></div>'
+    + '<div class="card"><h2>현황</h2>' + (OV && OV.students.length ? '<div style="overflow-x:auto"><table><thead><tr><th>학생</th>' + tests.map((s) => '<th>' + esc(s.title) + '</th>').join('') + '</tr></thead><tbody>'
+      + OV.students.map((st) => '<tr><td><b>' + esc(st.name || st.code) + '</b><br><span class="muted">' + esc(st.cls) + '</span></td>' + tests.map((s) => '<td>' + cell(st, s.id) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>'
+      : '<p class="muted">아직 제출한 학생이 없습니다.</p>')
+    + (DETAIL ? detailHtml() : '') + '</div>';
+}
+
+function detailHtml() {
+  const d = DETAIL, wrong = Object.keys(d.wrong);
+  return '<h2 style="margin-top:16px">' + esc(d.code) + ' · ' + esc(d.id) + '</h2>'
+    + '<p>틀린 번호: ' + (wrong.length ? wrong.map((n) => '<span class="tag ' + (d.wrong[n].cleared ? 'muted' : 'bad') + '">' + n + '번' + (d.wrong[n].cleared ? ' (다시 맞힘)' : '') + '</span>').join(' ') : '없음') + '</p>'
+    + Object.keys(d.essays).map((n) => { const e = d.essays[n]; return '<div class="msg"><b>' + n + '번 서술형</b> ' + (e.self ? '<span class="tag muted">학생 표시: ' + (e.self === 'ok' ? '맞게 썼다' : '부족했다') + '</span> ' : '') + (e.verdict ? '<span class="tag">확정: ' + (e.verdict === 'pass' ? '통과' : '다시') + '</span>' : '') + '<br>' + (esc(e.text) || '<span class="muted">(빈 답)</span>')
+      + '<br><button class="btn sm" data-verdict="pass" data-no="' + n + '">통과</button> <button class="btn sm ghost" data-verdict="fail" data-no="' + n + '">다시</button></div>'; }).join('');
+}
+
+/* 화면의 입력을 UP 에 옮긴다 — 문항 수를 바꾸면 줄을 늘리거나 줄인다 */
+function readForm() {
+  const s = UP.sheet, v = (id) => { const el = $('#' + id); return el ? el.value.trim() : ''; };
+  if (!UP.edit) UP.id = v('f_id');
+  Object.assign(s, { title: v('f_title'), subject: v('f_subject'), grade: v('f_grade'), unit: v('f_unit'), step: Number(v('f_step')), kind: v('f_kind'), answerFrom: Number(v('f_answerFrom') || 0), open: $('#f_open').checked });
+  document.querySelectorAll('[data-q]').forEach((el) => { const q = s.questions[el.dataset.q]; if (q) q[el.dataset.k] = el.dataset.k === 'page' ? Number(el.value) : el.value.trim(); });
+  const n = Math.max(0, Math.min(100, Number(v('f_count') || 0)));
+  while (s.questions.length < n) s.questions.push({ no: s.questions.length + 1, type: 'choice', page: Math.min(s.pages, Math.max(1, (s.answerFrom || s.pages + 1) - 1)), answer: '' });
+  s.questions.length = n;
+}
+
+async function save() {
+  readForm();
+  const s = UP.sheet, wantOpen = s.open;
+  try {
+    /* 닫힌 채로 정보를 먼저 저장하고 → 쪽 그림 → 마지막에 연다. 중간에 끊겨도 반쯤 올라간 문제지가 학생에게 보이지 않는다. */
+    await post('/admin/sheet', { id: UP.id, sheet: { ...s, open: false } });
+    if (UP.pages) for (let i = 0; i < UP.pages.length; i += 1) { MSG = '쪽 그림 올리는 중 ' + (i + 1) + ' / ' + UP.pages.length; render(); await post('/admin/page', { id: UP.id, n: i + 1, data: UP.pages[i] }); }
+    if (wantOpen) await post('/admin/sheet', { id: UP.id, sheet: { ...s, open: true } });
+    MSG = '저장했습니다: ' + s.title + (wantOpen ? ' (학생에게 열림)' : ' (닫힘)'); UP = null;
+  } catch (e) { MSG = '!' + e.message; }
+  refresh();
+}
+
+document.addEventListener('change', (e) => {
+  if (e.target.id === 'file' && e.target.files[0]) {
+    e.target.files[0].text().then((t) => {
+      const j = JSON.parse(t);
+      if (!j.id || !j.sheet || !Array.isArray(j.pages)) throw new Error('build-sheet.mjs 가 만든 파일이 아니에요.');
+      j.sheet.questions = j.sheet.questions || []; j.sheet.pages = j.pages.length; UP = j; MSG = ''; render();
+    }).catch((err) => { MSG = '!' + err.message; render(); });
+  } else if (UP && ['f_count', 'f_answerFrom', 'f_kind'].includes(e.target.id)) { readForm(); render(); }
+});
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest('button'); if (!b) return;
+  try {
+    if (b.id === 'save') return save();
+    if (b.id === 'cancel') { UP = null; MSG = ''; return render(); }
+    if (b.dataset.edit) { const r = await api('/sheet?id=' + encodeURIComponent(b.dataset.edit)); UP = { id: r.sheet.id, sheet: r.sheet, pages: null, edit: true }; MSG = ''; render(); return window.scrollTo(0, 0); }
+    if (b.dataset.del) { if (!confirm('문제지와 쪽 그림을 지웁니다. 학생 기록은 남습니다. 지울까요?')) return; await post('/admin/sheet-delete', { id: b.dataset.del }); MSG = '지웠습니다.'; return refresh(); }
+    if (b.id === 'assign') {
+      const ids = [...document.querySelectorAll('.pick:checked')].map((x) => x.value);
+      const r = await post('/admin/exam', { scope: $('#x_scope').value.trim() || 'default', title: $('#x_title').value, examDate: $('#x_date').value, sheetIds: ids });
+      MSG = '배정했습니다: ' + (r.scope === 'default' ? '반 공통' : r.scope) + ' · ' + ids.length + '건'; return refresh();
+    }
+    if (b.dataset.code) { DETAIL = (await api('/admin/student?code=' + encodeURIComponent(b.dataset.code) + '&id=' + encodeURIComponent(b.dataset.id))).student; return render(); }
+    if (b.dataset.verdict) { await post('/admin/essay', { code: DETAIL.code, id: DETAIL.id, no: Number(b.dataset.no), verdict: b.dataset.verdict }); DETAIL.essays[b.dataset.no].verdict = b.dataset.verdict; return refresh(); }
+  } catch (err) { if (err.message !== 'auth') { MSG = '!' + err.message; render(); } }
+});
+$('#btnLogout').onclick = () => { TOKEN = null; localStorage.removeItem('wbr.admin.token'); renderLogin(); };
+refresh();
+</script>
+</body>
+</html>

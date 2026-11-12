@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>WB 탐구브레인 — 사회·과학 시험대비</title>
+  <meta name="description" content="사회·과학 내신 문제지를 지면 그대로 풀고 채점·오답까지 — WB 원내 전용">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#2A3B2E">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <style>
+    /* 국어브레인과 같은 색·글자·부품(형제 앱). 지면이 주인공이라 풀이 화면은 왼쪽 지면 + 오른쪽 답안 칸이다. */
+    :root {
+      --bg: #F4F2EE; --panel: #FFFFFF; --ink: #222A24; --soft: #5F665C; --line: #E3E1DA;
+      --ind: #3E6B4A; --ind-soft: #E9F1EA; --green: #218358; --green-soft: #E8F4EE;
+      --red: #B4482F; --red-soft: #FAEBE7; --amber: #85600F; --amber-soft: #F8F1DF;
+      --b1: #E4EBE3; --b3: #7D9B6A; --b4: #3E6B4A;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body { background: var(--bg); color: var(--ink);
+      font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      font-size: 14.5px; line-height: 1.65; word-break: keep-all; -webkit-font-smoothing: antialiased;
+      display: flex; flex-direction: column; }
+    button { font-family: inherit; font-size: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+    input, textarea { font-family: inherit; font-size: 1rem; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; }
+    textarea { resize: vertical; min-height: 88px; }
+    :focus-visible { outline: 2px solid var(--ind); outline-offset: 2px; border-radius: 6px; }
+
+    header { display: flex; align-items: center; gap: 12px; padding: 9px 16px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    .brand { font-weight: 800; letter-spacing: -.3px; }
+    .brand em { font-style: normal; color: var(--ind); }
+    .hstat { margin-left: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--ind-soft); color: var(--ind); font-weight: 700; white-space: nowrap; }
+    .chip.warn { background: var(--amber-soft); color: var(--amber); }
+    .chip.mut { background: #EFEEE9; color: var(--soft); }
+    .chip.bad { background: var(--red-soft); color: var(--red); }
+    nav.seg { display: flex; gap: 2px; padding: 6px 12px; background: var(--panel); border-bottom: 1px solid var(--line); overflow-x: auto; }
+    nav.seg button { min-height: 44px; padding: 7px 14px; border-radius: 8px; font-weight: 700; color: var(--soft); white-space: nowrap; }
+    nav.seg button.on { background: var(--ind); color: #fff; }
+
+    main { flex: 1; min-height: 0; overflow-y: auto; }
+    .wpad { padding: 16px; max-width: 860px; margin: 0 auto; }
+    .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+    .card h3 { margin: 0 0 8px; font-size: 15px; }
+    h2.sec { font-size: 13px; color: var(--soft); margin: 18px 2px 8px; font-weight: 700; }
+    .muted { color: var(--soft); } .small { font-size: 12.5px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .btn { min-height: 44px; padding: 9px 15px; border-radius: 9px; background: var(--ind); color: #fff; font-weight: 700; }
+    .btn.ghost { background: var(--ind-soft); color: var(--ind); }
+    .btn.mut { background: #EFEEE9; color: var(--soft); }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .list button { display: flex; width: 100%; text-align: left; gap: 10px; align-items: center; justify-content: space-between;
+      min-height: 52px; padding: 10px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); margin-bottom: 6px; }
+    .list button .t { font-weight: 700; }
+    .bar { height: 8px; border-radius: 999px; background: #EFEEE9; overflow: hidden; margin-top: 6px; }
+    .bar i { display: block; height: 100%; background: var(--b3); }
+    .big { font-size: 30px; font-weight: 800; letter-spacing: -1px; line-height: 1.1; }
+
+    /* ── 풀이 화면 ── */
+    #solve { flex: 1; min-height: 0; display: none; }
+    body.solving #solve { display: flex; }
+    body.solving main, body.solving nav.seg { display: none; }
+    .paper { flex: 1; min-width: 0; display: flex; flex-direction: column; background: #DAD7CF; }
+    .ptools { display: flex; gap: 6px; align-items: center; padding: 6px 10px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+    .ptools .btn { min-height: 44px; padding: 6px 12px; }
+    .ptools .pg { font-weight: 700; min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
+    .pview { flex: 1; overflow: auto; padding: 10px; }
+    /* 지면은 고치지 않는다 — 한 단만 크게 볼 때도 같은 그림의 보이는 범위만 바꾼다(2단 조판) */
+    .pframe { margin: 0 auto; max-width: 900px; overflow: hidden; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.18); }
+    .pframe img { display: block; width: 100%; height: auto; }
+    .pframe.left img { width: 200%; } .pframe.right img { width: 200%; margin-left: -100%; }
+    .answers { width: 340px; flex-shrink: 0; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); padding: 12px; }
+    .aq { padding: 10px 0; border-bottom: 1px solid var(--line); }
+    .aq.dim { opacity: .5; }
+    .aq .no { font-weight: 800; margin-bottom: 6px; display: flex; gap: 8px; align-items: center; }
+    .opts { display: flex; gap: 6px; }
+    .opts button { flex: 1; min-height: 44px; border-radius: 9px; border: 1px solid var(--line); font-weight: 700; font-size: 17px; }
+    .opts button.on { background: var(--ind); color: #fff; border-color: var(--ind); }
+    .opts button:disabled { cursor: default; }
+    .mark { font-weight: 800; } .mark.ok { color: var(--green); } .mark.no { color: var(--red); }
+    @media (max-width: 780px) {
+      body.solving #solve { flex-direction: column; }
+      .paper { flex: none; height: 56vh; }
+      .answers { width: auto; flex: 1; border-left: 0; border-top: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div class="brand">WB <em>탐구브레인</em></div>
+  <div class="hstat" id="hstat"></div>
+</header>
+<nav class="seg" id="tabs" aria-label="화면 고르기"></nav>
+<main><div class="wpad" id="view" aria-live="polite"></div></main>
+<div id="solve"></div>
+
+<script>
+/* WB 탐구브레인 — 학생 앱
+   정답과 채점은 서버에 있다. 이 화면이 아는 것은 쪽 그림과 "몇 번이 몇 쪽에 있다"뿐이다(reading-server/naesin-tg-api.mjs). */
+(function () {
+  'use strict';
+  var API = '/api/naesin-tg', AUTH = 'wbr.auth';
+  var TABS = [['today', '오늘'], ['note', '개념'], ['test', '문제'], ['wrong', '오답'], ['stat', '성취도']];
+  var STEPS = { 1: '개념학습', 2: '단원별 학습', 3: '실전대비', 4: '직전대비' };
+  var SUBJ = { science: '과학', social: '사회', history: '역사', ethics: '도덕' };
+  var S = { tab: 'today', token: null, home: null, err: null, cur: null };
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var CIRC = ['①', '②', '③', '④', '⑤'];
+
+  function api(path, opts) {
+    opts = opts || {};
+    var h = { 'Content-Type': 'application/json' };
+    if (S.token) h.Authorization = 'Bearer ' + S.token;
+    return fetch(API + path, { method: opts.method || 'GET', headers: h, body: opts.body ? JSON.stringify(opts.body) : undefined })
+      .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); });
+  }
+
+  function boot() {
+    try { S.token = JSON.parse(localStorage.getItem(AUTH) || 'null'); } catch (e) {}
+    if (S.token && typeof S.token === 'object') S.token = S.token.token || S.token.t;
+    $('tabs').innerHTML = TABS.map(function (t) { return '<button data-tab="' + t[0] + '">' + t[1] + '</button>'; }).join('');
+    $('tabs').onclick = function (e) { var b = e.target.closest('button'); if (b) { S.tab = b.dataset.tab; render(); } };
+    if (!S.token) { S.err = 'login'; return render(); }
+    refresh();
+  }
+  function refresh() {
+    return api('/sheets').then(function (r) {
+      if (r.status === 401) S.err = 'login';
+      else if (r.status !== 200) S.err = r.body.error || '불러오지 못했어요.';
+      else { S.err = null; S.home = r.body; }
+      render();
+    }).catch(function () { S.err = '서버에 닿지 못했어요. 인터넷을 확인해 주세요.'; render(); });
+  }
+
+  function dday() {
+    var ex = S.home && S.home.exam;
+    if (!ex) return null;
+    return Math.round((Date.parse(ex.examDate) - Date.parse(S.home.today)) / 86400000);
+  }
+  function statusChip(p) {
+    if (!p) return '';
+    if (p.submitted) return '<span class="chip' + (p.wrongOpen ? ' warn' : '') + '">' + p.score + ' / ' + p.total + (p.wrongOpen ? ' · 오답 ' + p.wrongOpen : '') + '</span>';
+    return p.drafted ? '<span class="chip mut">푸는 중 ' + p.drafted + '</span>' : '<span class="chip mut">안 풂</span>';
+  }
+  function sheetBtn(e) {
+    return '<button data-open="' + esc(e.id) + '"><span><span class="t">' + esc(e.title) + '</span><br><span class="small muted">'
+      + esc([SUBJ[e.subject], e.grade, e.unit, e.kind === 'test' ? e.count + '문제' : e.pages + '쪽'].filter(Boolean).join(' · ')) + '</span></span>'
+      + (e.kind === 'test' ? statusChip(S.home.progress[e.id]) : '') + '</button>';
+  }
+
+  function render() {
+    document.body.classList.remove('solving');
+    [].forEach.call($('tabs').children, function (b) { b.classList.toggle('on', b.dataset.tab === S.tab); if (b.dataset.tab === S.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    var v = $('view');
+    if (S.err === 'login') {
+      $('hstat').innerHTML = '';
+      v.innerHTML = '<div class="card"><h3>로그인이 필요해요</h3><p>학원에서 받은 코드로 먼저 로그인해 주세요. 한 번 로그인하면 영어·국어 앱과 같이 쓸 수 있어요.</p><a class="btn" style="display:inline-block;text-decoration:none" href="/">로그인하러 가기</a></div>';
+      return;
+    }
+    if (S.err) { v.innerHTML = '<div class="card"><h3>잠깐 문제가 생겼어요</h3><p>' + esc(S.err) + '</p><button class="btn" id="again">다시 불러오기</button></div>'; $('again').onclick = refresh; return; }
+    if (!S.home) { v.innerHTML = '<p class="muted">불러오는 중…</p>'; return; }
+    var d = dday(), H = S.home, tests = H.sheets.filter(function (e) { return e.kind === 'test'; }), notes = H.sheets.filter(function (e) { return e.kind === 'note'; });
+    $('hstat').innerHTML = (H.exam ? '<span class="chip' + (d != null && d <= 7 ? ' warn' : '') + '">' + esc(H.exam.title || '시험') + ' ' + (d > 0 ? 'D-' + d : d === 0 ? 'D-day' : '끝') + '</span>' : '<span class="chip mut">시험 미등록</span>');
+    var html = '';
+    if (!H.sheets.length) {
+      html = '<div class="card"><h3>아직 받은 자료가 없어요</h3><p class="muted">선생님이 시험 범위를 정하면 여기에 문제지가 보여요.</p></div>';
+    } else if (S.tab === 'today') {
+      var todo = tests.filter(function (e) { return !H.progress[e.id].submitted; }).sort(function (a, b) { return a.step - b.step; });
+      var wr = tests.reduce(function (n, e) { return n + (H.progress[e.id].wrongOpen || 0); }, 0);
+      var eh = tests.reduce(function (n, e) { return n + (H.progress[e.id].essayHold || 0); }, 0);
+      html = '<div class="card"><h3>오늘 할 일</h3>' + (todo.length ? '<p class="muted small">단계 순서대로 위에서부터 풀어요.</p><div class="list">' + todo.slice(0, 3).map(sheetBtn).join('') + '</div>'
+        : '<p>받은 문제지를 모두 풀었어요.</p>') + '</div>'
+        + (wr ? '<div class="card"><h3>다시 풀 오답 ' + wr + '문제</h3><p class="muted small">틀린 날과 다른 날 다시 맞히면 지워져요.</p><button class="btn ghost" data-go="wrong">오답 보러 가기</button></div>' : '')
+        + (eh ? '<div class="card"><h3>서술형 ' + eh + '문제</h3><p class="muted small">모범답안과 견주어 스스로 표시했는지 확인해요. 확정은 선생님이 해요.</p></div>' : '');
+    } else if (S.tab === 'note' || S.tab === 'test') {
+      var list = S.tab === 'note' ? notes : tests;
+      if (!list.length) html = '<div class="card"><p class="muted">' + (S.tab === 'note' ? '받은 개념 자료가 없어요.' : '받은 문제지가 없어요.') + '</p></div>';
+      [1, 2, 3, 4].forEach(function (st) {
+        var g = list.filter(function (e) { return e.step === st; });
+        if (g.length) html += '<h2 class="sec">' + st + '단계 · ' + STEPS[st] + '</h2><div class="list">' + g.map(sheetBtn).join('') + '</div>';
+      });
+    } else if (S.tab === 'wrong') {
+      var w = tests.filter(function (e) { return H.progress[e.id].wrongOpen; });
+      html = w.length ? '<p class="muted small">문제지를 열면 틀린 번호만 다시 답할 수 있어요.</p><div class="list">' + w.map(sheetBtn).join('') + '</div>'
+        : '<div class="card"><p>남은 오답이 없어요.</p></div>';
+    } else {
+      var done = tests.filter(function (e) { return H.progress[e.id].submitted; });
+      var sc = done.reduce(function (n, e) { return n + H.progress[e.id].score; }, 0), tt = done.reduce(function (n, e) { return n + H.progress[e.id].total; }, 0);
+      html = '<div class="card"><h3>푼 문제지</h3><div class="big">' + done.length + ' <span class="muted" style="font-size:16px">/ ' + tests.length + '</span></div>'
+        + '<div class="bar"><i style="width:' + (tests.length ? Math.round(done.length / tests.length * 100) : 0) + '%"></i></div></div>'
+        + '<div class="card"><h3>정답률</h3><div class="big">' + (tt ? Math.round(sc / tt * 100) + '%' : '–') + '</div><p class="muted small">' + sc + ' / ' + tt + '문제 (서술형 제외)</p></div>'
+        + (done.length ? '<div class="list">' + done.map(sheetBtn).join('') + '</div>' : '');
+    }
+    v.innerHTML = html;
+  }
+  $('view').onclick = function (e) {
+    var b = e.target.closest('[data-open],[data-go]');
+    if (!b) return;
+    if (b.dataset.go) { S.tab = b.dataset.go; return render(); }
+    openSheet(b.dataset.open);
+  };
+
+  /* ── 풀이 ── */
+  function openSheet(id) {
+    api('/sheet?id=' + encodeURIComponent(id)).then(function (r) {
+      if (r.status !== 200) { alert(r.body.error || '열지 못했어요.'); return; }
+      var b = r.body;
+      S.cur = { sheet: b.sheet, my: b.my, answers: b.answers || null, today: b.today, page: 1, col: 'all', pages: {}, draft: Object.assign({}, b.my.draft), msg: '' };
+      document.body.classList.add('solving');
+      drawSolve();
+    });
+  }
+  function loadPage(n) {
+    var C = S.cur;
+    if (C.pages[n]) return Promise.resolve(C.pages[n]);
+    return api('/page?id=' + encodeURIComponent(C.sheet.id) + '&n=' + n).then(function (r) {
+      if (r.status !== 200) throw new Error(r.body.error || '쪽을 불러오지 못했어요.');
+      return (C.pages[n] = r.body.page.data);
+    });
+  }
+  var saveTimer = null;
+  function saveDraft() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () { var C = S.cur; if (C && !C.my.done) api('/draft', { method: 'PUT', body: { id: C.sheet.id, answers: C.draft } }); }, 1200);
+  }
+  function lastPage() { var s = S.cur.sheet; return (s.answerFrom && !S.cur.my.done) ? s.answerFrom - 1 : s.pages; }
+  function canRetry(w) { return w && !w.cleared && w.dates[w.dates.length - 1] !== S.cur.today; }
+
+  function answerBox(q) {
+    var C = S.cur, done = C.my.done, w = C.my.wrong[q.no], retry = done && canRetry(w);
+    var val = done && !retry ? (done.answers[q.no] || '') : (retry ? (C.retry && C.retry[q.no]) || '' : C.draft[q.no] || '');
+    var lock = done && !retry;
+    var head = '<div class="no">' + q.no + '번 <span class="small muted">' + q.page + '쪽</span>';
+    if (done && q.type !== 'essay') {
+      head += done.marks[q.no] ? '<span class="mark ok">○ 맞음</span>' : (w && w.cleared ? '<span class="mark ok">다시 맞힘</span>' : '<span class="mark no">✕ 틀림</span>');
+      if (C.answers) head += '<span class="chip mut">정답 ' + esc(q.type === 'choice' ? String(C.answers[q.no]).replace(/[1-5]/g, function (c) { return CIRC[c - 1]; }) : String(C.answers[q.no]).split('|')[0]) + '</span>';
+    }
+    head += '</div>';
+    var body;
+    if (q.type === 'choice') {
+      var picked = String(val).replace(/[^1-5]/g, '');
+      body = '<div class="opts" role="group" aria-label="' + q.no + '번 답">' + CIRC.map(function (c, i) {
+        return '<button data-no="' + q.no + '" data-pick="' + (i + 1) + '" aria-pressed="' + (picked.indexOf(i + 1) >= 0) + '"' + (picked.indexOf(i + 1) >= 0 ? ' class="on"' : '') + (lock ? ' disabled' : '') + '>' + c + '</button>';
+      }).join('') + '</div>';
+    } else if (q.type === 'short') {
+      body = '<input data-no="' + q.no + '" aria-label="' + q.no + '번 답" value="' + esc(val) + '"' + (lock ? ' disabled' : '') + ' autocomplete="off">';
+    } else {
+      body = '<textarea data-no="' + q.no + '" aria-label="' + q.no + '번 서술형 답"' + (lock ? ' disabled' : '') + '>' + esc(val) + '</textarea>';
+      var e = done && C.my.essays[q.no];
+      if (e) body += '<div class="row" style="margin-top:6px"><span class="small muted">모범답안과 견주어 보면</span>'
+        + '<button class="btn ghost" data-self="ok" data-no="' + q.no + '" aria-pressed="' + (e.self === 'ok') + '">' + (e.self === 'ok' ? '● ' : '') + '맞게 썼다</button>'
+        + '<button class="btn mut" data-self="no" data-no="' + q.no + '" aria-pressed="' + (e.self === 'no') + '">' + (e.self === 'no' ? '● ' : '') + '부족했다</button>'
+        + (e.verdict ? '<span class="chip' + (e.verdict === 'pass' ? '' : ' bad') + '">선생님 확정: ' + (e.verdict === 'pass' ? '통과' : '다시') + '</span>' : '') + '</div>';
+    }
+    if (retry) body += '<button class="btn" style="margin-top:8px" data-retry="' + q.no + '">다시 풀기 제출</button>';
+    else if (done && w && !w.cleared) body += '<p class="small muted" style="margin:6px 0 0">내일부터 다시 풀 수 있어요.</p>';
+    return '<div class="aq' + (q.page === C.page || done ? '' : ' dim') + '">' + head + body + '</div>';
+  }
+
+  function drawSolve() {
+    var C = S.cur, s = C.sheet, done = C.my.done, last = lastPage();
+    var left = s.questions.filter(function (q) { return !C.draft[q.no]; }).length;
+    $('solve').innerHTML = '<div class="paper"><div class="ptools">'
+      + '<button class="btn mut" id="back">← 목록</button>'
+      + '<button class="btn ghost" id="prev"' + (C.page <= 1 ? ' disabled' : '') + ' aria-label="앞 쪽">‹</button><span class="pg">' + C.page + ' / ' + last + '쪽</span>'
+      + '<button class="btn ghost" id="next"' + (C.page >= last ? ' disabled' : '') + ' aria-label="다음 쪽">›</button>'
+      + ['all', 'left', 'right'].map(function (c) { return '<button class="btn ' + (C.col === c ? '' : 'mut') + '" data-col="' + c + '" aria-pressed="' + (C.col === c) + '">' + { all: '전체', left: '왼쪽 단', right: '오른쪽 단' }[c] + '</button>'; }).join('')
+      + (done && s.answerFrom ? '<button class="btn ghost" id="expl">정답·해설 쪽</button>' : '')
+      + '</div><div class="pview"><div class="pframe ' + C.col + '"><img id="pimg" alt="' + esc(s.title) + ' ' + C.page + '쪽"></div></div></div>'
+      + (s.kind === 'test' ? '<div class="answers"><div class="row" style="justify-content:space-between"><strong>' + esc(s.title) + '</strong>'
+        + (done ? '<span class="chip">' + done.score + ' / ' + done.total + '</span>' : '') + '</div>'
+        + '<p class="small muted" style="margin:4px 0 0" role="status">' + esc(C.msg || (done ? '채점했어요. 틀린 문제는 해설 쪽을 읽어 보세요.' : '지금 쪽의 문제가 진하게 보여요.')) + '</p>'
+        + s.questions.map(answerBox).join('')
+        + (done ? '' : '<button class="btn" id="submit" style="width:100%;margin-top:12px">제출하고 채점하기' + (left ? ' (안 푼 ' + left + '문제)' : '') + '</button>')
+        + '</div>' : '');
+    loadPage(C.page).then(function (d) { var im = $('pimg'); if (im) im.src = d; }).catch(function (e) { C.msg = e.message; });
+  }
+  $('solve').onclick = function (e) {
+    var C = S.cur, b = e.target.closest('button');
+    if (!b || !C) return;
+    if (b.id === 'back') { clearTimeout(saveTimer); if (!C.my.done) api('/draft', { method: 'PUT', body: { id: C.sheet.id, answers: C.draft } }); S.cur = null; return refresh(); }
+    if (b.id === 'prev') C.page -= 1;
+    else if (b.id === 'next') C.page += 1;
+    else if (b.id === 'expl') C.page = C.sheet.answerFrom;
+    else if (b.dataset.col) C.col = b.dataset.col;
+    else if (b.dataset.pick) {
+      var box = C.my.done ? (C.retry = C.retry || {}) : C.draft, no = b.dataset.no, cur = String(box[no] || '').replace(/[^1-5]/g, '');
+      box[no] = cur.indexOf(b.dataset.pick) >= 0 ? cur.replace(b.dataset.pick, '') : cur + b.dataset.pick;
+      if (!box[no]) delete box[no];
+      if (!C.my.done) saveDraft();
+    } else if (b.dataset.self) {
+      return api('/essay', { method: 'POST', body: { id: C.sheet.id, no: Number(b.dataset.no), self: b.dataset.self } }).then(function (r) {
+        if (r.status === 200) C.my.essays[b.dataset.no].self = b.dataset.self; else C.msg = r.body.error; drawSolve();
+      });
+    } else if (b.dataset.retry) {
+      var n = b.dataset.retry;
+      return api('/retry', { method: 'POST', body: { id: C.sheet.id, no: Number(n), answer: (C.retry && C.retry[n]) || '' } }).then(function (r) {
+        if (r.status !== 200) C.msg = r.body.error;
+        else { var w = C.my.wrong[n]; if (r.body.retry.ok) { w.cleared = C.today; C.msg = n + '번을 다시 맞혔어요. 오답에서 지웠어요.'; } else { w.dates.push(C.today); C.msg = n + '번은 아직이에요. 해설을 다시 읽고 내일 한 번 더 풀어요.'; } }
+        drawSolve();
+      });
+    } else if (b.id === 'submit') {
+      var left = C.sheet.questions.filter(function (q) { return !C.draft[q.no]; }).length;
+      if (!confirm((left ? '안 푼 문제가 ' + left + '개 있어요. ' : '') + '제출하면 고칠 수 없어요. 제출할까요?')) return;
+      clearTimeout(saveTimer);
+      return api('/submit', { method: 'POST', body: { id: C.sheet.id, answers: C.draft } }).then(function (r) {
+        if (r.status !== 200) { C.msg = r.body.error || '제출하지 못했어요.'; return drawSolve(); }
+        var id = C.sheet.id; S.cur = null; openSheet(id);
+      });
+    } else return;
+    drawSolve();
+  };
+  $('solve').addEventListener('input', function (e) {
+    var C = S.cur, no = e.target.dataset && e.target.dataset.no;
+    if (!C || !no) return;
+    var box = C.my.done ? (C.retry = C.retry || {}) : C.draft;
+    if (e.target.value.trim()) box[no] = e.target.value; else delete box[no];
+    if (C.my.done) return;
+    saveDraft();
+    /* 글자를 칠 때마다 화면을 다시 그리면 커서가 달아난다 — 남은 문제 수만 고친다 */
+    var left = C.sheet.questions.filter(function (q) { return !C.draft[q.no]; }).length;
+    if ($('submit')) $('submit').textContent = '제출하고 채점하기' + (left ? ' (안 푼 ' + left + '문제)' : '');
+  });
+
+  boot();
+})();
+</script>
+</body>
+</html>

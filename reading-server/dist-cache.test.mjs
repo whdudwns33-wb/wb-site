@@ -184,7 +184,7 @@ t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/hanja/*·/letter/*·/ad
   const distText = fs.readFileSync(path.join(DIST, '_headers'), 'utf8');
   assert.strictEqual(distText, fs.readFileSync(path.join(HERE, '..', 'reading', '_headers'), 'utf8'), 'dist/_headers 는 reading/_headers 그대로여야 한다');
   const rules = parseHeaders(distText);
-  for (const p of ['/naesin/*', '/naesin-ko/*', '/vocab/*', '/haru/*', '/hanja/*', '/chunk/*', '/letter/*', '/admin/*']) {
+  for (const p of ['/naesin/*', '/naesin-ko/*', '/naesin-tg/*', '/vocab/*', '/haru/*', '/hanja/*', '/chunk/*', '/letter/*', '/admin/*']) {
     assert.ok(rules[p], p + ' 규칙이 없다 — 그 앱의 옛 화면이 브라우저 캐시에 굳는다');
     assert.strictEqual(rules[p]['Cache-Control'], 'no-store', p);
   }
