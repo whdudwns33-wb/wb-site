@@ -20480,8 +20480,22 @@ function studentLessonReferenceItems(studentId) {
 function rosterStudentLessonTasks(studentId) {
   const stableId = String(studentId || '');
   if (!stableId) return [];
+  const date = today();
   return (readLessonTasks() || []).filter(task => isRegularLessonTask(task) &&
-    String(task.studentId || '') === stableId).slice().sort((a, b) => {
+    String(task.studentId || '') === stableId).filter(task => {
+    if (task.end && task.end < date) return false;
+    // 과거 기록은 그대로 두고 현재 수업 목록에서만 종료된 시간표를 제외한다.
+    const slots = Array.isArray(task.scheduleSlots) ? task.scheduleSlots : [];
+    if (!slots.length) return true;
+    const from = task.start && task.start > date ? task.start : date;
+    return slots.some(slot => {
+      if (!slot || !Array.isArray(slot.days) || !slot.days.length) return false;
+      const start = String(slot.validFrom || slot.startDate || '');
+      const end = String(slot.validTo || slot.endDate || '');
+      return (!end || end >= from) && (!task.end || !start || start <= task.end) &&
+        (!start || !end || start <= end);
+    });
+  }).slice().sort((a, b) => {
       const teacherA = (staffById(a.staffId) || {}).name || '';
       const teacherB = (staffById(b.staffId) || {}).name || '';
       return String(a.subject || a.className || '').localeCompare(String(b.subject || b.className || ''), 'ko') ||
@@ -20824,7 +20838,8 @@ function rosterStudentSubjects(student) {
 
 function rosterStudentCanDelete(student) {
   if (!String(student && student.name || '').trim()) return false;
-  if (rosterStudentLessonTasks(student.id).length || rosterStudentSubjects(student).length) return false;
+  if ((readLessonTasks() || []).some(task => isRegularLessonTask(task) &&
+    String(task.studentId || '') === String(student.id || '')) || rosterStudentSubjects(student).length) return false;
   if (String(student.billingMode || 'monthly') !== 'monthly') return false;
   if (rosterStudentSubscriptions(student).length) return false;
   return ![
