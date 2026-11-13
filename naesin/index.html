@@ -195,6 +195,7 @@
     .q .qmeta { font-size: 12px; font-weight: 800; color: var(--soft); margin-bottom: 10px; }
     .q .prompt { font-size: 1.2rem; font-weight: 800; color: var(--ink); margin: 4px 0 16px; line-height: 1.6; }
     .q .prompt.sm { font-size: 1.02rem; font-weight: 500; }
+    .q .prompt.one { font-size: 1.9rem; letter-spacing: -.01em; line-height: 1.3; margin-bottom: 20px; }
     .choices { display: flex; flex-direction: column; gap: 8px; }
     .choices button { text-align: left; background: var(--panel); border: 1px solid var(--line);
       border-radius: 9px; padding: 12px 15px; font-weight: 500; font-size: 15px; min-height: 44px; }
@@ -291,6 +292,13 @@
       .boards { grid-template-columns: 1fr; }
       .big3 .n { font-size: 28px; }
       .bar .who { font-size: 11.5px; }   /* 세로 태블릿에서도 보인다 — 「다른 학생으로 연동」 입구가 사라지면 안 된다 */
+    }
+    @media (max-width: 600px) {
+      /* 휴대폰: 머리 줄이 세 줄이 되어 화면 위 1/5을 먹던 것 — 탭을 둘째 줄 전체 폭으로 내린다 */
+      .bar { gap: 4px 10px; padding: 6px 12px 8px; }
+      .bar .seg { order: 9; flex: 1 1 100%; }
+      .bar .seg button { flex: 1 1 0; padding: 7px 4px; }
+      .bar .who { min-height: 40px; }
     }
 
     /* ── 수업 띠(타임박스) ──
@@ -1719,7 +1727,7 @@
         ((w.antonyms || []).length ? '<p class="muted">반의어: ' + esc(w.antonyms.join(', ')) + '</p>' : '') +
         '</div>';
     } else {
-      workHtml += '<p class="muted">왼쪽 목록에서 단어를 선택하면 상세 정보가 표시됩니다.</p>';
+      workHtml += '<p class="muted">목록에서 단어를 선택하면 상세 정보가 표시됩니다.</p>';
     }
     layoutSplit(listHtml, workHtml);
     $('wRows').onclick = function (e) {
@@ -2496,7 +2504,7 @@
       (stage <= 2 || st.reached ? chunks + notes : '<p class="muted">청크·구문 해설은 2단계(영어 청크 배열)까지 표시됩니다.</p>') +
       '</div>' +
       (!ckg.open
-        ? '<div class="notice">먼저 이 단락의 「' + ZONE_MEAN + '」(청크 뜻)을 마쳐야 문장 사다리가 열립니다. 왼쪽 목록의 청크 항목부터 시작하십시오.</div>'
+        ? '<div class="notice">먼저 이 단락의 「' + ZONE_MEAN + '」(청크 뜻)을 마쳐야 문장 사다리가 열립니다. 목록의 청크 항목부터 시작하십시오.</div>'
         : (wordLocked
           ? '<div class="notice">단어 선행 기준(' + g.done + '/' + g.total + ' 도달) 충족 전에는 5·6단계가 잠깁니다. 단어 암기를 먼저 완성하십시오.</div>'
           : '<button class="btn p big" id="stageGo">' + (st.reached ? '단락 백지 시험 다시 보기' : stage + '단계 학습 시작 — ' + STAGE_NAMES[stage]) + '</button>')) +
@@ -3007,7 +3015,8 @@
     var pd = packDB();
     var stored = storedToRunner(pack.items || []);
     if (quizSource && !stored.some(function (q) { return q.stored.source === quizSource; })) quizSource = '';
-    var types = quizTypes();
+    /* 생성 유형은 재료가 있어야 문제가 나온다 — 빈 유형을 눌러 「출제할 문항이 없습니다」를 보지 않게 목록에서 뺀다 */
+    var types = quizTypes().filter(function (t) { return GEN_KEYS.indexOf(t.key) < 0 || t.make().length; });
     var wrongs = Object.keys(pd.wrong).filter(function (k) { return !pd.wrong[k].cleared; });
     if (!selType || (selType !== 'wrong' && selType.slice(0, 2) !== 'g-' && !types.some(function (t) { return t.key === selType; }))) selType = types[0].key;
     var groups = [];
@@ -3744,7 +3753,7 @@
       var ptxt = item.prompt != null ? String(item.prompt) : promptOf(item);
       root.innerHTML = head +
         (item.koFull ? '<div class="prompt sm" style="color:var(--soft)">' + esc(item.koFull) + '</div>' : '') +
-        '<div class="prompt' + (item.prompt != null ? '' : ' sm') + '">' + esc(ptxt) + ttsBtnHtml(item, 'chTts') + '</div><div class="choices" id="chs"></div></div>';
+        '<div class="prompt' + (item.prompt != null ? (/^[A-Za-z'’-]{1,24}$/.test(String(item.prompt).trim()) ? ' one' : '') : ' sm') + '">' + esc(ptxt) + ttsBtnHtml(item, 'chTts') + '</div><div class="choices" id="chs"></div></div>';
       wireTtsBtn(item, 'chTts');
       var chs = $('chs');
       var list = item.choices.slice();
