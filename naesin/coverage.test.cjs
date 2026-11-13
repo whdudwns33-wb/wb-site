@@ -32,6 +32,30 @@ t('gradeToken — 명부 표기가 흔들려도 같은 토큰으로 모은다', 
 });
 
 /* ── 배정 해석: 서버 규약과 같아야 한다 ── */
+t('classScope — 반 키는 정규화하되 내부 공백·학생 코드·default를 구분한다', () => {
+  eq(C.classScope('  A반  '), 'cls:A반');
+  eq(C.classScope('가반'), C.classScope('가반'), 'NFC가 같은 반은 같은 키');
+  eq(C.classScope('A  반'), 'cls:A  반', '서로 다른 반 이름을 합치지 않는다');
+  eq(C.classScope('default'), 'cls:default');
+  eq(C.classScope('cls'), 'cls:cls');
+  for (const bad of ['', '   ', null, undefined, 123, {}, 'A\n반', 'A\t반', 'A\u0000반', 'A\u007f반', 'A'.repeat(81)])
+    eq(C.classScope(bad), '', JSON.stringify(bad));
+  eq(C.classScope('A'.repeat(80)), 'cls:' + 'A'.repeat(80));
+});
+
+t('examFor — 학생 → 반 → 전체 공통, 다른 반은 적용되지 않는다', () => {
+  const exams = [{ scope: 'default', expired: true }, { scope: 'cls:가반' }, { scope: 'ST1' }];
+  eq(C.examFor(exams, 'ST1', '가반').scope, 'ST1');
+  exams[2].expired = true;
+  eq(C.examFor(exams, 'ST1', '  가반 ').scope, 'cls:가반');
+  eq(C.examFor(exams, 'ST2', '나반').scope, 'default');
+  eq(C.examFor(exams, 'ST1').scope, 'default', '기존 두 인자 호출은 그대로 공통 폴백');
+  exams[1].expired = true;
+  eq(C.examFor(exams, 'ST1', '가반').scope, 'default', '만료된 반은 지난 공통보다도 우선하지 않는다');
+  eq(C.examFor(exams.slice(1), 'ST1', '가반'), null, '학생·반 만료 뒤 공통도 없으면 배정 없음');
+  eq(C.examFor([{ scope: 'cls' }, { scope: 'cls:cls' }], 'cls', 'cls').scope, 'cls', '기존 학생 코드 cls 호환');
+});
+
 t('examFor — 개별 배정이 살아 있으면 그것, 만료면 반 공통으로 내려온다', () => {
   const exams = [
     { scope: 'default', packIds: ['2022-ne-kimgitaek-m2-L6'] },
@@ -83,6 +107,15 @@ t('combos — 문법이 아닌 팩 id 는 어느 조합에도 세지 않는다(�
 });
 
 /* ── 불일치 경고: 모를 때 침묵하는가 ── */
+t('mismatches — 반 배정과 학생 개별 우선순위를 실제 명부로 판정한다', () => {
+  const exams = [{ scope: 'default', packIds: ['2022-ne-kimgitaek-m2-L6'] },
+    { scope: 'cls:A', packIds: ['2022-bisang-hwangjongbae-m2-L6'] },
+    { scope: 'S1', packIds: ['2022-ne-kimgitaek-m2-L6'] }];
+  eq(C.report({ roster: ROSTER, books: BOOKS, exams }).mismatches.map(s => s.code), ['S2', 'S3']);
+  exams[1].expired = true;
+  eq(C.report({ roster: [ROSTER[1]], books: BOOKS, exams }).mismatches, []);
+});
+
 t('mismatches — 다른 교과서·다른 학년 팩이 배정되면 잡는다', () => {
   const exams = [{ scope: 'default', packIds: ['2022-bisang-hwangjongbae-m2-L6'] }];
   const r = C.report({ roster: [ROSTER[0]], books: BOOKS, packs: [], exams: exams });

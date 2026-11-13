@@ -3,6 +3,23 @@
 이그잼포유(EXAM4YOU) 구매 자료를 구조화해 재원생에게 무료 제공하는 원내 전용 학습 앱.
 정본 기획서: `docs/영어내신-학습웹앱-기획서-v1.md` (v1.2 — §14 혁신안 5가지 포함).
 
+**2026-10-12 운영 기준**: 사용자가 학원 내 사용·반출 금지를 확인했다. 중2 → 중3 → 중1 순서로 도입한다.
+새 PC 정본 운영과 실제 자료 반입·검증 기준은 `docs/내신브레인-원내PC-실운영-계획.md`를 따른다.
+아래의 기존 Drive·Claude·KV 제작 설명은 이전 구성이다. 원내 보관 모드에서는 구매 원천을 외부 AI로 보내지 않는다. 스튜디오의 「PC 자료 불러오기」로 로컬 추출 후보와 원본 PDF를 연결하고 나란히 대조·교정·검수한다. 파일·JSON 입력과 본문 줄 대응은 「고급 입력」에 남아 있으며 자동 승인·게시는 하지 않는다.
+
+학생 연동은 `/?app=naesin`에서 요청 → 교사 승인 → `/naesin/`으로 이어진다. 기존 계정도 영어 시험 API로 재확인하며 독해 프로필 설정·동기화·저장은 실행하지 않는다. 원내 관리 화면의 학생 QR은 영어 힌트를 붙이고 외부 관리 화면에서는 원내 주소를 안내한다.
+
+영어 듣기는 원내 PC에 Kokoro가 설정되면 기존 듣기 버튼에서 PC 생성 WAV를 재생한다. `start-local.ps1`은 `%LOCALAPPDATA%/WB/voice-tools/kokoro-venv/Scripts/python.exe`가 있으면 `WB_KOKORO_PYTHON`·`WB_KOKORO_HOME`을 설정한다. 해당 환경에는 `kokoro==0.9.4`·CPU PyTorch·soundfile·영어 spaCy 모델과 `models` 아래 Kokoro-82M·`af_heart`가 미리 설치돼 있어야 한다. [공식 Kokoro](https://github.com/hexgrad/kokoro)의 모델은 별도 비공개 경로에 두며 Git·정적 배포에 넣지 않는다.
+
+2026-10-16 사용자가 배정 본문 음성의 PC 사전 생성·보관을 승인했다. 서버는 학생→반→공통의 현재 배정과 권리를 확인해 본문·청크·대화·문항의 영어 듣기 원문을 모은다. 학생과 같은 `WBVoice.audioParts`로 180자 이하로 나누고 중복을 합쳐, 하나의 로컬 작업자로 **비공개 `DATA_DIR/naesin-audio/<음성모델·원문 해시>.wav`**에 미리 생성한다. 완료 파일은 원자적으로 교체하며 기동 시 검사·재사용한다. 배정·팩 변경은 1분 이내에 반영하고 최근 학습·현재 여는 단원을 우선 준비한다. 과거 파일을 자동 삭제하지 않으므로 전체 복구 때 이 폴더도 원내 비공개로 보관한다. 잃어도 교재 원본에서 재생성할 수 있다.
+
+`POST /api/naesin/tts`는 인증·원내망·현재 팩 배정/권리·본문 조각 일치를 검사한 뒤 **완료된 파일만 읽으며 합성을 기다리지 않는다.** 미준비·손상 파일은 425 `AUDIO_PREPARING`을 즉시 반환하고 백그라운드 준비에서 재생성한다. 속도 0.5~2는 학생 기기의 `playbackRate`로 조절해 속도별 음성을 다시 만들지 않는다. `GET /api/naesin/admin/audio`는 원내 관리자에게 숫자·팩별 준비 현황만 돌려주며 관리 화면이 30초마다 갱신한다. `status.json`에는 원문 없이 같은 준비 현황만 저장한다.
+
+음성 폴더는 정적 경로·Git·워커·외부 Tunnel에 노출하지 않는다. Python은 모델 오프라인 모드로 실행하며 구매 원문을 파일·로그·외부 서비스에 쓰지 않는다. WAV 응답은 `no-store`, 학생 앱은 한 번 듣는 본문의 조각을 기기당 두 요청씩 받아 PCM 형식·길이를 검증한 뒤 임시 메모리에서 한 WAV로 합친다(최대 64MB). 구간마다 파일을 다시 열지 않아 화면의 종료 이벤트가 지연돼도 본문 중간에 멈추지 않는다. 미준비 조각이 있으면 재생 전에 알리며, 재생·취소 후 Blob URL을 해제한다. 계정 교대·연결 이탈은 재생과 대기 요청을 취소한다. Kokoro 설정이 없는 서버와 자체 창작 체험은 기존 기기 음성을 유지하며, 구매 자료는 로컬 음성만 허용한다.
+
+문항의 `sourceImages`는 PC에서 미리 만든 PNG의 SHA-256 목록(최대 3개)이다. 원내 전용 `/api/naesin/item-image?id=<팩>&item=<문항>&index=0`이 기존 팩 배정·권리 검사를 거친 뒤 `naesin-materials/question-images/<해시>.png`만 읽는다. 워커·정적 자산에는 등록하지 않고 응답·학생 기기 모두 이미지를 저장하지 않는다. `sourceImageRequired`인 문제는 첫 원문을 표시한 뒤 답을 고를 수 있다. 원문은 문항 번호로 찾는 해당 문제 쪽이며, 정답·해설 쪽과 본문 빈칸 문제(source=00)는 제공하지 않는다. 구매 원문은 외부 AI로 보내지 않고 PC에서만 렌더링한다.
+영어 PC의 학생 Bearer는 영어 API와 명시된 공용 인증·알림 경로만 사용한다. 다른 앱의 학생 API는 403이며, 기존 명부 권한·관리자·일반 Node·워커 계약과 별도 가족·서비스 자격은 유지한다. 자세한 범위는 위 실운영 계획을 따른다.
+
 **최종 도달 목표 3가지** — 모든 설계가 여기로 정렬된다:
 ① 본문 영→한 해석 ② 백지에 영어 지문 전체 쓰기 ③ 시험 전 단어 100% 완성(안정화).
 
@@ -21,6 +38,7 @@ naesin/
   pack-validate.mjs 팩 검증기 CLI (파일 병합 + pack-check.js 위임)
   pack-sample.json  자체 창작 체험 팩 — 테스트 픽스처 겸 미연동 데모 (커밋 가능한 유일한 팩)
   coverage.js       팩 커버리지 — 재원생 교과서·학년 조합 ↔ 보유 팩 (관리 웹 전용)  [WBNaesinCoverage]
+  readiness.js      시험 준비도 — 반 성취도에서 70% 이상 학생 비율·평균·확정 미달·학생별 축을 표시 [WBNAESINREADY]
   *.test.cjs        각 모듈 테스트 (node로 바로 실행)
 reading-server/
   naesin-api.mjs    /api/naesin/* 라우트 (worker.mjs·server.mjs 양쪽에 등록)
@@ -29,14 +47,19 @@ reading-server/
   naesin-live.mjs     수업 라이브 세션 — 단계(타임박스)·투사 문제·라이브 보드 행 (순수 함수)
   naesin-extract.mjs  AI 추출 — 원천 텍스트 → 종류별 JSON (Claude, fetch 주입 가능)
   public/naesin-admin.html   관리 웹(운영) — 팩 업로드·시험 등록·반 성취도·교과서별 자료 준비·팩 커버리지·문항 신고
-  public/naesin-studio.html  관리 웹(제작) — 원천 붙이기 → AI 추출 → 검수 → 배포
+  public/naesin-studio.html  관리 웹(제작) — PC 자료 연결 → 원본 PDF 대조·교정 → 검수 → 배포
   public/naesin-live.html    관리 웹(수업) — 반 현황·타임박스·투사 모드 (강사 노트북)
 ```
 
-핵심 데이터 흐름: **PDF(구매 자료) → [추출·검증] → 팩 JSON → 관리 웹 업로드 → KV
-(`naesin:pack:<id>`) → 학생 앱이 인증 후 로드**. 팩은 저장소·정적 자산에 절대 없다.
+핵심 데이터 흐름: **PDF(구매 자료) → 로컬 추출 → PC 자료 불러오기 → 원본 PDF 대조·교정·검수 → 팩 검사·게시 → PC DB → 반 배정 → 원내 학생 앱이 인증 후 로드**.
+문제 전용 팩은 `contentMode: "questions"`와 빈 `words`·`sentences` 배열을 명시한다. 문항·정답 검사는 동일하게 적용하며 학생 홈은 진단 대신 문제 풀이를 연다. `extract/question_draft.py`는 원내 자료실의 단원별 문항·정답 위치를 미검수 후보로 변환한다. 쪽 구성·공통 지문·소문항 답은 교사가 대조해야 하고, 정답 미대응은 게시를 막는다. 제작 화면의 **검수 완료 문항 게시·반 배정**은 승인·교정 완료 문항만 별도 `-questions` 팩으로 게시하며, 미검토·버림 문항은 제외한다. 기존 반 범위는 유지하고 팩을 추가한다.
+워커의 기존 KV 어댑터도 호환되지만 PC 운영 전환 후 두 서버에 학생 기록을 동시에 쓰지 않는다. 팩은 저장소·정적 자산에 절대 없다.
+
+문제 팩에도 승인된 `sentences`를 함께 게시할 수 있다. 같은 단원에서 문제와 본문 암기를 선택하며 빈 본문은 표시하지 않는다. `extract/passage_draft.py`는 워크북 4의 연속 문장 번호와 같은 번호의 해석 정답을 연결한다. 워크북이 없는 본문은 같은 PDF 쪽의 양쪽 열에서 문장 수가 일치할 때만 대응한다. 문장 전체를 하나의 뜻 단위로 보존하며 세부 구문을 추측해 나누지 않는다. 구문 단위가 하나인 문장의 어순 연습은 원문 낱말 배열을 사용한다. 원본·해석·위치 기록은 원내 PC 초안에 보관하고 학생 팩에는 원천 위치를 싣지 않는다.
 
 ## 학생 앱 동작 요약
+
+학습용 배정(`mode: practice`)은 최대 500개 팩을 허용한다. 20개를 넘으면 학생은 자기 배정의 `/api/naesin/catalog` 메타 목록에서 **학년 → 출판사·저자 → 단원** 순서로 고른다. 학년이나 교과서를 바꾸면 그 안의 첫 단원을 열고, 단원 목록은 해당 학년·교과서만 표시한다. 마지막 선택과 단원별 학습 기록은 기존 방식으로 유지한다. 구매 본문과 문제는 선택한 한 단원만 받아 메모리에서 열고, 이전 단원 원문은 교체한다. 실제 날짜가 있는 시험 배정은 기존 20개 상한과 범위 통합 학습을 유지한다. 문장 구두점 수가 서로 다른 병렬 본문은 영어·한글 열을 같은 쪽 단위로 보존하며 화면에 쪽 전체 암기 단위임을 표시한다.
 
 - **진단**: 팩 진입 첫 세션은 2분 사전 인출 진단(4지선다+모름) → 아는 단어는 신규 큐 건너뜀
 - **단어**: SRS + 판정 퀴즈(응답마다 확신도 3버튼) · '완료' = 도달 후 **서로 다른 날 3회**
@@ -55,28 +78,35 @@ reading-server/
 - **브레인덤프**: 매일 2분, 판정 없는 자유 인출(diff만 표시)
 - **성취도 탭**: 단어 안정화·해석 통과·백지 암송 문장별 체크 + **종이 백지시험 ○× 입력**
   (○는 암송 기록으로 환류) + 시험일 설정
-- 상태는 localStorage(`wbn.v1`) 정본 + 연동 학생은 서버 백업(`state.summary`가 관리
-  overview의 원천). 미연동 기기는 `pack-sample.json` 체험 모드.
+- 학습 중 기록은 학생별 localStorage(`wbn.v1:<학생코드>`)에 저장하고 서버와 과별 최신 시각으로 병합한다.
+  `state.summary`가 관리 overview의 원천이다. 구매 팩 본문은 기기에 영구 캐시하지 않으며, 연결 이탈·계정 변경 시 화면에서 회수한다.
+  미연동 기기는 자체 창작 `pack-sample.json` 체험 모드다.
+
+- **문제 풀이**: 저장 문제는 자료 선택(전체·PRE-STEP·예상문제 1회/2회·문법 객관식/주관식) 후 단일 정답·복수 정답·주관식으로 고른다. 원문 번호와 출처를 표시하고 기존 채점·해설·오답 재시험을 사용한다. 자료 선택은 오늘의 배정 과제나 범위 모의시험을 제한하지 않는다. 주관식은 등록된 허용 답안과 대조하며 자유 서술형 의미 채점을 하지 않는다.
+  새 PC 반입 문항은 원천 후보의 `id`를 유지해 전체 연번이 달라져도 오답·검수·신고가 다른 문제로 옮겨가지 않는다. `id` 없는 옛 팩은 유일한 번호의 기존 `i-no` 기록을 유지하고, 동번호가 여러 개면 출처·섹션·번호·각주 복합키로 구분한다. 애매한 옛 번호 기록은 임의로 연결하지 않는다. 공유 팩 검사에서 실제로 풀 수 없는 유형·빈 문제/정답·보기 불일치·중복 식별자를 게시 전에 차단한다.
 
 ## 서버 API (naesin-api.mjs)
 
 학생(토큰)
 - `GET /pack?id=` → `{pack, updatedAt}` — **자기 유효 시험의 `packIds`에 든 팩만**, 아니면 403
-- `GET/PUT /state` → `{state, updatedAt}` — 300KB(UTF-8 바이트). `state.summary`는 서버가
+- `GET/PUT /state` → `{state, updatedAt}` — 요청 300KB, 병합 후 256KB(UTF-8 바이트).
+  다른 학생 owner는 거절하고, 같은 과는 최신 `savedAt`을 유지한다(동률은 기존 기록). 서버가 보존한 기록이 있으면 PUT 응답의 `state`를 기기가 반영한다. `state.summary`는 서버가
   화이트리스트로 정규화해 저장·출력한다(숫자 강제·문자열 길이 제한) — 학생 기기가 올린 값이
   강사 화면에 그대로 그려지지 않게 하는 관문
-- `GET /exam` → `{exam:{examDate, packIds, wordDeadlineDays?}, scope}` — 개별 배정(만료 전) →
-  반 공통(`default`) → 빈 값. **만료 = `examDate < 오늘(KST)`** (`resolveExam`)
-- `GET /task` → `{task, scope}` — `task.updatedAt`이 학생 앱 완료 기록의 `taskAt` 원천
+- `GET /exam` → `{exam:{examDate, packIds, wordDeadlineDays?}, scope}` — 학생 배정(만료 전) →
+  반 배정(`cls:<반>`, 만료 전) → 공통(`default`, 지난 날짜도 유지) → 빈 값.
+  응답 scope는 `student`·`class`·`default`·null이다. **만료 = `examDate < 오늘(KST)`** (`resolveExam`).
+- `GET /task` → `{task, scope}` — 오늘의 반 과제 → 공통 과제 순서. `task.updatedAt`이 학생 앱 완료 기록의 `taskAt` 원천
 
 관리(PIN)
 - 팩: `POST /admin/pack {id, pack}` (4.5MB, packId 일치) · `GET /admin/packs` ·
   `DELETE /admin/pack {id}` — 배정에 쓰이는 팩이면 409 + `scopes`
 - 시험: `POST /admin/exam {scope, examDate, packIds, wordDeadlineDays?}` (실제 달력 날짜 검증) ·
   `GET /admin/exams` → `{exams:[{scope, examDate, packIds, expired, …}]}` · `DELETE /admin/exam {scope}`
-- 과제: `GET/POST /admin/task` — `typeKeys`는 서버 화이트리스트(`TASK_TYPE_KEYS` + `g-<n>`),
+  scope는 기존 학생 코드·`default`와 `cls:<반>`을 받는다. 반 이름은 NFC·앞뒤 공백만 정규화하며 1~80자, 제어문자는 금지한다. 학생 코드 `cls`는 기존 개별 배정이다.
+- 과제: `GET/POST/DELETE /admin/task?scope=cls:<반>` — scope 생략은 기존 `default`. `typeKeys`는 서버 화이트리스트(`TASK_TYPE_KEYS` + `g-<n>`),
   학생 앱 `quizTypes()`·관리 웹 `TYPE_LIST`와 같은 목록이어야 한다
-- `GET /admin/overview` → 학생별 `summary`(정규화본) + 과제 완료 열
+- `GET /admin/overview` → 학생별 `summary`(정규화본) + 과제 완료 열 + 적용 과제 `assignedTask`(없으면 null)
 - 교과서 지정표: `GET /admin/books` → `{books, updatedAt}` · `PUT /admin/books {books}` →
   `{books, count, updatedAt}`. `books` 는 `{학생코드: 교과서코드}` 한 칸짜리 표이고 **PUT 은 전체
   교체**다(빈 값 = 지정 해제, 한 줄이라도 형식이 틀리면 전부 거절). 교과서 코드 목록과 대조하지
@@ -91,10 +121,12 @@ reading-server/
   `GET /admin/reports?packId=` → 문항별로 묶어 건수 내림차순 · `POST /admin/reports/resolve {packId, id|itemRef}`
 - 수업 라이브(naesin-live.mjs, 계약 L1): 학생 `GET /live` → `{live:{phase, projector}, scope}` —
   **투사 문제의 `answerKey`는 공개(revealed) 전까지 응답에 없고, 지금 띄운 문제 하나만 내려간다** ·
-  학생 `POST /live/answer {ref, key}` (지금 화면의 문제만, 정답 여부는 돌려주지 않는다) · 관리
+  학생 `POST /live/answer {ref, key, scope?}` (지금 화면의 문제만, scope 지정 시 자기 적용 세션과 일치해야 한다; 정답 여부는 돌려주지 않는다) · 관리
   `GET /admin/live` → `{live, votes, board, weakest}` (폴링 한 번으로 세션·응답 분포·반 현황) ·
   `POST /admin/live/phase {phase|null}` (endsAt 은 서버가 분 입력에서 계산 — 강사 노트북 시계를 믿지 않는다) ·
-  `POST /admin/live/projector {items|null, index?, revealed?}` · `DELETE /admin/live`.
+  `POST /admin/live/projector {packId, items|null, index?, revealed?}` · `DELETE /admin/live`.
+  관리 라이브 요청은 모두 `?scope=cls:<반>`을 받으며 생략은 기존 `default`. 반별 응답·현황·삭제를 분리하고 학생은 현재 반 세션 → 공통 순서로 받는다.
+  투사 내용은 학생의 시험 범위 packId와 대조한다. packId 없는 기존 투사 문제는 학생에게 숨기며 강사가 다시 시작해야 한다.
   세션은 `updatedAt` 이 4시간을 넘으면 없는 것으로 본다 — 방치된 단계가 다음 날 학생 화면에 남지 않게.
 - 팩 단건: `GET /admin/pack?id=` → `{pack, updatedAt}` — 강사 화면이 즉석 문제를 만들 때 쓴다
   (문제 생성은 학생 앱과 같은 `gen.js` 로 화면에서 한다)
@@ -104,6 +136,8 @@ reading-server/
   `POST /admin/job/publish {jobId}` · `DELETE /admin/job {jobId}`.
   **배포 관문은 CLI 검증기와 같은 함수**(`pack-check.js`)를 쓴다 — 규칙을 복제하면 "검증기는
   통과인데 배포가 막히는" 상태가 생긴다. 원천은 `naesin:jobsrc:*`에만 있고 작업을 지우면 함께 지운다.
+  로컬 PDF 후보는 원내 PC의 `localPdfReview` capability가 있을 때만 받는다. 「PC 자료 불러오기」는 Node의 원내 관리자 전용 `GET /admin/job/local-review?id=`로 검수 초안·원본 정보를 읽고 `GET /admin/job/local-pdf?id=&source=02|03&sha256=`로 확인값이 같은 원본만 표시한다. 두 경로는 저장·검수 상태를 변경하지 않고 워커에는 없다. 기존과 같은 단어 후보는 재업로드 없이 교정·검수·메모·버전을 유지한다. 원본 위치·검토 표시로 개별 대조하며 학생 팩에서는 해당 메타를 제거한다. 본문 미대응 열과 PDF 표시용 데이터는 브라우저 메모리에만 두고 작업 이동·로그아웃 때 회수한다. 영·한 대응과 청크·핵심어는 교사가 「고급 입력」에서 구성하며 자동 승인하지 않는다.
+  학생 필드·배열 형태와 필수 내용을 공용 관문에서 검증한다. 검수 원천·알 수 없는 배열은 새 업로드/발행에서 거절하며 기존 저장 팩을 자동 변경하지 않는다.
 
 공통: 몸통은 파싱 전 `content-length`로 끊는다(팩 4.5MB / 그 외 300KB). 학생 삭제(퇴원)는
 `naesin:state:<코드>`·`naesin:exam:<코드>`까지 지운다 — 같은 코드를 재사용해도 앞 학생 기록이
@@ -154,7 +188,11 @@ reading-server/
    업로드 → 시험 등록. packId 규칙: `<개정>-<출판사저자>-<학년>-L<과>`
    (예: `2022-ne-kimgitaek-m2-L6`).
 
-### 원천 자료 인테이크 — 구글 드라이브에 PDF 그대로
+### 이전 원천 자료 인테이크 — 구글 드라이브에 PDF 그대로
+
+**현재 영어 자료 받기·모으기 규칙(이그잼포유 → Aside → 원내 PC 자료실 `library/` + `index.json`)은 `docs/자료-폴더-표준.md` §7이 정본이다.**
+
+이 절의 Drive·Claude 제작은 이전 구성이다. 현재 원내 PC의 구매 원천은 외부 AI로 보내지 않으며 위의 PC 자료 연결과 실운영 계획을 따른다.
 
 원장이 구매 자료 **PDF 를 드라이브에 올리면**, 그 PDF 를 **Claude Code 세션에서 읽어** 팩 JSON 을
 만들고, 관리 웹 제작 스튜디오에 **파일로 넣어** 검수·배포한다. 텍스트로 바꿔 올릴 필요가 없다.
@@ -244,15 +282,18 @@ PDF 를 서버가 파싱하지 않는 이유는 그대로다 — 워커에 PDF �
 **원천 PDF 는 어디에도 커밋되지 않는다.** 드라이브와 원장 기기에만 있고, 저장소에는
 산출물(팩 JSON)조차 올라가지 않는다(팩은 KV 로만 간다, §9.3).
 
-**제작 스튜디오(`/admin/naesin-studio.html`)가 4~5를 맡는다**: 작업을 만들고 → **초안 JSON 을
-파일로 넣고**(세션에서 만든 것) → **자동 대조가 잡은 행만** 검수(`j`/`k` 이동, `a` 승인,
-`x` 버림, `e` 편집)하고 나머지는 일괄 승인 → 배포. 전수 검토는 현실적으로 안 하므로
-**검사 규칙의 촘촘함이 곧 팩 품질**이다(그래서 `pack-check.js` 를 CLI 검증기와 공유한다).
+**현재 제작 스튜디오(`/admin/naesin-studio.html`)의 교사 순서**: 작업을 열고 → **PC 자료 불러오기**
+→ **원본 PDF와 후보를 나란히 대조** → 오류·누락을 편집해 저장하거나 맞는 행을 승인
+(`j`/`k` 이동, `a` 승인, `x` 버림, `e` 편집) → 모든 미검수·검사 오류를 해소한 뒤 배포.
+PDF 후보는 일괄 승인하지 않는다. 본문은 「고급 입력」에서 교사가 영어·한글 줄 대응과
+직독직해 청크·핵심어를 직접 구성해야 한다. 자동 검사 관문은 CLI와 같은 `pack-check.js`를 쓰며
+PDF를 표시하거나 자동 검사를 통과한 것만으로 교사 대조를 대신하지 않는다.
 **배포는 학생에게 서빙이 아니다** — 시험 범위에 넣어야 받는다(운영 화면의 팩 커버리지 카드가
 어느 쪽이 빠졌는지 짚어 준다).
 
-첫 팩(NE능률(김기택) 중2 L6: 단어 77·문장 25·청크 74·대화 6·패턴 2·문항 20 샘플)은
-원장이 JSON 사본을 보관 중이며 KV에 업로드되어 있다.
+첫 팩(NE능률(김기택) 중2 L6: 단어 77·문장 25·청크 74·대화 6·패턴 2·문항 20 샘플)의
+KV 업로드 설명은 2026-09-03 기록이다. 현재 실자료 반입·검수·게시 여부의 증거는
+`docs/내신브레인-원내PC-실운영-계획.md`를 확인하며 과거 샘플 업로드를 실수업 완료로 보지 않는다.
 
 ## 현재 상태 (2026-09-03)
 
@@ -412,7 +453,7 @@ Claude Code 세션이 PDF 를 읽어 팩 JSON 을 만들고, 앱은 검수·배�
 - 문항 확장: Grammar 객관식 21~45 + 워크북(07)·주관식(09) 전량, 내용정리 점검 문항
 - AI 채점: 해석 청크 enum 판정(+KV 캐시·표본 감사, §14-2) · 백지 실패 원인 라우팅 ·
   종이 답안 촬영 채점(§14-3) — Claude API는 vocab-api.mjs의 호출 패턴·ai-quota 재사용
-- 회복 triage(targetRefs 역인덱스) · 결석 감지→개입 카드 · 라이브 세션을 반별(scope=cls)로 · 학부모 D-day 브리핑(§14-5,
+- 회복 triage(targetRefs 역인덱스) · 결석 감지→개입 카드 · ~~라이브 세션을 반별(scope=cls)로~~ ✅ 2026-10-12 · 학부모 D-day 브리핑(§14-5,
   기존 발송 승인 워크플로우 경유) · ~~21:00 푸시에 내신 복습 포함~~ ✅
 - 관리: ~~학교↔교과서 매핑~~ ✅ 2026-10-11 — 학교를 거치지 않고 **학생 → 교과서** 한 칸으로 풀었다
   (「교과서별 자료 준비」카드 · `coverage.js`). 학교 기준 매핑은 desk 자료원장이 정본으로 남는다

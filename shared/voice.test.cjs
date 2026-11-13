@@ -229,6 +229,43 @@ t('순차 발화는 완료마다 이어지고 중지·옛 핸들 취소는 새 �
   assert.strictEqual(errors, 0);
 });
 
+t('로컬 전용은 같은 언어의 localService true만 고르고 기존 기본 목소리는 바꾸지 않는다', () => {
+  const b = browser();
+  const remote = { lang: 'en-US', name: '자체 테스트 원격', default: true, localService: false };
+  const local = { lang: 'en-GB', name: '자체 테스트 로컬', localService: true };
+  b.engine.voices = [remote, { lang: 'ko-KR', localService: true }, local];
+  assert.strictEqual(b.voice.voiceFor('en'), remote);
+  assert.strictEqual(b.voice.voiceFor('en', { localOnly: true }), local);
+  assert.strictEqual(b.voice.hasVoice('en', { localOnly: true }), true);
+  const onlyLocal = b.voice.speak('A toy is blue.', { lang: 'en', localOnly: true });
+  assert.strictEqual(onlyLocal.voice, local);assert.strictEqual(onlyLocal.lang, 'en-GB');onlyLocal.onend();
+  assert.strictEqual(b.voice.speak('A toy is round.', { lang: 'en' }).voice, remote);
+});
+
+t('원격만·다른 언어의 로컬·빈 목록·미확인 localService는 로컬 전용 발화와 기본 음성 폴백을 막는다', () => {
+  for (const voices of [[], [{ lang: 'en-US', localService: false }], [{ lang: 'ko-KR', localService: true }],
+    [{ lang: 'en-US' }], [{ lang: 'en-US', localService: 'true' }]]) {
+    const b = browser(), errors = [];
+    b.engine.voices = voices;
+    let created = 0;b.context.SpeechSynthesisUtterance = function () { created++; };
+    const result = b.voice.speak('A self-created sentence.', { lang: 'en', localOnly: true, onerror: why => errors.push(why), onend: () => assert.fail('오류는 성공이 아니다') });
+    assert.strictEqual(result, null);assert.strictEqual(created, 0);assert.strictEqual(b.sent.length, 0);
+    assert.deepStrictEqual(errors, ['local-voice-unavailable']);assert.strictEqual(b.voice.hasVoice('en', { localOnly: true }), false);
+  }
+});
+
+t('순차 발화는 토막마다 로컬 제한을 지키고 중간에 로컬 음성이 사라지면 다음 원격 발화를 막는다', () => {
+  const b = browser(), errors = [];let ended = 0;
+  const remote = { lang: 'en-US', localService: false, default: true }, local = { lang: 'en-US', localService: true };
+  b.engine.voices = [remote, local];
+  b.voice.speakSeq(['One self-created sentence.', 'Another self-created sentence.'], { lang: 'en', localOnly: true, onend: () => ended++, onerror: why => errors.push(why) });
+  assert.strictEqual(b.sent[0].voice, local);b.sent[0].onend();assert.strictEqual(b.sent[1].voice, local);b.sent[1].onend();
+  assert.strictEqual(ended, 1);
+  b.voice.speakSeq(['Local first.', 'Remote forbidden.'], { lang: 'en', localOnly: true, onend: () => ended++, onerror: why => errors.push(why) });
+  b.engine.voices = [remote];b.sent[2].onend();assert.strictEqual(b.sent.length, 3);
+  assert.deepStrictEqual(errors, ['local-voice-unavailable']);assert.strictEqual(ended, 1);
+});
+
 t('clock — 분:초 표시', () => {
   assert.strictEqual(V.clock(0), '0:00');
   assert.strictEqual(V.clock(7000), '0:07');

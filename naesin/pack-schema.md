@@ -42,8 +42,19 @@
   + `functions[]` + `vocabSidebar[]` + `readingQA[]`
 - `patterns.json` → `patterns[]: { patternNo, title, conceptKo, grammarPoint[][]?,
   textbookExamples[{en,ko,origin}], letsUseIt[] }`
-- `items-*.json` → `items[]: { no, footnoteNo, formatType, instructionKo, isNegative,
+- `items-*.json` → `items[]: { id?, source?, section?, no, footnoteNo?, formatType, instructionKo, isNegative,
   answerCount, stimulus{type,parts[]}, choices[{label,text|tuple}], answer[], explanationKo }`
+
+저장 문항의 `formatType`은 `mcq`(객관식), `mcq_multi`(복수 선택), `short`(주관식)이다. `no`와
+있는 경우의 `footnoteNo`는 양의 정수다. 선택지는 고유 라벨과 텍스트 또는 문자열 `tuple`을 가지며,
+정답 라벨은 선택지에 있어야 한다. 주관식 `answer[]`는 허용 답안 문자열들로, `answerCount`를
+허용 답안 개수로 해석하지 않는다. `choices`는 생략하거나 빈 배열로 둔다. 문항문은
+`instructionKo`와 기존 별칭(`promptKo`·`stem`·`questionKo`·`question`), 지문은 `stimulus.parts[].text`를 쓴다.
+
+선택 `id`는 영숫자로 시작하는 1~60자의 영숫자·`.`·`_`·`:`·`-`이고 팩 안에서 고유해야 한다.
+로컬 시험 문항의 후보 ID를 그대로 보존하여 누락 문항을 보완하거나 순서를 바꿔도 검수·오답 기록이
+다른 문항으로 이동하지 않게 한다. `id`가 없는 기존 문항은 `(source, section, no, footnoteNo)`
+복합키로 구분하며, 서로 다른 자료의 같은 번호는 허용한다. 기존 저장 팩은 자동 변경하지 않는다.
 
 ## 본문 문장 상세 (`sentences.json`)
 
@@ -120,3 +131,8 @@ node naesin/pack-validate.mjs <팩 디렉터리>
 청크 연결과 `en` 일치 · 정답-보기 정합 · packId 일치. 오류는 배포 차단, 경고는 검수 화면 확인 대상.
 `oddOneItems`·`checkItems`는 개수만 요약에 나온다 — 내용 정합(조각을 지면에서 찾을 수 있는가,
 보기가 겹치지 않는가)은 생성기가 `null`로 걸러 내고 `naesin/gen.test.cjs`가 지킨다.
+
+
+## 권리 메타데이터 (필수)
+
+팩 루트에 `rights`를 둔다: `basis`는 `self_authored|open_license|licensed`, `holder`, `evidenceRef`, `studentUseAllowed`, `derivativeUseAllowed`, `externalAiAllowed`, 선택 `expiresAt`(YYYY-MM-DD)와 `notes`. 학생 배포에는 권리자와 학생 이용·2차 제작 허용이 확인되어야 하며, 공개 라이선스·별도 계약은 증빙 참조가 필수다. 만료일이 지난 권리는 차단한다. 외부 AI 전송은 `externalAiAllowed: true`인 경우에만 가능하다. 기존 팩은 자동 인정하지 않는다. 운영자가 실제 약관·라이선스·계약 증빙을 확인하며, 이 코드는 법률 판단을 대신하지 않는다. 자체 제작 데모는 이를 명시한다.

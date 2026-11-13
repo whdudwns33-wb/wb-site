@@ -13,9 +13,9 @@
     /* 중학생 전용 학습 시스템 — D(스플릿 워크스페이스) 골격 + E(프로그레스 보드) 홈.
        주 기기 태블릿 가로, 보조 노트북. 놀이 요소 없이 목록·지면·숫자로만 말한다. */
     :root {
-      --bg: #F2F4F7; --panel: #FFFFFF; --ink: #1C2430; --soft: #667382; --line: #E2E6EC;
+      --bg: #F2F4F7; --panel: #FFFFFF; --ink: #1C2430; --soft: #5F6E7E; --line: #E2E6EC;
       --ind: #4A56C9; --ind-soft: #EDEFFB; --green: #218358; --green-soft: #E8F4EE;
-      --red: #C2402E; --red-soft: #FBEBE8; --amber: #B27B16; --amber-soft: #F8F1DF;
+      --red: #B93B29; --red-soft: #FBEBE8; --amber: #805911; --amber-soft: #F8F1DF;
       --b1: #DCE9F7; --b2: #A9CBEF; --b3: #5E9BE0; --b4: #1F6BC4;
       --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
     }
@@ -37,6 +37,8 @@
     .seg { display: flex; background: var(--bg); border-radius: 9px; padding: 3px; }
     .seg button { padding: 7px 16px; border-radius: 7px; font-size: 13.5px; font-weight: 700; color: var(--soft); white-space: nowrap; }
     .seg button.on { background: var(--panel); color: var(--ind); box-shadow: 0 1px 3px rgba(20,30,60,.12); }
+    .bar .seg { min-width: 0; max-width: 100%; overflow-x: auto; }
+    .bar .seg button { flex: none; min-width: 44px; min-height: 44px; }
     .bar .who { margin-left: auto; font-size: 12.5px; color: var(--soft); text-align: right; line-height: 1.35;
       padding: 4px 6px; border-radius: 6px; min-height: 44px; display: inline-flex; align-items: center; }
     .bar .who b { color: var(--ink); }
@@ -283,7 +285,9 @@
     /* ── 반응형: 세로 패드·폰 — 목록이 위로 접힌다 ── */
     @media (max-width: 880px) {
       .wrap { flex-direction: column; }
-      .list { width: 100%; max-height: 38vh; border-right: none; border-bottom: 1px solid var(--line); }
+      .list { width: 100%; max-height: 38vh; overflow-y: auto; border-right: none; border-bottom: 1px solid var(--line); }
+      .list .rows { flex: none; overflow: visible; }
+      .list .hdr { position: static; }
       .boards { grid-template-columns: 1fr; }
       .big3 .n { font-size: 28px; }
       .bar .who { font-size: 11.5px; }   /* 세로 태블릿에서도 보인다 — 「다른 학생으로 연동」 입구가 사라지면 안 된다 */
@@ -389,37 +393,55 @@
   /* 저장 키는 학생 코드별이다 — 공용 태블릿에서 앞 학생의 기록이 다음 학생에게 섞이지 않게.
      미연동 기기는 'wbn.v1:demo'. 옛 단일 키 'wbn.v1'은 부팅 때 1회 이관한다. */
   var KEY = 'wbn.v1:demo', LEGACY_KEY = 'wbn.v1';
-  /* 팩 캐시는 시험 범위 전체다 — 실제 시험은 보통 2~3개 과라 '마지막 교재' 하나만 캐시하면
-     오프라인에서 범위의 나머지 과가 통째로 사라진다. 옛 단일 키('wbn.pack')는 부팅 때 이관한다. */
-  var PACKS_CACHE_KEY = 'wbn.packs', LEGACY_PACK_CACHE_KEY = 'wbn.pack';
   var DEMO_PACK_ID = 'sample-demo-L0';
   var $ = function (id) { return document.getElementById(id); };
   var pack = null, DB = null, view = 'home';
   var PACKS = {};              // 시험 범위 팩 전부 {packId: pack} — pack 은 그중 '지금 보는 과'
-  var authed = false, examServer = null, packList = [];
-  var selSeq = null, selWordId = null, selType = null, selDlg = null;
+  var authed = false, examServer = null, packList = [], packCatalog = [], packRead = 0;
+  var localSpeech = false;
+  var sessionCode = null, sessionToken = null, studyStopped = false, accessTimer = null, pendingRemote = null;
+  var selSeq = null, selWordId = null, selType = null, selDlg = null, quizSource = '';
   /* 본문 탭에서 문장이 아닌 항목을 고른 상태 — {kind:'chunk'|'para'|'cum'|'check', day, i}.
      null 이면 selSeq(문장)가 지면의 주인이다. */
   var selPass = null;
   var wordFilter = 'all';      // 단어 목록 필터 — 'unfinished' 는 회고 칩에서 들어온 미완성만 보기
   var taskServer = null, resultServer = null;
-  var offlineMode = false;     // 연동 기기인데 서버가 닿지 않아 마지막 교재 캐시로 여는 중
   var demoMode = false;        // 체험 교재(pack-sample)로 열린 상태 — 미연동 기기 또는 배정 전 연습
   var DUMP_MAX = 20, LOG_MAX = 50;   // 기록 상한 — state 256KB 계약을 넘기지 않기 위해
 
   /* ── 저장소·동기화 ──
      save()   : 로컬 쓰기만(savedAt 안 올림) — 원격에서 받아 적거나 서버 값 반영 같은 '내 학습이 아닌' 변경
      persist(): 학습 결과 — savedAt 갱신 + 팩별 savedAt + 서버 push 예약 */
-  function loadDB() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {} }
+  function recoverStateStamps(state) {
+    if (!state || typeof state !== 'object') return state;
+    var limit = Date.now() + 5 * 60e3;
+    /* 시계 교정 전의 저장 시각은 모름(0)으로만 바꾼다. 학습 내용·due·last는 그대로 보존한다. */
+    [state].concat(Object.values(state.packs || {})).forEach(function (rec) {
+      if (rec && typeof rec.savedAt === 'number' && rec.savedAt > limit) rec.savedAt = 0;
+    });
+    return state;
+  }
+  function loadDB() { try { return recoverStateStamps(JSON.parse(localStorage.getItem(KEY) || 'null')); } catch (e) { return null; } }
+  function save() {
+    if (!checkAccount()) return false;
+    try {
+      localStorage.setItem(KEY, JSON.stringify(DB));
+      clearBanner('local-save');
+      return true;
+    } catch (e) {
+      showBanner('이 기기에 저장하지 못했어요. 서버 동기화를 확인하세요.', 'local-save');
+      return false;
+    }
+  }
   /* 이번 persist 에서 savedAt 을 올려야 할 과들. 통합 범위 학습은 한 세션에서 여러 과의 단어를
      같이 푼다 — 현재 과만 올리면 다른 과의 기록이 '오래된 것'으로 남아 다른 기기의 옛 기록에
      덮인다(pullAdopt 는 팩별 savedAt 으로 병합한다). */
   var touchedPacks = {};
   function touchPack(pid) { if (pid != null) touchedPacks[pid] = 1; }
-  function persist() {
+  function persist(pid) {
+    if (!checkAccount()) return;
     DB.savedAt = Date.now();
-    if (pack) touchPack(pack.packId);
+    if (pid != null) touchPack(pid); else if (pack) touchPack(pack.packId);
     Object.keys(touchedPacks).forEach(function (pid) {
       var pd = DB.packs[pid];
       if (!pd) return;
@@ -468,6 +490,35 @@
   }
   function setLast(label, resume) { DB.last = { packId: pack.packId, label: label, resume: resume || null, at: Date.now() }; }
   function auth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
+  function checkAccount() {
+    if (studyStopped) return false;
+    if (!sessionCode) return true;
+    var a = auth();
+    if (a && String(a.code || '') === sessionCode && a.token === sessionToken && DB && DB.owner === sessionCode) return true;
+    stopStudy('account-changed');
+    return false;
+  }
+  function stopStudy(reason) {
+    if (studyStopped) return;
+    studyStopped = true;
+    clearTimeout(syncTimer); clearInterval(accessTimer); clearTimeout(liveAutoId);
+    accessTimer = null; pendingRemote = null;
+    if (RQ && RQ.timerId) clearInterval(RQ.timerId);
+    RQ = null; liveStop(); liveState = null;
+    closeRunner(); pjClose();
+    if (window.WBVoice) WBVoice.stop();
+    localSpeech = false;
+    packRead++;pack = null; PACKS = {}; packList = []; packCatalog = []; examServer = null; taskServer = null; resultServer = null;
+    authed = false; quizSource = ''; selType = null;
+    ['rBody', 'rCount', 'pjNo', 'pjCh', 'pjMsg', 'whoLine'].forEach(function (id) { $(id).innerHTML = ''; });
+    $('liveBar').hidden = true; $('saveDot').hidden = true;
+    $('ddayBadge').textContent = '';
+    clearPackCache();
+    fatal('<h2>' + (reason === 'account-changed' ? '연동 학생이 바뀌었습니다' : '학원 연결을 확인해 주세요') + '</h2>' +
+      '<p class="muted">교재를 닫았습니다. 학습 기록은 보존됩니다. ' + (reason === 'account-changed' ? '새로고침해 현재 학생으로 다시 시작하세요.' : '학원 학습존에 연결한 뒤 다시 시작하세요.') + '</p>' +
+      '<button class="btn p" id="retryBtn">다시 시작</button>');
+    $('retryBtn').onclick = function () { location.reload(); };
+  }
   /* ── 학원 달력 (KST) ──
      서버는 시험 만료·과제 날짜를 늘 KST 로 판정하고(naesin-api todayKst), 관리 웹도 KST 로 적는다.
      학생 앱만 기기 시간대로 견주면 시간대가 어긋난 태블릿에서 배정된 과제가 조용히 안 뜨고
@@ -483,47 +534,39 @@
     return Math.round(target - today);
   }
 
-  function api(path, opt) {
-    var a = auth();
-    if (!a || !a.token) return Promise.reject(new Error('no-auth'));
+  function api(path, opt, audio) {
+    if (!checkAccount()) return Promise.reject(new Error('account-changed'));
+    if (!sessionToken) return Promise.reject(new Error('no-auth'));
     return fetch('/api/naesin' + path, Object.assign({
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.token }
+      cache: 'no-store', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessionToken }
     }, opt || {})).then(function (r) {
-      if (!r.ok) throw new Error('api-' + r.status);
-      return r.json();
+      if (!checkAccount()) throw new Error('account-changed');
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (body) {
+        var error = new Error('api-' + r.status);
+        error.code = body && body.code;
+        error.detail = body && body.error;
+        throw error;
+      });
+      return audio ? r.blob() : r.json();
+    }).then(function (r) {
+      if (!checkAccount()) throw new Error('account-changed');
+      return r;
     });
   }
-  /* 네트워크 단절(fetch 자체 실패)과 서버가 답한 오류(api-NNN)를 가른다 — 오프라인 캐시는 전자에만 쓴다 */
+  /* 구매 교재는 연결 확인이 필요하다. 자체 창작 체험 팩만 서비스 워커의 오프라인 셸로 열린다. */
   function isNetErr(e) { return !(e && /^api-\d+$/.test(String(e.message || ''))); }
-
-  /* 시험 범위 팩 캐시 — 연동 기기에서 팩 로드에 성공할 때마다 갱신. 연동 해제 시 함께 지운다.
-     담는 것은 '지금 범위'뿐이다: 지난 학기 팩까지 쌓으면 localStorage 를 몇 MB씩 먹는다. */
-  function cachePacks(entries) {
-    var out = {};
-    entries.forEach(function (e) { if (e && e.pack && e.pack.packId) out[e.id] = { pack: e.pack, updatedAt: e.updatedAt || null }; });
-    try {
-      localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify(out));
-      /* 옛 단일 캐시는 여기서 끝난다 — 남겨 두면 팩 하나(수백 KB~MB)가 영영 자리를 차지한다 */
-      localStorage.removeItem(LEGACY_PACK_CACHE_KEY);
-    } catch (e) {}
-  }
-  /* 캐시 읽기 — 옛 단일 키('wbn.pack')는 여기서 한 번 이관하고 지운다(업그레이드 직후 오프라인) */
-  function loadPacksCache() {
-    var out = null;
-    try { out = JSON.parse(localStorage.getItem(PACKS_CACHE_KEY) || 'null'); } catch (e) { out = null; }
-    if (!out || typeof out !== 'object') out = {};
-    var legacy = null;
-    try { legacy = JSON.parse(localStorage.getItem(LEGACY_PACK_CACHE_KEY) || 'null'); } catch (e) {}
-    if (legacy && legacy.pack && legacy.pack.packId && !out[legacy.id || legacy.pack.packId]) {
-      out[legacy.id || legacy.pack.packId] = { pack: legacy.pack, updatedAt: legacy.updatedAt || null };
-      try { localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify(out)); } catch (e) {}
-    }
-    try { localStorage.removeItem(LEGACY_PACK_CACHE_KEY); } catch (e) {}
-    var ids = Object.keys(out).filter(function (id) { return out[id] && out[id].pack && out[id].pack.packId; });
-    return ids.length ? out : null;
-  }
   function clearPackCache() {
-    try { localStorage.removeItem(PACKS_CACHE_KEY); localStorage.removeItem(LEGACY_PACK_CACHE_KEY); } catch (e) {}
+    sourceImageRead++;
+    document.querySelectorAll('#rBody img').forEach(function(image){image.removeAttribute('src');});
+    try { localStorage.removeItem('wbn.packs'); localStorage.removeItem('wbn.pack'); } catch (e) {}
+  }
+  function checkAccess() {
+    if (!checkAccount() || !authed || demoMode || !pack) return Promise.resolve(false);
+    var controller = new AbortController();
+    var timeout = setTimeout(function () { controller.abort(); stopStudy('connection'); }, 10000);
+    return api('/exam', { signal: controller.signal }).then(function () { return true; }).catch(function () {
+      stopStudy('connection'); return false;
+    }).finally(function () { clearTimeout(timeout); });
   }
 
   /* 저장 상태 표시 — 실패는 다음 persist 때 자연히 재시도된다(push는 늘 전체 상태) */
@@ -556,7 +599,7 @@
   var syncTimer = null;
   /* 체험 교재(배정 전 연습)는 서버에 올리지 않는다 — 관리 overview에 예시 교재 요약이 학생 기록으로 뜨면 안 된다 */
   function scheduleSync() {
-    if (!authed || demoMode) return;
+    if (!checkAccount() || !authed || demoMode) return;
     setSaveStatus('pending');
     clearTimeout(syncTimer);
     syncTimer = setTimeout(pushState, 3000);
@@ -627,14 +670,27 @@
     if (!r.passage) r.passage = passageSummaryRange();
     return r;
   }
-  function pushState() {
-    if (!authed || !pack || demoMode) return;
+  function pushState(repair) {
+    if (!checkAccount() || !authed || !pack || demoMode) return;
+    recoverStateStamps(DB);
+    if (pendingRemote && !RQ) {
+      pullAdopt(pendingRemote.state, pendingRemote.sent);
+      pendingRemote = null;
+    }
     var sentAt = DB.savedAt;
     var body = { state: { v: 1, owner: DB.owner || null, packs: DB.packs, last: DB.last || null, summary: summaryOf(), savedAt: DB.savedAt } };
-    api('/state', { method: 'PUT', body: JSON.stringify(body) }).then(function () {
+    var payload = JSON.stringify(body), sent = JSON.parse(payload).state;
+    return api('/state', { method: 'PUT', body: payload }).then(function (r) {
+      if (r && r.state) {
+        if (RQ) pendingRemote = { state: r.state, sent: sent };
+        else if (pullAdopt(r.state, sent) && repair !== true) { render(); return pushState(true); }
+      }
       if (DB.savedAt === sentAt) setSaveStatus('saved');   // 그 사이 새 persist가 있었으면 '대기'가 맞다
     }).catch(function (e) {
-      setSaveStatus(e && e.message === 'api-413' ? 'toobig' : 'failed');
+      if (!studyStopped) {
+        setSaveStatus(e && e.message === 'api-413' ? 'toobig' : 'failed');
+        if (e && typeof e.detail === 'string' && /기기 시간/.test(e.detail)) showBanner(e.detail, 'save');
+      }
     });
   }
   /* 원격 채택은 팩 단위 — 팩별 savedAt이 더 새로운 것만 받는다. 다른 기기에서 다른 팩을
@@ -652,7 +708,8 @@
   /* 앱으로 돌아올 때(다른 탭·기기에서 공부하고 온 경우) 원격을 다시 받는다 — 러너 중엔 안 한다 */
   var lastWake = 0;
   function onWake() {
-    if (!authed || !pack || offlineMode) return;
+    if (!checkAccount() || !authed || !pack || demoMode) return;
+    checkAccess();
     if ($('runner').classList.contains('open')) return;
     if (Date.now() - lastWake < 5000) return;
     lastWake = Date.now();
@@ -667,6 +724,8 @@
   }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') onWake(); });
   window.addEventListener('focus', onWake);
+  window.addEventListener('storage', function (e) { if (e.key === 'wbr.auth' || e.key == null) checkAccount(); });
+  window.addEventListener('offline', function () { if (authed && !demoMode) stopStudy('connection'); });
 
   /* ── 상태 접근 ── */
   function mkDialogueState(id, now) {
@@ -873,6 +932,11 @@
       return !!(st && st.reached);
     });
   }
+  function cumRecordPassed(record) {
+    if (!record || typeof record !== 'object') return false;
+    if (typeof record.passed === 'boolean') return record.passed;
+    return record.score === 100 && record.okCount === record.total && record.total > 0;
+  }
   /* 누적 백지 단계 — 1일차 → 1+2일차 → … → 전체. 앞 칸을 밟아야 다음 칸이 열린다. */
   function cumSteps(pid) {
     var gs = dayGroupsOf(packOf(pid) || pack), pd = packDB(pid), rec = pd.cumulative || {};
@@ -880,13 +944,16 @@
     for (var i = 0; i < gs.length; i++) {
       var lastDay = gs[i].day;
       out.push({ i: i, lastDay: lastDay, days: gs.slice(0, i + 1).map(function (g) { return g.day; }),
-        rec: rec[lastDay] || null, open: i === 0 ? true : !!rec[gs[i - 1].day] });
+        rec: rec[lastDay] || null, open: i === 0 ? true : cumRecordPassed(rec[gs[i - 1].day]) });
     }
     return out;
   }
   function cumReachedCount(pid) {
     var steps = cumSteps(pid), n = 0;
-    steps.forEach(function (s, i) { if (s.rec) n = i + 1; });
+    for (var i = 0; i < steps.length; i++) {
+      if (!cumRecordPassed(steps[i].rec)) break;
+      n += 1;
+    }
     return n;
   }
   /* 상태 요약의 passage(§3.6) — 엔진판이 있으면 그것을 쓰고, 없으면 같은 모양을 앱이 만든다 */
@@ -938,6 +1005,11 @@
   /* 서버 시험 배정을 팩 기록에 반영 — 시험일이 바뀌었으면 학생의 자율 학습 오버라이드는 풀린다 */
   function applyServerExam(pid) {
     var ex = examServer;
+    if (ex && ex.mode === 'practice') {
+      var practiceDB = packDB(pid);
+      delete practiceDB.exam; delete practiceDB.examOverride; delete practiceDB.examOverrideFor;
+      return;
+    }
     if (!ex || !ex.examDate) return;
     var pd = packDB(pid);
     if (pd.examOverride && pd.examOverrideFor !== ex.examDate) { delete pd.examOverride; delete pd.examOverrideFor; }
@@ -964,6 +1036,7 @@
     return (pack && pack.packId === pid) ? pack : null;
   }
   function rangeIds() {
+    if (isLibrary()) return pack ? [curPackId()] : [];
     var ids = packList.filter(function (id) { return !!PACKS[id]; });
     var cur = curPackId();
     if (cur && ids.indexOf(cur) < 0) ids.push(cur);
@@ -979,11 +1052,13 @@
     }).filter(function (e) { return !!e.pack; });
   }
   function isRange() { return rangeIds().length > 1; }
+  function isLibrary() { return !!(examServer&&examServer.mode==='practice'&&packList.length>20); }
   /* 과 표시명 — 학생이 아는 단위는 packId 가 아니라 'L6' 이다 */
   function lessonLabel(pid) {
-    var p = packOf(pid);
+    var p = packOf(pid)||packCatalog.filter(function(p){return p.packId===pid;})[0];
     var l = p && p.lesson;
-    return (l != null && l !== '') ? ('L' + l) : String(pid);
+    var label=p&&/^Special (?:Lesson|Reading)/i.test(p.lessonTitle||'')?p.lessonTitle:(l != null && l !== '') ? ('L' + l) : String(pid);
+    return isLibrary()&&p?(p.textbook+' · '+String(p.grade||'').replace(/^m([123])$/,'중$1')+' · '+label):p&&p.contentMode==='questions'?String(p.grade||'').replace(/^m([123])$/,'중$1')+' · '+label:label;
   }
   function lessonTitle(pid) {
     var p = packOf(pid);
@@ -991,6 +1066,20 @@
   }
   /* 세 탭의 목록 창 맨 위 과 선택 — 통합 범위에서 '지금 보는 과'를 바꾸는 유일한 상시 입구 */
   function packSegHtml() {
+    if(isLibrary()) {
+      var current=packCatalog.filter(function(p){return p.packId===curPackId();})[0]||packCatalog[0];
+      if(!current)return '';
+      var grades=Array.from(new Set(packCatalog.map(function(p){return p.grade;}))).sort();
+      var books=Array.from(new Set(packCatalog.filter(function(p){return p.grade===current.grade;}).map(function(p){return p.textbook;})));
+      var lessons=packCatalog.filter(function(p){return p.grade===current.grade&&p.textbook===current.textbook;});
+      function field(label,attr,values,selected,text) {
+        return '<label class="fld">'+label+'<select '+attr+' aria-label="'+label+'" style="width:100%;min-height:44px">'+values.map(function(value){return '<option value="'+esc(value)+'"'+(value===selected?' selected':'')+'>'+esc(text(value))+'</option>';}).join('')+'</select></label>';
+      }
+      return '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr));gap:12px">'+
+        field('학년','data-library-grade',grades,current.grade,function(g){return String(g).replace(/^m([123])$/,'중$1');})+
+        field('출판사·저자','data-library-textbook',books,current.textbook,function(b){return b||'교과서 미지정';})+
+        field('단원','data-library-pack',lessons.map(function(p){return p.packId;}),current.packId,function(id){var p=lessons.filter(function(p){return p.packId===id;})[0];return /^Special (?:Lesson|Reading)/i.test(p.lessonTitle||'')?p.lessonTitle:p.lesson==null||p.lesson===''?(p.lessonTitle||'단원 정보 없음'):p.lesson+'과'+(p.lessonTitle?' · '+p.lessonTitle:'');})+'</div>';
+    }
     var ids = rangeIds();
     if (ids.length <= 1) return '';
     return '<div class="packseg" role="group" aria-label="시험 범위 과 선택">' + ids.map(function (id) {
@@ -1047,8 +1136,11 @@
      강사 화면의 「정체」가 이 값에서 나온다. 화면을 켜 두고 딴짓하는 것과 열심히 푸는 것을
      서버가 가릴 방법이 이것뿐이다(state 는 3초 디바운스로만 올라간다). */
   var lastAct = Date.now();
-  ['pointerdown', 'keydown', 'input'].forEach(function (ev) {
-    document.addEventListener(ev, function () { lastAct = Date.now(); }, { passive: true, capture: true });
+  ['pointerdown', 'keydown', 'input', 'click'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      if (!studyStopped && !checkAccount()) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+      lastAct = Date.now();
+    }, { capture: true });
   });
 
   /* ── 탭 ── */
@@ -1070,6 +1162,17 @@
     e.preventDefault();
     switchPack(b.getAttribute('data-pks'));
   });
+  $('wrap').addEventListener('change',function(e){
+    var target=e.target;
+    if(!target)return;
+    if(target.hasAttribute('data-library-pack'))return switchPack(target.value);
+    var current=packCatalog.filter(function(p){return p.packId===curPackId();})[0];
+    if(!current)return;
+    var next;
+    if(target.hasAttribute('data-library-grade'))next=packCatalog.filter(function(p){return p.grade===target.value;})[0];
+    if(target.hasAttribute('data-library-textbook'))next=packCatalog.filter(function(p){return p.grade===current.grade&&p.textbook===target.value;})[0];
+    if(next)return switchPack(next.packId);
+  });
   /* 목록 행은 role=button — 키보드(Enter/Space)로도 누른다 */
   $('wrap').addEventListener('keydown', function (e) {
     if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -1079,22 +1182,22 @@
   });
   /* 이름 탭 → 다른 학생으로 연동 (공용 태블릿에서 학생이 바뀔 때) */
   $('whoLine').onclick = function () {
-    if (!authed) return;
+    if (!authed || !checkAccount()) return;
     if (!confirm('다른 학생으로 연동할까요?\n이 기기의 연동이 해제되고 학원 QR 연동 화면으로 이동합니다.')) return;
     try { localStorage.removeItem('wbr.auth'); } catch (e) {}
-    clearPackCache();
-    location.href = '/';
+    stopStudy('account-changed');
+    location.href = '/?app=naesin';
   };
   $('offBadge').onclick = function () { location.reload(); };
 
   function renderHeader() {
     var a = auth(), who = $('whoLine');
     who.innerHTML = '<span>' + (authed && a && a.name ? '<b>' + esc(a.name) + '</b> · ' : (authed ? '' : '체험 모드 · ')) +
-      (pack ? esc((pack.textbook || '') + ' L' + pack.lesson) : '') +
+      (pack ? esc((pack.textbook || '') + (pack.lesson != null && pack.lesson !== '' ? ' L' + pack.lesson : '')) : '') +
       (authed ? '<small style="display:block;font-size:10.5px;font-weight:400">다른 학생으로 연동 ↻</small>' : '') + '</span>';
     who.className = 'who' + (authed ? ' linked' : '');
     who.title = authed ? '누르면 다른 학생으로 연동합니다' : '';
-    $('offBadge').hidden = !offlineMode;
+    $('offBadge').hidden = true;
     setSaveStatus(saveStatus);
     var ex = exam(), b = $('ddayBadge');
     if (ex && ex.examDate) {
@@ -1252,10 +1355,11 @@
     if (!demoMode) return '';
     return authed
       ? '<div class="notice">배정 전 연습 — 체험 교재입니다. 선생님이 시험 범위를 배정하면 새로고침 때 내 학교 교재가 열립니다.</div>'
-      : '<div class="notice">체험 모드 — 예시 교재입니다. 학원 QR로 연동하면 내 학교 교재와 기록 저장이 열립니다.</div>';
+      : '<div class="notice">체험 모드 — 예시 교재입니다. 학원 QR로 연동하면 내 학교 교재와 기록 저장이 열립니다. <a class="btn p" href="/?app=naesin">학생 코드로 연동</a></div>';
   }
   /* 시험 범위가 여러 팩이면 전환 링크 — 진단 전 화면에도 있어야 다른 교재로 돌아갈 수 있다 */
   function packListHtml() {
+    if(isLibrary())return '<p class="muted">학년 → 출판사·저자 → 단원을 선택한 뒤 학습을 시작하세요.</p>';
     if (packList.length <= 1) return '';
     /* 학생이 아는 단위는 packId 가 아니라 'L6' 이다 — 팩 id 는 title 로만 남긴다 */
     return '<p class="muted" style="margin:0 0 10px">시험 범위: ' + packList.map(function (id) {
@@ -1273,6 +1377,12 @@
     });
   }
   function renderHome() {
+    if (pack.contentMode === 'questions') {
+      var questionTask=todayTask();
+      layoutFull(demoNotice()+packSegHtml()+packListHtml()+(questionTask?taskCardHtml(questionTask):'')+'<div class="card"><h2>문제 학습</h2><p>배정된 '+(pack.items||[]).length+'문항을 풀고 틀린 문제를 다시 확인하세요.</p><button class="btn p big" id="startQuestions">문제 풀이 시작</button></div>'+((pack.sentences||[]).length?'<div class="card"><h2>본문 암기</h2><p>'+pack.sentences.length+'문장 · 읽고 듣기, 문장 연습, 백지 쓰기</p><button class="btn p big" id="startPassage">본문 암기 시작</button></div>':''));
+      if($('startPassage'))$('startPassage').onclick=function(){setTab('passage');};
+      $('startQuestions').onclick=function(){setTab('quiz');};wireTaskCard(questionTask);wireHomeLinks();return;
+    }
     var pd = packDB();
     var task = todayTask();
     if (!pd.diagDone) {
@@ -1428,7 +1538,7 @@
     return pat ? luiItems(pat) : [];
   }
   function runTask(task) {
-    var items = [], types = quizTypes();
+    var items = [], types = quizTypes(true);
     (task.typeKeys || []).forEach(function (k) {
       var t = types.filter(function (x) { return x.key === k; })[0];
       var made = t ? t.make() : (/^g-\d+$/.test(k) ? patternItems(k) : []);
@@ -1462,12 +1572,14 @@
   /* 과 전환 — 범위 팩은 부팅 때 전부 받아 두므로 대개 즉시다. 캐시에 없을 때만(옛 기록의
      last, 배정이 방금 바뀐 경우) 서버에서 받아 온다. */
   function openPack(p, pid, opt) {
+    if (!checkAccount()) return;
     opt = opt || {};
     pack = normPack(p);
+    if(isLibrary())PACKS={};
     PACKS[pid] = pack;
     /* 교재가 바뀌면 이전 교재의 선택(문장·단어·유형·대화·종이 입력 모드)은 무의미하다 */
     selSeq = opt.seq != null ? Number(opt.seq) : null;
-    selWordId = null; selType = null; selDlg = null; selPass = null; paperMode = false; wordFilter = 'all';
+    selWordId = null; selType = null; selDlg = null; selPass = null; paperMode = false; wordFilter = 'all'; quizSource = '';
     applyServerExam(pid);
     ensureStates(pid);
     setLast('교재 ' + pid, null);
@@ -1475,21 +1587,13 @@
     if (opt.tab) setTab(opt.tab); else render();
   }
   function switchPack(pid) {
+    var read=++packRead;
     if (!pid || pid === curPackId()) return;
     if (PACKS[pid]) { openPack(PACKS[pid], pid); return; }
-    api('/pack?id=' + encodeURIComponent(pid)).then(function (r) {
+    return api('/pack?id=' + encodeURIComponent(pid)).then(function (r) {
+      if(read!==packRead)return;
       openPack(r.pack, pid);
-      cacheCurrentRange(pid, r.updatedAt);
-    }).catch(function () { alert('교재를 불러오지 못했습니다.'); });
-  }
-  /* 지금 열린 범위 팩 전부를 캐시에 다시 쓴다 — 오프라인에서도 범위 전체가 열려야 한다 */
-  function cacheCurrentRange(newId, newUpdatedAt) {
-    if (!authed || demoMode || offlineMode) return;
-    var known = {};
-    try { known = JSON.parse(localStorage.getItem(PACKS_CACHE_KEY) || '{}') || {}; } catch (e) { known = {}; }
-    cachePacks(rangeIds().map(function (id) {
-      return { id: id, pack: PACKS[id], updatedAt: id === newId ? (newUpdatedAt || null) : ((known[id] && known[id].updatedAt) || null) };
-    }));
+    }).catch(function () { if(read===packRead){render();alert('교재를 불러오지 못했습니다. 다시 선택해 주세요.');} });
   }
   function doResume(r) {
     if (!r) return;
@@ -1748,7 +1852,11 @@
     var kos = (s.chunks || []).map(function (c) { return c.ko; }).filter(Boolean);
     if (!q || !Array.isArray(q.answer) || q.answer.length < 2) {
       if (WBGEN.enChunkOrder) genNote('enChunkOrder');
-      if (ens.length < 2) return null;
+      if (ens.length < 2) {
+        var tokens=(s.tokens||[]).filter(Boolean);
+        if(tokens.length<2)return null;
+        return {type:'order',seq:s.seq,shuffled:shuffleNot(tokens),answer:tokens,hintText:s.ko,hintLabel:'문장 뜻'};
+      }
       q = { shuffled: shuffleNot(ens), answer: ens, koChunks: kos };
     }
     return { type: 'order', seq: s.seq, shuffled: (q.shuffled && q.shuffled.length ? q.shuffled : shuffleNot(q.answer)),
@@ -2086,7 +2194,7 @@
     var tts = $('ckTts');
     if (tts) tts.onclick = function () {
       var list = chunksOfGroup(gr).map(function (c) { return c.en; });
-      if (window.WBVoice && WBVoice.ttsSupported() && list.length) WBVoice.speakSeq(list, { lang: 'en' });
+      if (checkAccount() && window.WBVoice && list.length) WBVoice.speakSeq(list, ttsOptions());
     };
     var go = $('ckGo');
     if (go) go.onclick = function () { runChunkSession(day); };
@@ -2099,7 +2207,9 @@
     var items = stage === 1 ? ckMatchItems(gr) : (stage === 2 ? ckMeanItems(gr) : ckOrderItems(gr));
     if (!items.length) {
       alert('이 단락의 ' + CK_STAGES[stage] + ' 문항을 만들 수 없습니다 (청크 데이터 부족). 문장 사다리로 바로 진행합니다.');
+      st.stage = CK_MAX;
       trackAdvance(st, true, CK_MAX, Date.now());
+      selPass = null; selDlg = null; selSeq = gr.sentences[0].seq;
       persist(); render();
       return;
     }
@@ -2111,7 +2221,7 @@
     runQueue(items, ZONE_MEAN + ' ' + stage + '/3 · ' + CK_STAGES[stage],
       function (it, ok) { if (ok) okN += 1; logEvent('chunk', it.type, day, ok, pid); },
       function (finished) {
-        var passed = finished && items.length > 0 && (okN / items.length) >= 0.8;
+        var passed = finished && items.length > 0 && (okN / items.length) === 1;
         trackAdvance(st, passed, CK_MAX, Date.now());
         touchPack(pid); persist(); render();
       });
@@ -2279,7 +2389,7 @@
     var tts = $('dlgTts');
     if (tts) tts.onclick = function () {
       /* speakSeq(list, opt)는 문자열 배열을 받는다(shared/voice.js) — 줄마다 영어 목소리로 차례 읽기 */
-      if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speakSeq(d.lines.map(function (l) { return l.en; }), { lang: 'en' });
+      if (checkAccount() && window.WBVoice) WBVoice.speakSeq(d.lines.map(function (l) { return l.en; }), ttsOptions());
     };
     if (go) go.onclick = function () { trainDialogue(d, st); };
   }
@@ -2382,6 +2492,7 @@
       '<p class="enline">' + esc(s.en) +
       ' <button id="ttsBtn" class="tag t-ind tb" aria-label="문장 듣기">듣기</button></p>' +
       '<p class="muted" style="font-size:13.5px;margin:0 0 10px">' + esc(s.ko) + '</p>' +
+      (s.notes||[]).filter(function(note){return note==='원문 한 쪽을 통째로 암기하는 학습 단위입니다.';}).map(function(note){return '<p class="notice">'+esc(note)+'</p>';}).join('')+
       (stage <= 2 || st.reached ? chunks + notes : '<p class="muted">청크·구문 해설은 2단계(영어 청크 배열)까지 표시됩니다.</p>') +
       '</div>' +
       (!ckg.open
@@ -2395,7 +2506,7 @@
     var s = senBySeq(seq), st = senState(seq);
     if (!s || !st) return;
     var tts = $('ttsBtn');
-    if (tts) tts.onclick = function () { if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(s.en, { lang: 'en' }); };
+    if (tts) tts.onclick = function () { if (checkAccount() && window.WBVoice) WBVoice.speak(s.en, ttsOptions()); };
     var go = $('stageGo');
     if (go) go.onclick = function () { trainSentence(seq); };
   }
@@ -2584,7 +2695,7 @@
   /* ── 누적 백지 — 1일차 → 1+2일차 → … → 전체 ── */
   function startCumulative(i) {
     var steps = cumSteps(), cs = steps[i];
-    if (!cs) return;
+    if (!cs || !cs.open) return;
     var targets = [], pid = curPackId();
     cs.days.forEach(function (d) { var gr = groupOfDay(d); if (gr) targets = targets.concat(gr.sentences); });
     if (!targets.length) return;
@@ -2599,7 +2710,8 @@
           var v = $('cmIn').value;
           var d = WBGRADE.diffPassage(v, targets.map(function (s) { return { seq: s.seq, en: s.en }; }));
           var score = targets.length ? Math.round(d.okCount / targets.length * 100) : 0;
-          var html = '<div class="result ' + (score >= 80 ? 'good' : 'bad') + '">정확 ' + d.okCount + ' / ' + targets.length + ' (' + score + '%)' +
+          var passed = targets.length > 0 && d.okCount === targets.length && d.missingCount === 0 && d.partialCount === 0 && d.orderOk === true && !(d.extras || []).length;
+          var html = '<div class="result ' + (passed ? 'good' : 'bad') + '">정확 ' + d.okCount + ' / ' + targets.length + ' (' + score + '%)' +
             ' · 부분 ' + d.partialCount + ' · 누락 ' + d.missingCount + '</div>';
           d.perSentence.forEach(function (ps) { html += diffLineHtml(ps, senBySeq(ps.seq)); });
           html += '<div class="rnext"><button class="btn p big" id="cmDone">기록하고 닫기</button></div>';
@@ -2607,9 +2719,9 @@
           $('cmDone').onclick = function () {
             var pd = packDB(pid);
             d.perSentence.forEach(function (ps) { if (ps.status !== 'ok') pd.senMiss[ps.seq] = n0(pd.senMiss[ps.seq]) + 1; });
-            pd.cumulative[cs.lastDay] = { at: new Date().toISOString(), okCount: d.okCount, total: targets.length, score: score };
+            pd.cumulative[cs.lastDay] = { at: new Date().toISOString(), okCount: d.okCount, total: targets.length, score: score, passed: passed };
             pd.dump.push({ at: new Date().toISOString(), scope: 'cum:' + cs.lastDay, ok: d.okCount, partial: d.partialCount, missing: d.missingCount });
-            logEvent('cumulative', 'blank', cs.lastDay, score >= 80, pid);
+            logEvent('cumulative', 'blank', cs.lastDay, passed, pid);
             touchPack(pid); closeCustom(); persist(); render();
           };
         };
@@ -2665,7 +2777,20 @@
     return a.slice(0, n);
   }
   function tagWord(q) { if (q) q.kind = 'word'; return q; }
-  function quizTypes() {
+  /* 문항 source 는 이그잼포유 파일 앞 번호다 — 중1·2(2022 개정)와 중3(2015 개정)은 같은 번호가 다른 자료라 학년별로 이름을 붙인다 */
+  var QUIZ_SOURCES_M12 = [['00', '본문 빈칸'], ['02', '본문 워크북'], ['04', 'PRE-STEP'], ['05', '예상문제 1회'], ['06', '예상문제 2회'], ['07', '문법 워크북'], ['08', '문법 객관식'], ['09', '문법 주관식']];
+  var QUIZ_SOURCES_M3 = [['02', '본문 워크북'], ['03', 'READING CHECK'], ['05', '기본학습 빈칸'], ['06', '기본학습 주관식'], ['07', '내용이해 T/F'], ['08', '내용이해 문장 완성'],
+    ['09', '형성평가 PRE-STEP'], ['10', '형성평가 BASIC'], ['11', '형성평가 ACTUAL'], ['12', '형성평가 FINAL'], ['13', '문법 워크북'], ['14', '문법 객관식'], ['15', '문법 주관식'], ['16', '내신 기출']];
+  function quizSources() { return pack && /^(?:m3|중3)$/.test(pack.grade) ? QUIZ_SOURCES_M3 : QUIZ_SOURCES_M12; }
+  function storedSourceLabel(source) {
+    var match = quizSources().filter(function (entry) { return entry[0] === source; })[0];
+    return match ? match[1] : String(source || '');
+  }
+  function storedQuizDesc(items) {
+    var explained = items.filter(function (q) { return q.explanation.trim(); }).length;
+    return items.length + '문항' + (explained ? ' · 해설 ' + explained + '문항' : '');
+  }
+  function quizTypes(allSources) {
     var types = [];
     var W = pack.words || [], S = pack.sentences || [];
     types.push({ key: 'w-e2k', group: '단어 시험', name: '영어 → 뜻 고르기', desc: '4지선다 · 10문항 무작위',
@@ -2693,13 +2818,16 @@
     if (W.some(function (w) { return (w.synonyms || []).length || (w.antonyms || []).length; }))
       types.push({ key: 'w-syn', group: '단어 시험 · 심화', name: '유의어·반의어', desc: '짝 고르기',
         make: synItems });
-    var items = pack.items || [];
-    var single = items.filter(function (it) { return (it.answerCount || 1) === 1; });
-    var multi = items.filter(function (it) { return (it.answerCount || 1) > 1; });
-    if (single.length) types.push({ key: 'i-mcq', group: '문법·실전', name: '객관식 (단일 정답)', desc: single.length + '문항 · 해설 포함',
-      make: function () { return storedToRunner(single); } });
-    if (multi.length) types.push({ key: 'i-multi', group: '문법·실전', name: '객관식 (복수 정답)', desc: multi.length + '문항 · 해설 포함',
-      make: function () { return storedToRunner(multi); } });
+    var items = storedToRunner(pack.items || []).filter(function (q) { return allSources || !quizSource || q.stored.source === quizSource; });
+    var single = items.filter(function (q) { return q.type === 'storedmcq' && q.answerCount === 1; });
+    var multi = items.filter(function (q) { return q.type === 'storedmcq' && q.answerCount > 1; });
+    var short = items.filter(function (q) { return q.type === 'storedshort'; });
+    if (single.length) types.push({ key: 'i-mcq', group: '교재 문제', name: '객관식 (단일 정답)', desc: storedQuizDesc(single),
+      make: function () { return single; } });
+    if (multi.length) types.push({ key: 'i-multi', group: '교재 문제', name: '객관식 (복수 정답)', desc: storedQuizDesc(multi),
+      make: function () { return multi; } });
+    if (short.length) types.push({ key: 'i-short', group: '교재 문제', name: '주관식', desc: storedQuizDesc(short),
+      make: function () { return short; } });
     /* 세션 ④ 실전 모의 — 유형 혼합·시간 제한·종료 후 일괄 채점 */
     types.push({ key: 'mock', group: '실전 모의', name: '모의 시험 (유형 혼합)', desc: '10분 제한 · 즉시 채점 없음 · 종료 후 결과',
       make: mockItems });
@@ -2767,8 +2895,8 @@
       if (!p) return;
       (p.words || []).forEach(function (w) { wordRefs.push({ pid: pid, w: w, W: p.words }); });
       (p.sentences || []).forEach(function (sn) { senRefs.push({ pid: pid, s: sn }); });
-      (p.items || []).filter(function (it) { return (it.answerCount || 1) === 1; })
-        .forEach(function (it) { storedRefs.push({ pid: pid, it: it }); });
+      storedToRunner(p.items || [], p.items || []).filter(function (q) { return q.type === 'storedshort' || q.answerCount === 1; })
+        .forEach(function (q) { storedRefs.push({ pid: pid, q: q }); });
     });
     var out = [];
     var take = function (q, pid) { if (q) { q.packId = pid; out.push(q); } };
@@ -2779,20 +2907,56 @@
       (WBGEN.grammarChoiceDrill(r.s) || []).forEach(function (q) { q.packId = r.pid; gram.push(q); });
     });
     rndPick(gram, 3).forEach(function (q) { out.push(q); });
-    rndPick(storedRefs, 5).forEach(function (r) { storedToRunner([r.it]).forEach(function (q) { take(q, r.pid); }); });
+    rndPick(storedRefs, 5).forEach(function (r) { take(r.q, r.pid); });
     return WBGEN.shuffle(out, Math.random);
   }
-  function storedToRunner(items) {
-    return items.map(function (it) {
-      var stim = ((it.stimulus && it.stimulus.parts) || []).map(function (p) { return p.text; }).join(' ').trim();
-      return {
-        stored: it, no: it.no, type: 'storedmcq',
-        prompt: (it.instructionKo || '') + (stim ? '\n' + stim : ''),
-        choices: it.choices.map(function (c) { return { key: String(c.label), text: c.text || (c.tuple || []).join(' - ') }; }),
-        answerKeys: it.answer.map(String), answerCount: it.answerCount || 1,
-        explanation: it.explanationKo || ''
-      };
-    });
+  function storedItemKey(it, sourceItems) {
+    if (it.id != null) {
+      if (typeof it.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,59}$/.test(it.id)) return null;
+      if (sourceItems.filter(function (other) { return other && other.id === it.id; }).length > 1) return null;
+      return 'i:id:' + it.id;
+    }
+    if (sourceItems.filter(function (other) { return other && other.no === it.no; }).length <= 1) return 'i-' + it.no;
+    var tuple = [it.source || '', it.section || '', it.no, it.footnoteNo == null ? '' : it.footnoteNo];
+    var key;
+    try { key = 'i:loc:' + tuple.map(function (part) { return encodeURIComponent(String(part)); }).join(':'); }
+    catch (e) { return null; }
+    // shortcut: 2048자를 넘는 옛 위치 식별자는 제외한다. 이런 팩은 안정적인 id를 붙여 재검수한다.
+    if (key.length > 2048 || sourceItems.filter(function (other) {
+      return other && other.id == null && other.no === it.no && (other.source || '') === tuple[0] && (other.section || '') === tuple[1]
+        && String(other.footnoteNo == null ? '' : other.footnoteNo) === String(tuple[3]);
+    }).length > 1) return null;
+    return key;
+  }
+  function storedToRunner(items, sourceItems) {
+    sourceItems = Array.isArray(sourceItems) ? sourceItems : (pack && Array.isArray(pack.items) ? pack.items : items || []);
+    return (Array.isArray(items)?items:[]).map(function (it) {
+      if(!it||!Number.isInteger(it.no)||it.no<1||!Array.isArray(it.answer)||['mcq','mcq_multi','short'].indexOf(it.formatType)<0)return null;
+      var sourceChoices = it.formatType === 'short' && it.choices == null ? [] : it.choices;
+      if (!Array.isArray(sourceChoices)) return null;
+      var itemKey = storedItemKey(it, sourceItems);
+      if (!itemKey) return null;
+      var stim = ((it.stimulus && Array.isArray(it.stimulus.parts)?it.stimulus.parts:[]) || []).map(function (p) { return p&&typeof p.text==='string'?p.text:''; }).filter(Boolean).join(' ').trim();
+      if(it.answer.some(function(a){return (typeof a!=='string'&&typeof a!=='number')||(typeof a==='number'&&!Number.isFinite(a))||!String(a).trim();}))return null;
+      var instruction = [it.instructionKo, it.promptKo].filter(function (value) { return typeof value === 'string' && value.trim(); })[0] || '';
+      var stem = [it.stem, it.questionKo, it.question].filter(function (value) { return typeof value === 'string' && value.trim(); })[0] || '';
+      var prompt = [instruction, stem, stim].filter(function (value, i, parts) { return value.trim() && parts.indexOf(value) === i; }).join('\n');
+      var answers=it.answer.map(String).filter(function(a){return !!a.trim();});
+      if (!prompt.trim()) return null;
+      if(it.formatType==='short'){
+        if(sourceChoices.length!==0||!answers.length||it.answer.some(function(a){return typeof a!=='string';})||!prompt.trim())return null;
+        return{stored:it,no:it.no,itemKey:itemKey,type:'storedshort',prompt,answerTexts:answers,explanation:typeof it.explanationKo==='string'?it.explanationKo:''};
+      }
+      if(sourceChoices.length<2||!answers.length)return null;
+      var choices=sourceChoices.map(function (c) {
+        if(!c||(typeof c.label!=='string'&&typeof c.label!=='number')||(typeof c.label==='number'&&!Number.isFinite(c.label)))return null;
+        var text=typeof c.text==='string'?c.text:Array.isArray(c.tuple)&&c.tuple.every(function(x){return typeof x==='string';})?c.tuple.join(' - '):'';
+        return text.trim()?{key:String(c.label),text}:null;
+      });
+      var answerCount=it.answerCount||answers.length;
+      if(choices.some(function(c){return !c||!c.key.trim()||!c.text;})||new Set(choices.map(function(c){return c.key;})).size!==choices.length||new Set(answers).size!==answers.length||answers.some(function(a){return !choices.some(function(c){return c.key===a;});})||!Number.isInteger(answerCount)||answerCount!==answers.length)return null;
+      return {stored:it,no:it.no,itemKey:itemKey,type:'storedmcq',prompt,choices,answerKeys:answers,answerCount,explanation:typeof it.explanationKo==='string'?it.explanationKo:''};
+    }).filter(Boolean);
   }
   function runQuizType(key) {
     var tdef = quizTypes().filter(function (t) { return t.key === key; })[0];
@@ -2832,8 +2996,7 @@
   }
   function wrongRetryItems(keys) {
     var pd = packDB(), out = [];
-    var stored = (pack.items || []).filter(function (it) { return keys.indexOf('i-' + it.no) >= 0; });
-    storedToRunner(stored).forEach(function (q) { out.push(q); });
+    storedToRunner(pack.items || []).forEach(function (q) { if (keys.indexOf(q.itemKey) >= 0) out.push(q); });
     keys.forEach(function (k) {
       var e = pd.wrong[k];
       if (e && e.kind === 'gen') regenWrong(e).forEach(function (q) { out.push(q); });
@@ -2842,16 +3005,23 @@
   }
   function renderQuiz() {
     var pd = packDB();
+    var stored = storedToRunner(pack.items || []);
+    if (quizSource && !stored.some(function (q) { return q.stored.source === quizSource; })) quizSource = '';
     var types = quizTypes();
     var wrongs = Object.keys(pd.wrong).filter(function (k) { return !pd.wrong[k].cleared; });
-    if (!selType) selType = types[0].key;
+    if (!selType || (selType !== 'wrong' && selType.slice(0, 2) !== 'g-' && !types.some(function (t) { return t.key === selType; }))) selType = types[0].key;
     var groups = [];
     types.forEach(function (t) {
       var g = groups.filter(function (x) { return x.name === t.group; })[0];
       if (!g) { g = { name: t.group, types: [] }; groups.push(g); }
       g.types.push(t);
     });
-    var listHtml = packSegHtml() +
+    var sourceHtml = stored.length ? '<div style="padding:8px 14px 12px"><label class="muted" for="qSource">문제 자료</label><select id="qSource" style="width:100%;min-height:44px;margin-top:6px;padding:8px;border:1px solid var(--line);border-radius:9px;background:var(--panel)"><option value="">전체 자료 (' + stored.length + '문항)</option>' +
+      quizSources().map(function (entry) {
+        var count = stored.filter(function (q) { return q.stored.source === entry[0]; }).length;
+        return count ? '<option value="' + entry[0] + '"' + (quizSource === entry[0] ? ' selected' : '') + '>' + entry[1] + ' (' + count + '문항)</option>' : '';
+      }).join('') + '</select></div>' : '';
+    var listHtml = packSegHtml() + sourceHtml +
       '<div class="lh"><span>문제 유형 ' + types.length + '종</span><span>오답 <b>' + wrongs.length + '</b> 미해결</span></div><div class="rows" id="qRows">';
     /* 세션 ② 문법 개념 — 문제 앞에 개념 학습이 온다 */
     if ((pack.patterns || []).length) {
@@ -2908,6 +3078,13 @@
         '<button class="btn p big" id="qGo"' + (mg && !mg.open ? ' disabled' : '') + '>시작</button></div>';
     }
     layoutSplit(listHtml, workHtml);
+    var sourceSelect = $('qSource');
+    if (sourceSelect) sourceSelect.onchange = function () {
+      quizSource = quizSources().some(function (entry) { return entry[0] === sourceSelect.value; }) ? sourceSelect.value : '';
+      var savedType = quizTypes().filter(function (t) { return t.key.slice(0, 2) === 'i-'; })[0];
+      selType = savedType ? savedType.key : null;
+      render();
+    };
     $('qRows').onclick = function (e) {
       var r = e.target.closest('.row[data-qt]');
       if (r) { selType = r.getAttribute('data-qt'); render(); }
@@ -2952,6 +3129,7 @@
       return c ? c.text : '';
     }
     if (item.parts) return item.parts.filter(function (p) { return p.blank; }).map(function (p) { return p.blank.answers[0]; }).join(', ');
+    if (item.answerTexts) return shownAnswers(item.answerTexts).join(' / ');
     if (item.answers) return item.answers[0];
     if (item.answer) return item.answer.join(' ');
     return '';
@@ -3005,7 +3183,8 @@
     }
   }
   function recordStoredResult(q, ok, now, pid) {
-    markWrong('i-' + q.no, { kind: 'item', no: q.no }, ok, now, pid);
+    var key = q.itemKey || (q.stored && storedItemKey(q.stored, (packOf(pid) || {}).items || []));
+    if (key) markWrong(key, { kind: 'item', no: q.no }, ok, now, pid);
   }
   /* 생성형 문항의 오답 노트 키 유형 — 재시험 생성기가 있는 유형만(REGEN). 유형 태그가 없으면 문항 모양에서 유추. */
   var GEN_KEYS = ['w-e2k', 'w-k2e', 'w-spell', 'w-cloze', 'w-def', 's-gram', 's-verb', 's-order', 's-kw', 'w-poly', 'w-syn'];
@@ -3187,7 +3366,7 @@
     var pid = item.packId != null ? item.packId : curPackId();
     var pd = packDB(pid);
     touchPack(pid);
-    if (item.type === 'storedmcq') { recordStoredResult(item, ok, now, pid); return; }
+    if (item.type === 'storedmcq' || item.type === 'storedshort') { recordStoredResult(item, ok, now, pid); return; }
     if (item.kind === 'sentence' || (item.seq != null && item.stage != null)) {
       var st = senState(item.seq, pid);
       if (st && seqRes) {
@@ -3232,6 +3411,7 @@
     try { r.focus(); } catch (e) {}
   }
   function closeRunner() {
+    sourceImageRead++;
     $('runner').classList.remove('open');
     if (livePollId) setTimeout(liveTimers, 0);   /* RQ 가 비워진 뒤 주기를 되돌린다 */
     /* 신고 창을 열어 둔 채 세션이 끝나면 다음 세션에 남의 문항 신고가 열려 있다 */
@@ -3239,6 +3419,7 @@
     document.body.style.overflow = '';
     if (lastFocus && lastFocus.focus && document.contains(lastFocus)) { try { lastFocus.focus(); } catch (e) {} }
     lastFocus = null;
+    if (pendingRemote) setTimeout(function () { if (!RQ) pushState(); }, 0);
   }
   /* 러너 종료 계약(0.7): finished=true 는 마지막 문항까지 채점됨(또는 모의 시간 종료), false 는 ✕ 중단 */
   function endQueue(finished) {
@@ -3291,6 +3472,7 @@
   }
   /* 신고 식별자 — 오답노트 키(gen:<유형>:<대상>)와 같은 결로 만들어 강사가 같은 문항을 찾을 수 있게 */
   function itemRefOf(it) {
+    if (it.type === 'storedmcq' || it.type === 'storedshort') return it.itemKey || '';
     var type = it.type || it.kind || 'item';
     var ref = it.wordId || (it.checkId ? 'chk:' + it.checkId : null) || (it.id ? String(it.id) : null)
       || (it.seq != null ? 's' + it.seq : null) || (it.day ? 'd' + it.day : null) || '?';
@@ -3367,10 +3549,53 @@
        ③ 같은 판단을 기록으로 더 정확하게 할 수 있다 — 이미 외운 단어를 틀리면 그것이 과신이고,
           찍어서 맞히는 것은 철자 인출(완전 인출) 자리에서 걸러진다. 엔진이 그렇게 읽는다.
        탭도 문항당 하나씩 줄었다 — 30문항이면 30번이다. */
+    var correctionRecorded = false;
     function next() {
       if (RQ !== q0) return;
-      if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, {});
+      if (!correctionRecorded && RQ.onGrade) RQ.onGrade(item, ok, answerKey, {});
       RQ.i += 1; stepRunner();
+    }
+    if (!ok && item.type === 'spell') {
+      var correction = document.createElement('div');
+      correction.className = 'correction';
+      var correctionLabel = document.createElement('p');
+      correctionLabel.className = 'muted';
+      correctionLabel.textContent = '정답 철자를 보고 한 번 정확히 입력해 주세요.';
+      var correctionInput = document.createElement('input');
+      correctionInput.className = 'ans'; correctionInput.type = 'text';
+      correctionInput.setAttribute('aria-label', '정답 철자 다시 입력');
+      correctionInput.setAttribute('autocorrect', 'off'); correctionInput.setAttribute('spellcheck', 'false');
+      correctionInput.setAttribute('autocomplete', 'off'); correctionInput.setAttribute('autocapitalize', 'off');
+      correctionInput.setAttribute('enterkeyhint', 'done');
+      var correctionHint = document.createElement('p');
+      correctionHint.className = 'muted'; correctionHint.setAttribute('role', 'status');
+      var correctionSubmit = document.createElement('button');
+      correctionSubmit.className = 'btn p big'; correctionSubmit.textContent = '철자 확인';
+      correctionSubmit.setAttribute('aria-label', '정답 철자 확인');
+      correction.appendChild(correctionLabel); correction.appendChild(correctionInput);
+      correction.appendChild(correctionHint); correction.appendChild(correctionSubmit);
+      q.appendChild(correction);
+      correctionSubmit.onclick = function () {
+        if (correction.getAttribute('data-correct') === '1') { next(); return; }
+        var checked = WBGRADE.gradeAnswer(correctionInput.value, item.answers);
+        if (!checked.correct) {
+          correctionHint.textContent = '철자가 아직 달라요. 정답을 다시 보고 정확히 입력해 주세요.';
+          correctionInput.focus(); return;
+        }
+        correction.setAttribute('data-correct', '1');
+        if (RQ === q0 && RQ.onGrade) { RQ.onGrade(item, ok, answerKey, {}); correctionRecorded = true; }
+        correctionHint.textContent = '교정 완료. 다음을 눌러 계속하세요.';
+        correctionSubmit.textContent = '다음';
+        correctionSubmit.setAttribute('aria-label', '교정 완료 후 다음 문항');
+        correctionInput.disabled = true;
+        try { correctionSubmit.focus({ preventScroll: true }); } catch (e) { correctionSubmit.focus(); }
+      };
+      correctionInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); correctionSubmit.click(); }
+      });
+      try { correctionInput.focus({ preventScroll: true }); } catch (e) { correctionInput.focus(); }
+      try { box.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+      return;
     }
     var nb = document.createElement('div');
     nb.className = 'rnext';
@@ -3409,9 +3634,30 @@
     if (!item.ttsText) return '';
     return ' <button id="' + id + '" class="tag t-ind tb" aria-label="영어 듣기">듣기</button>';
   }
+  function ttsOptions() {
+    var isDemo = demoMode && pack && pack.packId === DEMO_PACK_ID;
+    var opt = { lang: 'en', localOnly: !isDemo };
+    if (!isDemo && localSpeech) {
+      opt.audioSource = function (text, rate, signal) {
+        return api('/tts', { method: 'POST', signal: signal, body: JSON.stringify({ packId: pack.packId, text: text, rate: rate }) }, true);
+      };
+      opt.startTimeout = 8000;
+      opt.onloading = function () { if (checkAccount()) showBanner('영어 음성을 여는 중…', 'tts'); };
+    }
+    if (!isDemo) {
+      opt.onstart = function () { if (checkAccount()) clearBanner('tts'); };
+      opt.onerror = function (why) {
+        if (!checkAccount()) return;
+        showBanner(why === 'audio-preparing' ? '이 단원의 음성을 PC에서 미리 준비하고 있습니다. 준비 완료 후 다시 눌러 주세요.' : why === 'local-voice-unavailable' || why === 'language-unavailable' || why === 'unsupported'
+          ? '이 기기에는 영어 읽기 음성이 없습니다. 기기의 영어 음성 설정을 확인해 주세요.'
+          : '음성을 재생하지 못했습니다. 다시 듣기를 눌러 주세요.', 'tts');
+      };
+    }
+    return opt;
+  }
   function wireTtsBtn(item, id) {
     var b = $(id);
-    if (b) b.onclick = function () { if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(item.ttsText, { lang: 'en' }); };
+    if (b) b.onclick = function () { if (checkAccount() && window.WBVoice) WBVoice.speak(item.ttsText, ttsOptions()); };
   }
   /* 전사(cue 3) 화면에 보여 줄 답 — 생성기는 showAnswer(불리언)+given(전문)으로 준다.
      옛 판·앱 대체본은 showAnswer 에 문자열을 담기도 해서 둘 다 받는다. */
@@ -3436,6 +3682,7 @@
     return { allCorrect: all, perBlank: per };
   }
   function renderItem(item, root) {
+    sourceImageRead++;
     var stageLabel = item.track === 'chunk' ? ZONE_MEAN + (item.day ? ' · ' + item.day : '')
       : item.stage ? '본문 ' + Math.floor(item.stage) + '단계 · ' + (STAGE_NAMES[Math.floor(item.stage)] || '')
       : (item.kind === 'word' || item.wordId ? '단어'
@@ -3447,6 +3694,7 @@
       (item.roundNote ? '<div class="cuebar"><span>' + esc(item.roundNote) + '</span></div>' : '');
 
     if (item.type === 'storedmcq') return renderStored(item, root);
+    if (item.type === 'storedshort') return renderStoredShort(item, root);
 
     /* 청크 짝 맞추기 — 왼쪽 영어를 누르면 소리가 나고, 오른쪽 한글을 눌러 잇는다.
        틀리면 표시만 하고 다시 고를 수 있다(여기서 막히면 첫날이 끝난다). 다 이으면 통과. */
@@ -3473,7 +3721,7 @@
         if (!b || b.disabled) return;
         if (b.hasAttribute('data-en')) {
           clearSel(); pickedEn = Number(b.getAttribute('data-en')); b.classList.add('sel');
-          if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(pairs[pickedEn].en, { lang: 'en' });
+          if (checkAccount() && window.WBVoice) WBVoice.speak(pairs[pickedEn].en, ttsOptions());
           return;
         }
         var ki = Number(b.getAttribute('data-ko'));
@@ -3500,14 +3748,14 @@
       wireTtsBtn(item, 'chTts');
       var chs = $('chs');
       var list = item.choices.slice();
-      if (item.unknownKey) list.push({ key: item.unknownKey, text: '모름 (진단용 — 감점 없음)' });
+      if (item.unknownKey && !list.some(function (c) { return c.key === item.unknownKey; })) list.push({ key: item.unknownKey, text: '모름 (진단용 — 감점 없음)' });
       list.forEach(function (c) {
         var b = document.createElement('button');
         b.textContent = c.text; b.setAttribute('data-k', c.key);
         chs.appendChild(b);
       });
       chs.onclick = function (e) {
-        var b = e.target.closest('button'); if (!b || chs.getAttribute('data-done')) return;
+        var b = e.target.closest('button'); if (!b || b.disabled || chs.getAttribute('data-done')) return;
         chs.setAttribute('data-done', '1');
         var k = b.getAttribute('data-k');
         var ok = k === item.answerKey;
@@ -3666,7 +3914,7 @@
   }
   function renderStored(item, root) {
     var multi = item.answerCount > 1;
-    root.innerHTML = '<div class="q"><div class="qmeta">문항 ' + item.no + (multi ? ' · 정답 ' + item.answerCount + '개 선택' : '') + '</div>' +
+    root.innerHTML = '<div class="q"><div class="qmeta">' + storedItemMeta(item) + (multi ? ' · 정답 ' + item.answerCount + '개 선택' : '') + '</div>' +
       '<div class="prompt sm" style="white-space:pre-line">' + esc(item.prompt) + '</div><div class="choices" id="chs"></div>' +
       (multi ? '<div class="rnext"><button class="btn p big" id="subBtn">확인</button></div>' : '') + '</div>';
     var chs = $('chs');
@@ -3689,7 +3937,7 @@
     if (multi) {
       var picked = [];
       chs.onclick = function (e) {
-        var b = e.target.closest('button'); if (!b || chs.getAttribute('data-done')) return;
+        var b = e.target.closest('button'); if (!b || b.disabled || chs.getAttribute('data-done')) return;
         var k = b.getAttribute('data-k'), i = picked.indexOf(k);
         if (i >= 0) { picked.splice(i, 1); b.classList.remove('sel'); }
         else { picked.push(k); b.classList.add('sel'); }
@@ -3702,10 +3950,58 @@
         grade([b.getAttribute('data-k')]);
       };
     }
+    renderSourceImages(item,root);
+  }
+  function renderStoredShort(item, root) {
+    root.innerHTML='<div class="q"><div class="qmeta">'+storedItemMeta(item)+' · 주관식</div><div class="prompt sm" style="white-space:pre-line">'+esc(item.prompt)+'</div><input class="ans" id="storedShortIn" type="text" aria-label="주관식 답 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="답을 입력하세요"><div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
+    var input=$('storedShortIn');
+    function grade(){var got=normalizeStoredAnswer(input.value),ok=!!got&&item.answerTexts.some(function(a){return normalizeStoredAnswer(a)===got;});input.disabled=true;
+      var feedback=(item.answerTexts.length?'<div class="exp">정답: '+shownAnswers(item.answerTexts).map(esc).join(' / ')+'</div>':'')+(item.explanation?'<div class="exp">'+esc(item.explanation)+'</div>':'');
+      finishItem(item,ok,input.value,feedback);}
+    bindSubmit(grade);
+    input.onkeydown=function(e){if(e.key==='Enter'&&!e.isComposing){e.preventDefault();var b=$('subBtn');if(b&&!b.getAttribute('data-done'))b.onclick();}};
+    renderSourceImages(item,root);
+  }
+  var sourceImageRead = 0;
+  function renderSourceImages(item,root) {
+    var stored=item.stored || {}, hashes=stored.sourceImages;
+    if (!hashes || !hashes.length || stored.source==='00') return;
+    var serial=sourceImageRead, owner=sessionCode, token=sessionToken;
+    var controls=root.querySelectorAll('.choices button,#subBtn,#storedShortIn');
+    if (stored.sourceImageRequired) controls.forEach(function(el){el.disabled=true;});
+    hashes.forEach(function(hash,index){
+      var panel=document.createElement('details'),label=document.createElement('summary'),status=document.createElement('p'),image=document.createElement('img');
+      label.textContent=index ? '관련 원문 '+(index+1) : '문제 원문 보기 · 문항 '+(stored.footnoteNo || item.no);
+      panel.appendChild(label);panel.appendChild(status);panel.appendChild(image);
+      image.alt='문제 원문 '+(stored.footnoteNo || item.no);image.style.cssText='display:block;width:100%;height:auto';
+      panel.style.cssText='margin:16px 0;padding:12px;border:1px solid var(--line);border-radius:8px';
+      root.querySelector('.prompt').insertAdjacentElement('afterend',panel);
+      function current(){return serial===sourceImageRead && owner===sessionCode && token===sessionToken && document.contains(panel);}
+      var loading=false,loaded=false;
+      panel.ontoggle=function(){
+        if(!panel.open || loading || loaded || !current())return;
+        loading=true;status.textContent='원문을 불러오는 중…';
+        fetch('/api/naesin/item-image?id='+encodeURIComponent(item.packId || curPackId())+'&item='+encodeURIComponent(stored.id)+'&index='+index,{cache:'no-store',headers:{Authorization:'Bearer '+token}})
+          .then(function(r){if(!r.ok)throw Error('image');return r.blob();})
+          .then(function(blob){if(!current())return;var reader=new FileReader();reader.onerror=failed;reader.onload=function(){if(!current())return;
+            image.onload=function(){if(!current())return;loaded=true;loading=false;status.textContent='원문에서 해당 문항 번호를 확인하세요.';
+              if(index===0 && stored.sourceImageRequired)controls.forEach(function(el){el.disabled=false;});};
+            image.onerror=failed;image.src=reader.result;};reader.readAsDataURL(blob);}).catch(failed);
+      };
+      function failed(){if(!current())return;loading=false;status.textContent='원문을 불러오지 못했습니다. 접었다 다시 열어 주세요.';}
+      if(index===0 && stored.sourceImageRequired)panel.open=true;
+    });
+  }
+  /* 채점은 허용 답 전부로 하되, 화면에는 구분자(/ ,)·따옴표·->만 다른 변형을 한 번만 보인다 */
+  function shownAnswers(list){var seen={};return list.filter(function(a){var k=String(a).normalize('NFKC').toLowerCase().replace(/->/g,'→').replace(/[\s\/,'"‘’“”`]/g,'');if(seen[k])return false;seen[k]=1;return true;});}
+  function normalizeStoredAnswer(value){return String(value==null?'':value).normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();}
+  function storedItemMeta(item) {
+    var stored = item.stored || {}, source = storedSourceLabel(stored.source);
+    return (source ? esc(source) + ' · ' : '') + '문항 ' + esc(stored.footnoteNo != null ? stored.footnoteNo : item.no);
   }
   function bindSubmit(fn) {
     var b = $('subBtn');
-    b.onclick = function () { if (!b.getAttribute('data-done')) { b.setAttribute('data-done', '1'); fn(); } };
+    b.onclick = function () { if (!b.disabled && !b.getAttribute('data-done')) { b.setAttribute('data-done', '1'); fn(); } };
   }
 
   /* ════════ 수업 라이브 (계약 L3 · 기획서 §15-3) ════════
@@ -3718,7 +4014,7 @@
      쪽지시험은 반 전체가 같은 순간에 같은 문제를 봐야 성립한다. */
   var LIVE_POLL_MS = 5000, LIVE_POLL_BUSY_MS = 10000;   /* 러너가 열려 있으면 네트워크를 덜 쓴다 */
   var LIVE_AUTO_MS = 3000;                              /* 홈에 있으면 이만큼 뒤 스스로 이동 */
-  var liveState = null, livePollId = null, liveClockId = null;
+  var liveState = null, liveScope = null, livePollId = null, liveClockId = null;
   var liveSeen = '';          /* 이미 안내한 단계 — 같은 단계로 계속 자동 이동하지 않게 */
   var liveAutoId = null;
   var pjSeen = '';            /* 이미 본 투사 문제(ref) — 문제가 넘어가면 응답 화면을 새로 그린다 */
@@ -3747,10 +4043,11 @@
     if (!authed) return;
     api('/live').then(function (r) {
       liveState = (r && r.live) || null;
+      liveScope = (r && r.scope) || null;
       liveApply();
     }).catch(function () {
       /* 수업 신호를 못 받는 것은 학습을 막을 일이 아니다 — 띠만 내리고 조용히 다음 폴링을 기다린다 */
-      liveState = null; liveApply();
+      liveState = null; liveScope = null; liveApply();
     });
   }
   function liveApply() {
@@ -3804,10 +4101,13 @@
   /* ── 투사 응답 ──
      화면(TV)에 문제가 있고 태블릿에는 보기 버튼만 있다. 정답은 서버가 공개할 때까지
      응답에 실려 오지 않는다(계약 L1) — 여기서 정답을 알 방법이 없어야 맞다. */
+  function projectorSession(pj) { return String(liveScope||'')+'|'+String(pj.packId||'')+'|'+String(pj.startedAt||''); }
   function pjApply(pj) {
     var it = pj.item;
     var box = $('pjv');
-    if (pjSeen !== it.ref) { pjSeen = it.ref; pjPick = null; pjSent = false; }
+    var session=projectorSession(pj),seen=session+'|'+it.ref;
+    if(pjSession!==session){pjSession=session;pjDone={};}
+    if (pjSeen !== seen) { pjSeen = seen; pjPick = null; pjSent = false; }
     $('pjNo').textContent = (pj.index + 1) + ' / ' + pj.count;
     $('pjSub').textContent = pj.revealed ? '정답이 공개됐어요.' : '문제는 앞 화면에 있어요. 답만 고르세요.';
     var ch = $('pjCh');
@@ -3826,7 +4126,7 @@
       else if (pjPick === it.answerKey) { msg.className = 'pmsg ok'; msg.textContent = '맞았어요.'; }
       else { msg.className = 'pmsg bad'; msg.textContent = '틀렸어요 — 정답은 ' + esc(it.answerKey) + '번이에요.'; }
       /* 결과는 오답노트로 들어간다 — 별도 통계를 만들지 않는다(계약 L3) */
-      pjRecord(it, pjPick === it.answerKey);
+      pjRecord(it, pjPick === it.answerKey, pj.packId);
     } else {
       msg.className = 'pmsg' + (pjSent ? ' ok' : '');
       msg.textContent = pjSent ? '제출했어요. 다음 문제를 기다리세요.' : '';
@@ -3850,13 +4150,15 @@
     var b = e.target.closest('button[data-pjk]');
     if (!b || b.disabled) return;
     var pj = liveState && liveState.projector;
-    if (!pj || !pj.item || pj.revealed) return;
+    if (!pj || !pj.item || pj.revealed || !liveScope) return;
+    var scope=liveScope,seen=projectorSession(pj)+'|'+pj.item.ref;
     pjPick = b.getAttribute('data-pjk');
     pjSent = false;
     pjApply(pj);                       /* 고른 것을 먼저 보여 준다 — 왕복을 기다리면 눌렸는지 알 수 없다 */
-    api('/live/answer', { method: 'POST', body: JSON.stringify({ ref: pj.item.ref, key: pjPick }) })
-      .then(function () { pjSent = true; if (liveState && liveState.projector) pjApply(liveState.projector); })
+    api('/live/answer', { method: 'POST', body: JSON.stringify({ scope:scope,ref: pj.item.ref, key: pjPick }) })
+      .then(function () { if(pjSeen!==seen)return;pjSent = true; if (liveState && liveState.projector) pjApply(liveState.projector); })
       .catch(function () {
+        if(pjSeen!==seen)return;
         /* 제출이 실패하면 고른 표시를 지운다 — 낸 줄 알고 기다리는 것이 가장 나쁘다 */
         pjPick = null; pjSent = false;
         if (liveState && liveState.projector) pjApply(liveState.projector);
@@ -3864,22 +4166,26 @@
       });
   });
   /* 투사 문제의 오답노트 키 — ref 가 '<유형>:<단어id>' 라 그 유형의 재시험 생성기로 이어진다 */
-  var pjDone = {};
-  function pjRecord(it, ok) {
-    if (!it || pjPick == null || pjDone[it.ref]) return;
+  var pjDone = {},pjSession='';
+  function pjRecord(it, ok, pid) {
+    if (!checkAccount() || !it || !pid || !PACKS[pid] || rangeIds().indexOf(pid)<0 || pjPick == null || pjDone[it.ref]) return;
     pjDone[it.ref] = true;
     var parts = String(it.ref || '').split(':');
     var type = parts[0], ref = parts[1];
     if (GEN_KEYS.indexOf(type) < 0 || !ref) return;
-    markWrong('gen:' + type + ':' + ref, { kind: 'gen', type: type, ref: ref }, ok, Date.now(), curPackId());
-    logEvent('projector', type, ref, ok);
-    persist();
+    markWrong('gen:' + type + ':' + ref, { kind: 'gen', type: type, ref: ref }, ok, Date.now(), pid);
+    logEvent('projector', type, ref, ok, pid);
+    touchPack(pid);
+    persist(pid);
   }
 
   /* ── 렌더 루트 ── */
   function render() {
+    if (!checkAccount()) return;
     renderHeader();
     if (!pack) { layoutFull('<p class="muted">교재를 불러오는 중…</p>'); return; }
+    $('tabs').querySelectorAll('button').forEach(function(button){var tab=button.getAttribute('data-tab');button.hidden=pack.contentMode==='questions'&&(tab==='words'||tab==='passage'&&!pack.sentences.length);});
+    if (pack.contentMode==='questions' && (view==='words'||view==='passage'&&!pack.sentences.length)) view='quiz';
     if (view === 'home') renderHome();
     else if (view === 'words') renderWords();
     else if (view === 'passage') renderPassage();
@@ -3894,23 +4200,35 @@
     return fetch('./pack-sample.json').then(function (r) { return r.json(); });
   }
   function openLoaded() {
+    if (!checkAccount()) return;
     var n = ensureStatesAll();       // 범위 전체 — 아직 안 연 과의 단어·문장도 합계에 들어가야 한다
     if (n) persist(); else save();   // 실제로 상태를 만들었을 때만 서버 push — 열기만으로 savedAt을 올리지 않는다
     setTab('home');
   }
   function openDemo() {
-    return loadDemo().then(function (p) { pack = normPack(p); PACKS[p.packId] = pack; demoMode = true; openLoaded(); });
+    return loadDemo().then(function (p) { if (!checkAccount()) return; pack = normPack(p); PACKS[p.packId] = pack; quizSource = ''; selType = null; demoMode = true; openLoaded(); });
   }
   /* 시험 범위 팩 전부 로드 — 실제 시험 범위는 보통 2~3개 과다. 하나라도 열리면 학습을 시작한다:
      한 과의 팩이 삭제·오류여도 나머지 범위까지 막을 이유가 없다. 전부 실패해야 부팅 오류다. */
   function loadRangePacks() {
     if (!packList.length) return Promise.reject(new Error('no-pack'));
+    if(isLibrary())return api('/catalog').then(function(r){
+      if(!checkAccount())throw new Error('account-changed');
+      packCatalog=(r.packs||[]).filter(function(p){return packList.indexOf(p.packId)>=0;});
+      if(!packCatalog.length)throw new Error('no-pack');
+      var pid=DB.last&&packCatalog.some(function(p){return p.packId===DB.last.packId;})?DB.last.packId:packCatalog[0].packId;
+      return api('/pack?id='+encodeURIComponent(pid)).then(function(r){
+        if(!checkAccount())throw new Error('account-changed');
+        pack=normPack(r.pack);PACKS={};PACKS[pid]=pack;applyServerExamAll();return [{id:pid,pack:pack}];
+      });
+    });
     var errs = [];
     return Promise.all(packList.map(function (id) {
       return api('/pack?id=' + encodeURIComponent(id))
         .then(function (r) { return { id: id, pack: r.pack, updatedAt: r.updatedAt || null }; })
         .catch(function (e) { errs.push(e); return null; });
     })).then(function (list) {
+      if (!checkAccount()) throw new Error('account-changed');
       var got = list.filter(function (x) { return x && x.pack && x.pack.packId; });
       if (!got.length) {
         /* 배정 밖(403)만이면 '아직 배정되지 않음'이다 — 서버 오류가 아니라 A7 안내 화면 */
@@ -3918,7 +4236,6 @@
         throw errs[0] || new Error('no-pack');
       }
       got.forEach(function (g) { PACKS[g.id] = normPack(g.pack); });
-      cachePacks(got);
       /* 지금 열 과 — 마지막으로 보던 과가 범위에 남아 있으면 그것, 아니면 범위의 첫 과 */
       var pid = (DB.last && PACKS[DB.last.packId]) ? DB.last.packId : got[0].id;
       pack = PACKS[pid];
@@ -3928,11 +4245,12 @@
   }
   function fatal(html) { layoutFull('<div class="card" style="max-width:560px;margin:40px auto">' + html + '</div>'); }
   function bootError(e) {
+    if (studyStopped) return;
     var msg = (e && e.message) || '';
     if (msg === 'api-401') {
       fatal('<h2>연동이 만료되었습니다</h2><p class="muted">학원 QR로 다시 연동해 주세요.</p>' +
-        '<div class="row2" style="margin-top:10px"><a class="btn p" href="/">연동 화면으로</a><button class="btn" id="unlinkBtn">이 기기의 연동 해제</button></div>');
-      $('unlinkBtn').onclick = function () { try { localStorage.removeItem('wbr.auth'); } catch (x) {} clearPackCache(); location.href = '/'; };
+        '<div class="row2" style="margin-top:10px"><a class="btn p" href="/?app=naesin">연동 화면으로</a><button class="btn" id="unlinkBtn">이 기기의 연동 해제</button></div>');
+      $('unlinkBtn').onclick = function () { if (!checkAccount()) return; try { localStorage.removeItem('wbr.auth'); } catch (x) {} clearPackCache(); location.href = '/?app=naesin'; };
       return;
     }
     if (msg === 'no-pack') {
@@ -3943,22 +4261,6 @@
       return;
     }
     if (isNetErr(e)) {
-      var c = loadPacksCache();
-      if (c) {
-        /* 오프라인 — 캐시된 시험 범위 전체를 연다. 기록은 로컬에 쌓이고 다음 연결 때 push된다
-           (팩별 savedAt 병합). 범위가 여러 과면 오프라인에서도 과 전환이 그대로 된다. */
-        Object.keys(c).forEach(function (id) { if (c[id] && c[id].pack) PACKS[id] = normPack(c[id].pack); });
-        var ids = packList.filter(function (id) { return !!PACKS[id]; });
-        if (!ids.length) ids = Object.keys(PACKS);
-        /* /exam 도 못 받은 상태다 — 캐시에 담긴 팩 목록이 곧 마지막으로 아는 시험 범위다.
-           이걸 안 채우면 범위를 캐시해 두고도 과 선택이 사라져 한 과만 열린다. */
-        packList = ids.slice();
-        var pid = (DB.last && PACKS[DB.last.packId]) ? DB.last.packId : ids[0];
-        pack = PACKS[pid];
-        offlineMode = true;
-        openLoaded();
-        return;
-      }
       fatal('<h2>연결 실패</h2><p class="muted">서버에 연결할 수 없습니다. 인터넷 연결을 확인하고 다시 시도하세요.</p>' +
         '<button class="btn p" id="retryBtn" style="margin-top:10px">다시 시도</button>');
       $('retryBtn').onclick = function () { location.reload(); };
@@ -3972,6 +4274,7 @@
   function migrateLegacy() {
     var legacy = null;
     try { legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null'); } catch (e) {}
+    if (sessionCode && (!legacy || legacy.owner !== sessionCode)) return false;
     if (!legacy || !legacy.packs || Object.keys(legacy.packs).length === 0) return false;
     if (Object.keys(DB.packs).length) return false;
     DB.packs = legacy.packs;
@@ -3981,8 +4284,10 @@
     return true;
   }
   function boot() {
+    clearPackCache();
     var a = auth();
     var code = (a && a.token && a.code) ? String(a.code) : null;
+    sessionCode = code; sessionToken = code ? a.token : null;
     KEY = 'wbn.v1:' + (code || 'demo');
     DB = loadDB();
     if (!DB || (code && DB.owner && DB.owner !== code)) DB = { v: 1, packs: {}, savedAt: 0 };
@@ -3997,6 +4302,7 @@
     api('/exam').then(function (r) {
       var ex = (r && r.exam) || {};
       examServer = ex;
+      localSpeech = r.localTts === true;
       packList = (ex.packIds || []).slice();
       /* 원격 pull이 먼저다 — 로컬에 뭐가 있든 원격이 더 새로우면 그것을 받은 뒤 팩을 연다 */
       return api('/state').then(function (sr) {
@@ -4005,9 +4311,11 @@
         if (!pulled && !(remote && remote.packs && Object.keys(remote.packs).length)) {
           if (migrateLegacy()) { save(); scheduleSync(); }
         }
-        /* pull이 됐으면 옛 단일 키는 이 기기에서 역할이 끝났다 — 남겨 두면 공용 태블릿에서 다음 학생이
-           부팅할 때 남의 레거시 기록이 이관되어 그 학생의 서버 상태로 올라간다. */
-        try { localStorage.removeItem(LEGACY_KEY); } catch (e) {}
+        /* 소유자 불명 레거시는 학생에게 섞거나 원본을 삭제하지 않는다. */
+        try {
+          var legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null');
+          if (legacy && legacy.owner === sessionCode && remote && remote.packs && Object.keys(remote.packs).length) localStorage.removeItem(LEGACY_KEY);
+        } catch (e) {}
         /* 오프라인에서 공부한 분량 — 로컬이 더 새로운 팩이 하나라도 있으면 다음 학습 행동을 기다리지 않고
            지금 올린다(관리 현황판이 재부팅 후에도 뒤처지지 않게). */
         var localNewer = Object.keys(DB.packs).some(function (pid) {
@@ -4024,16 +4332,28 @@
       }).then(function () {
         return loadRangePacks();
       });
-    }).then(function () { openLoaded(); liveStart(); }).catch(bootError);
+    }).then(function () {
+      openLoaded();
+      if (!checkAccount()) return;
+      liveStart();
+      accessTimer = setInterval(checkAccess, 30000);
+    }).catch(bootError);
   }
   /* 원격 상태를 팩별 savedAt 비교로 받아 적는다(pullState와 같은 규칙, 부팅용 동기 버전) */
-  function pullAdopt(remote) {
+  function pullAdopt(remote, sent) {
+    if (!checkAccount()) return false;
+    if (remote && remote.owner != null && remote.owner !== DB.owner) return false;
     if (!remote || !remote.packs || typeof remote.packs !== 'object') return false;
+    recoverStateStamps(DB); recoverStateStamps(remote);
     var changed = false;
     Object.keys(remote.packs).forEach(function (pid) {
       var rp = remote.packs[pid], lp = DB.packs[pid];
       if (!rp || typeof rp !== 'object') return;
-      if (!lp || (rp.savedAt || 0) > (lp.savedAt || 0)) { DB.packs[pid] = rp; changed = true; }
+      /* 동률 충돌은 서버 확정을 받되, 요청 뒤 새로 공부한 이 기기 기록은 덮지 않는다. */
+      var acknowledged = sent && sent.packs && sent.packs[pid] && JSON.stringify(lp) === JSON.stringify(sent.packs[pid]);
+      if (!lp || (rp.savedAt || 0) > (lp.savedAt || 0) || (acknowledged && (rp.savedAt || 0) === (lp.savedAt || 0) && JSON.stringify(rp) !== JSON.stringify(lp))) {
+        DB.packs[pid] = rp; changed = true;
+      }
     });
     if ((remote.savedAt || 0) > (DB.savedAt || 0)) {
       if (remote.last) DB.last = remote.last;

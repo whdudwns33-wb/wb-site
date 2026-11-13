@@ -13,14 +13,18 @@
  * 겸해서 로컬 서버의 몸통 상한(팩 4.5MB·기록 300KB → 413 JSON)과 큰 한글 몸통의
  * 조각 경계 디코딩, 예약어 코드('default') 등록 거부도 실제 HTTP 로 확인한다.
  */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
-const PORT = 8900 + (process.pid % 90);
+// 운영 Mac의 8910/8920/8930/8951과 충돌하지 않는 임시 포트.
+const probe = (await import('node:net')).createServer();
+await new Promise(resolve => probe.listen(0, '127.0.0.1', resolve));
+const PORT = probe.address().port;
+await new Promise(resolve => probe.close(resolve));
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'wbr-life-'));
 const PIN = 'test-pin-not-a-real-secret';  // 테스트 전용 — 서버는 이제 ADMIN_PIN 기본값을 갖지 않아 여기서 넣어 준다
 const BASE = `http://127.0.0.1:${PORT}`;
@@ -83,20 +87,51 @@ try {
   const PACK_ID = 'life-dummy-pack';
   const KO = '더미 문장 — 자체 창작 한글 본문. '.repeat(20000);
   const up = await req('/api/naesin/admin/pack', { method: 'POST', token: admin,
-    body: { id: PACK_ID, pack: { packId: PACK_ID, words: [], sentences: [{ en: 'dummy', ko: KO }] } } });
+    body: { id: PACK_ID, pack: { packId: PACK_ID,
+      rights: { basis: 'self_authored', holder: 'WB 자체 테스트', studentUseAllowed: true, derivativeUseAllowed: true, externalAiAllowed: false },
+      words: [{ id: 'w-dummy', headword: 'dummy', meaningKo: ['더미'], sections: ['reading'] }],
+      sentences: [{ seq: 1, dayGroup: '첫 단락', en: 'Dummy sentence.', ko: KO }] } } });
   ok(up.body.ok, '⑥-2 내신 팩 업로드 실패: ' + JSON.stringify(up.body).slice(0, 200));
   const back = await req('/api/naesin/pack?id=' + PACK_ID, { token: admin });
   ok(back.status === 200 && back.body.pack && back.body.pack.sentences[0].ko === KO,
     '⑥-2 큰 한글 팩이 올린 그대로 돌아오지 않는다 — 조각 경계에서 글자가 깨졌다');
   ok((await req('/api/naesin/pack?id=' + PACK_ID, { token: stuTok })).status === 403, '⑥-2 배정 전인데 학생이 팩을 받는다');
+  const setExam = (scope, wordDeadlineDays) => req('/api/naesin/admin/exam', { method: 'POST', token: admin,
+    body: { scope, examDate: '2099-12-31', packIds: [PACK_ID], wordDeadlineDays } });
+  const delExam = (scope) => req('/api/naesin/admin/exam', { method: 'DELETE', token: admin, body: { scope } });
+  const questionPack={packId:'life-question-pack',contentMode:'questions',rights:{basis:'self_authored',holder:'Own fixture',evidenceRef:'Synthetic only',studentUseAllowed:true,derivativeUseAllowed:true,externalAiAllowed:false},words:[],sentences:[],items:[{id:'own-question',no:1,source:'00',formatType:'short',instructionKo:'Fill in the blank.',stimulus:{type:'text',parts:[{text:'The sky is ____.'}]},choices:[],answer:['blue'],answerCount:1}]};
+  ok((await req('/api/naesin/admin/pack',{method:'POST',token:admin,body:{id:questionPack.packId,pack:questionPack}})).body.ok,'문제 전용 팩 등록 실패');
+  ok((await req('/api/naesin/admin/exam',{method:'POST',token:admin,body:{scope:'cls:A',mode:'practice',examDate:'',packIds:[questionPack.packId]}})).body.ok,'시험일 없는 문제 팩 반 배정 실패');
+  const assignedQuestions=(await req('/api/naesin/pack?id='+questionPack.packId,{token:stuTok}));
+  ok(assignedQuestions.status===200&&assignedQuestions.body.pack?.contentMode==='questions'&&assignedQuestions.body.pack?.items.length===1,'학생 문제 전용 팩 수신 실패');
+  await delExam('cls:A');
+  ok((await setExam('default', 8)).body.ok, '⑥-2 전체 공통 시험 배정 실패');
+  ok((await setExam('cls: A ', 6)).body.scope === 'cls:A', '⑥-2 반 시험 키 정규화 실패');
+  const classExam = (await req('/api/naesin/exam', { token: stuTok })).body;
+  ok(classExam.scope === 'class' && classExam.exam.wordDeadlineDays === 6, '⑥-2 반 시험이 공통보다 우선하지 않는다');
+  ok((await req('/api/naesin/pack?id=' + PACK_ID, { token: stuTok })).status === 200, '⑥-2 반 배정된 팩을 학생이 못 받는다');
   ok((await req('/api/naesin/admin/exam', { method: 'POST', token: admin,
     body: { scope: CODE, examDate: '2099-12-31', packIds: [PACK_ID], wordDeadlineDays: 10 } })).body.ok, '⑥-2 개별 시험 배정 실패');
   const exam = (await req('/api/naesin/exam', { token: stuTok })).body;
   ok(exam.scope === 'student' && exam.exam.wordDeadlineDays === 10, '⑥-2 개별 배정이 학생에게 안 보인다: ' + JSON.stringify(exam));
   ok((await req('/api/naesin/pack?id=' + PACK_ID, { token: stuTok })).status === 200, '⑥-2 배정된 팩을 학생이 못 받는다');
+  await delExam(CODE);
+  ok((await req('/api/naesin/exam', { token: stuTok })).body.scope === 'class', '⑥-2 개별 해제 후 반 시험으로 폴백하지 않는다');
+  await delExam('cls:A');
+  const commonExam = (await req('/api/naesin/exam', { token: stuTok })).body;
+  ok(commonExam.scope === 'default' && commonExam.exam.wordDeadlineDays === 8, '⑥-2 반 해제 후 공통 시험으로 폴백하지 않는다');
+  await delExam('default');
+  ok((await req('/api/naesin/exam', { token: stuTok })).body.scope === null, '⑥-2 배정 전체 해제 후에도 시험이 남는다');
+  ok((await req('/api/naesin/pack?id=' + PACK_ID, { token: stuTok })).status === 403, '⑥-2 배정 전체 해제 후에도 팩을 받는다');
+  await setExam('cls:A', 6);
+  await setExam(CODE, 10);
   ok((await req('/api/naesin/state', { method: 'PUT', token: stuTok,
     body: { state: { marker: 'naesin-life', summary: { packId: PACK_ID, word: { total: 1, reached: 1 } } } } })).body.ok, '⑥-2 내신 기록 저장 실패');
   ok((await req('/api/naesin/state', { token: stuTok })).body.state?.marker === 'naesin-life', '⑥-2 내신 기록을 다시 못 읽는다');
+  const beforeQuestions=(await req('/api/naesin/state',{token:stuTok})).body.state;
+  ok((await req('/api/naesin/state',{method:'PUT',token:stuTok,body:{state:{...beforeQuestions,owner:CODE,packs:{...beforeQuestions.packs,[questionPack.packId]:{savedAt:Date.now(),wrong:{'i:id:own-question':{cleared:false}}}},savedAt:Date.now()}}})).body.ok,'문제 전용 학습 기록 저장 실패');
+  const questionState=(await req('/api/naesin/state',{token:stuTok})).body.state;
+  ok(questionState?.packs?.[questionPack.packId]?.wrong?.['i:id:own-question']?.cleared===false,'문제 전용 오답 기록 왕복 실패');
   const exams = (await req('/api/naesin/admin/exams', { token: admin })).body.exams || [];
   ok(exams.some(e => e.scope === CODE && e.name === '수명시험' && e.expired === false), '⑥-2 배정 현황에 학생별 배정이 없다');
   ok((await req('/api/naesin/admin/pack', { method: 'DELETE', token: admin, body: { id: PACK_ID } })).status === 409,
@@ -193,6 +228,8 @@ try {
     '⑨ 지운 학생의 상세가 아직 200 이다 — 관리 화면이 빈 상세 창을 열다 터진다');
   ok(!((await req('/api/naesin/admin/exams', { token: admin })).body.exams || []).some(e => e.scope === CODE),
     '⑨ 퇴원했는데 내신 개별 시험 배정이 남아 있다');
+  ok(((await req('/api/naesin/admin/exams', { token: admin })).body.exams || []).some(e => e.scope === 'cls:A' && e.cls === 'A'),
+    '⑨ 학생 퇴원이 반 전체 시험 배정도 지웠다');
   ok(!((await req('/api/naesin/admin/overview', { token: admin })).body.students || []).some(s => s.code === CODE),
     '⑨ 퇴원했는데 내신 성취도 목록에 남아 있다');
 
@@ -207,6 +244,7 @@ try {
   ok((await req('/api/naesin/exam', { token: newTok })).body.scope !== 'student', '⑩ 새 학생에게 앞 학생의 개별 시험 배정이 따라왔다');
   ok((await req('/api/naesin/pack?id=' + PACK_ID, { token: newTok })).status === 403, '⑩ 새 학생이 앞 학생의 팩을 받는다');
   await req('/api/admin/students', { method: 'DELETE', token: admin, body: { code: CODE } });
+  await delExam('cls:A');
   /* 배정이 없어졌으니 팩도 지워진다 — 목록에서도 빠진다 */
   ok((await req('/api/naesin/admin/pack', { method: 'DELETE', token: admin, body: { id: PACK_ID } })).body.ok, '⑩ 배정 해제 뒤에도 팩이 안 지워진다');
   ok(!((await req('/api/naesin/admin/packs', { token: admin })).body.packs || []).includes(PACK_ID), '⑩ 지운 팩이 목록에 남아 있다');
@@ -216,7 +254,10 @@ try {
   ok(!disk.includes(CODE), '⑪ 저장 파일에 지운 학생 코드가 남아 있다');
   ok(!disk.includes(HCODE) && !disk.includes('haru-life'), '⑪ 저장 파일에 지운 하루 학생의 기록이 남아 있다');
   ok(disk.includes(HKEY), '⑪ 저장 파일에서 대응표가 사라졌다');
-  ok(!disk.includes(PACK_ID) && !disk.includes('자체 창작 한글 본문'), '⑪ 저장 파일에 지운 팩이 남아 있다');
+  const reloaded = spawnSync(process.execPath, ['--input-type=module', '-e',
+    `import assert from 'node:assert/strict';import {load} from ${JSON.stringify(new URL('./store.mjs', import.meta.url).href)};const db=load();assert.ok(!db.naesin.packs[${JSON.stringify(PACK_ID)}]);assert.ok(!db.naesin.packIds.includes(${JSON.stringify(PACK_ID)}));`],
+    { env: { ...process.env, DATA_DIR: DATA }, windowsHide: true });
+  ok(reloaded.status === 0, '⑪ 재기동하면 지운 팩이 본문이나 목록에 되살아난다');
   /* 일일 스냅샷은 팩 본문을 싣지 않는다 — 라이선스 원문이 백업 파일로 흩어지지 않게 */
   const snapDay = (await req('/api/admin/backup-now', { method: 'POST', token: admin })).body.day;
   const snap = (await req('/api/admin/export?backup=' + snapDay, { token: admin })).body;
