@@ -70,12 +70,31 @@ export function normalizeSheet(id, s) {
     questions.push({ no, type, page, answer });
   }
   questions.sort((a, b) => a.no - b.no);
+  /* 문항 영역(한 문제씩 보기) — 쪽 그림 위 사각형, 쪽 크기 대비 비율. 위치뿐이라 학생에게 나가도 정답이 새지 않는다.
+     정답·해설 쪽(answerFrom 이후)을 가리키면 거절한다 — 제출 전에 그 쪽 그림을 받을 수 없으니 화면도 그릴 수 없다. */
+  const crops = {};
+  if (s.crops != null) {
+    if (typeof s.crops !== 'object' || Array.isArray(s.crops)) return '문항 영역(crops) 형식이 아니에요.';
+    const nos = new Set(questions.map((q) => q.no));
+    const unit = (v) => typeof v === 'number' && v >= 0 && v <= 1;
+    for (const [k, rects] of Object.entries(s.crops)) {
+      const no = Number(k);
+      if (kind === 'note' || (nos.size && !nos.has(no))) continue;   // 문항 수를 줄였으면 남은 영역은 버린다
+      if (!Number.isInteger(no) || no < 1 || no > 999 || !Array.isArray(rects) || !rects.length || rects.length > 4) return no + '번 문항 영역이 잘못됐어요.';
+      for (const r of rects) {
+        const p = Number(r && r.p);
+        if (!Number.isInteger(p) || p < 1 || p > pages || (answerFrom && p >= answerFrom)) return no + '번 문항 영역의 쪽이 문제 쪽을 벗어나요.';
+        if (![r.x, r.y, r.w, r.h].every(unit) || r.w <= 0 || r.h <= 0 || r.x + r.w > 1.001 || r.y + r.h > 1.001) return no + '번 문항 영역 좌표가 쪽을 벗어나요.';
+      }
+      crops[no] = rects.map((r) => ({ p: Number(r.p), x: r.x, y: r.y, w: r.w, h: r.h }));
+    }
+  }
   /* 학생에게 여는 것(open)은 정답이 다 찬 뒤에만 — 빈 정답으로 채점하면 전원 오답이 된다(Q9). */
   const missing = questions.filter((q) => q.type !== 'essay' && !q.answer).map((q) => q.no);
   const open = !!s.open;
   if (open && kind === 'test' && !questions.length) return '문항이 하나도 없으면 열 수 없어요.';
   if (open && missing.length) return '정답이 빈 문항이 있어 열 수 없어요: ' + missing.slice(0, 10).join(', ') + '번';
-  return { id, title, subject: s.subject, grade: str(s.grade, 10), unit: str(s.unit, 40), step, kind, pages, answerFrom, questions, open };
+  return { id, title, subject: s.subject, grade: str(s.grade, 10), unit: str(s.unit, 40), step, kind, pages, answerFrom, questions, open, crops };
 }
 
 const indexEntry = (s) => ({ id: s.id, title: s.title, subject: s.subject, grade: s.grade, unit: s.unit, step: s.step,

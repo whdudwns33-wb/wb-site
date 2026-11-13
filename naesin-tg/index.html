@@ -71,6 +71,14 @@
     .pframe { margin: 0 auto; max-width: 900px; overflow: hidden; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.18); }
     .pframe img { display: block; width: 100%; height: auto; }
     .pframe.left img { width: 200%; } .pframe.right img { width: 200%; margin-left: -100%; }
+    /* 한 문제씩 보기 — 쪽 그림에서 그 문항 영역만 잘라 그린다(지면은 고치지 않는다) */
+    .qframe { margin: 0 auto; max-width: 760px; display: flex; flex-direction: column; gap: 4px; }
+    .qframe canvas { display: block; width: 100%; height: auto; background: #fff; box-shadow: 0 1px 6px rgba(0,0,0,.18); }
+    .qgrid { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 12px; }
+    .qgrid button { min-width: 36px; min-height: 36px; border-radius: 8px; border: 1px solid var(--line); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .qgrid button.has { background: var(--ind-soft); color: var(--ind); }
+    .qgrid button.ok { background: var(--green-soft); color: var(--green); } .qgrid button.no { background: var(--red-soft); color: var(--red); }
+    .qgrid button.cur { outline: 2px solid var(--ind); outline-offset: 1px; }
     .answers { width: 340px; flex-shrink: 0; overflow-y: auto; background: var(--panel); border-left: 1px solid var(--line); padding: 12px; }
     .aq { padding: 10px 0; border-bottom: 1px solid var(--line); }
     .aq.dim { opacity: .5; }
@@ -84,6 +92,7 @@
       body.solving #solve { flex-direction: column; }
       .paper { flex: none; height: 56vh; }
       .answers { width: auto; flex: 1; border-left: 0; border-top: 1px solid var(--line); }
+      #solve.qv .paper { height: auto; max-height: 62vh; }   /* 한 문제씩: 문항 높이만큼만 차지한다 */
     }
   </style>
 </head>
@@ -221,7 +230,8 @@
     api('/sheet?id=' + encodeURIComponent(id)).then(function (r) {
       if (r.status !== 200) { alert(r.body.error || '열지 못했어요.'); return; }
       var b = r.body;
-      S.cur = { sheet: b.sheet, my: b.my, answers: b.answers || null, today: b.today, page: 1, col: 'all', pages: {}, draft: Object.assign({}, b.my.draft), msg: '' };
+      S.cur = { sheet: b.sheet, my: b.my, answers: b.answers || null, today: b.today, page: 1, col: 'all', pages: {}, draft: Object.assign({}, b.my.draft), msg: '',
+        qi: 0, view: hasCrops(b.sheet) ? 'q' : 'page' };
       document.body.classList.add('solving');
       drawSolve();
     });
@@ -239,6 +249,8 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(function () { var C = S.cur; if (C && !C.my.done) api('/draft', { method: 'PUT', body: { id: C.sheet.id, answers: C.draft } }); }, 1200);
   }
+  /* 문항마다 영역이 다 있어야 한 문제씩 보기 — 하나라도 없으면 쪽 화면(예전 그대로)으로 둔다 */
+  function hasCrops(s) { return s.kind === 'test' && s.questions.length > 0 && s.questions.every(function (q) { return s.crops && s.crops[q.no] && s.crops[q.no].length; }); }
   function lastPage() { var s = S.cur.sheet; return (s.answerFrom && !S.cur.my.done) ? s.answerFrom - 1 : s.pages; }
   function canRetry(w) { return w && !w.cleared && w.dates[w.dates.length - 1] !== S.cur.today; }
 
@@ -270,11 +282,54 @@
     }
     if (retry) body += '<button class="btn" style="margin-top:8px" data-retry="' + q.no + '">다시 풀기 제출</button>';
     else if (done && w && !w.cleared) body += '<p class="small muted" style="margin:6px 0 0">내일부터 다시 풀 수 있어요.</p>';
-    return '<div class="aq' + (q.page === C.page || done ? '' : ' dim') + '">' + head + body + '</div>';
+    return '<div class="aq' + (C.view === 'q' || q.page === C.page || done ? '' : ' dim') + '">' + head + body + '</div>';
+  }
+
+  function qGrid() {
+    var C = S.cur, done = C.my.done;
+    return '<div class="qgrid" role="group" aria-label="문항 고르기">' + C.sheet.questions.map(function (q, i) {
+      var cls = done && q.type !== 'essay' ? (done.marks[q.no] ? 'ok' : 'no') : (C.draft[q.no] ? 'has' : '');
+      return '<button data-goq="' + i + '" class="' + cls + (i === C.qi ? ' cur' : '') + '" aria-current="' + (i === C.qi) + '" aria-label="' + q.no + '번' + (cls === 'has' ? ' 답함' : cls === 'ok' ? ' 맞음' : cls === 'no' ? ' 틀림' : '') + '">' + q.no + '</button>';
+    }).join('') + '</div>';
+  }
+  function drawQuestion() {
+    var C = S.cur, s = C.sheet, done = C.my.done, n = s.questions.length, q = s.questions[C.qi];
+    var left = s.questions.filter(function (x) { return !C.draft[x.no]; }).length;
+    $('solve').innerHTML = '<div class="paper"><div class="ptools">'
+      + '<button class="btn mut" id="back">← 목록</button>'
+      + '<button class="btn ghost" id="qprev"' + (C.qi <= 0 ? ' disabled' : '') + ' aria-label="앞 문제">‹</button><span class="pg">' + (C.qi + 1) + ' / ' + n + '</span>'
+      + '<button class="btn ghost" id="qnext"' + (C.qi >= n - 1 ? ' disabled' : '') + ' aria-label="다음 문제">›</button>'
+      + '<button class="btn mut" id="pagemode">지면 전체</button>'
+      + (done && s.answerFrom ? '<button class="btn ghost" id="expl">정답·해설 쪽</button>' : '')
+      + '</div><div class="pview"><div class="qframe" id="qframe" role="img" aria-label="' + esc(s.title) + ' ' + q.no + '번 문제"></div></div></div>'
+      + '<div class="answers"><div class="row" style="justify-content:space-between"><strong>' + esc(s.title) + '</strong>'
+      + (done ? '<span class="chip">' + done.score + ' / ' + done.total + '</span>' : '') + '</div>'
+      + '<p class="small muted" style="margin:4px 0 0" role="status">' + esc(C.msg || (done ? '채점했어요. 틀린 문제는 해설 쪽을 읽어 보세요.' : '문제를 읽고 답을 고르세요. 다른 번호는 아래에서 고를 수 있어요.')) + '</p>'
+      + answerBox(q)
+      + (C.qi < n - 1 ? '<button class="btn ghost" id="qnext2" style="width:100%;margin-top:10px">다음 문제 ›</button>' : '')
+      + qGrid()
+      + (done ? '' : '<button class="btn" id="submit" style="width:100%;margin-top:12px">제출하고 채점하기' + (left ? ' (안 푼 ' + left + '문제)' : '') + '</button>')
+      + '</div>';
+    /* 영역마다 캔버스를 순서대로 먼저 만들고, 쪽 그림이 오는 대로 그 부분만 옮겨 그린다 */
+    var frame = $('qframe'), shown = C.qi;
+    (s.crops[q.no] || []).forEach(function (r) {
+      var cv = document.createElement('canvas'); frame.appendChild(cv);
+      loadPage(r.p).then(function (d) {
+        if (S.cur !== C || C.qi !== shown || C.view !== 'q') return;
+        var im = new Image();
+        im.onload = function () {
+          var sx = Math.round(r.x * im.naturalWidth), sy = Math.round(r.y * im.naturalHeight), sw = Math.max(1, Math.round(r.w * im.naturalWidth)), sh = Math.max(1, Math.round(r.h * im.naturalHeight));
+          cv.width = sw; cv.height = sh; cv.getContext('2d').drawImage(im, sx, sy, sw, sh, 0, 0, sw, sh);
+        };
+        im.src = d;
+      }).catch(function (e) { C.msg = e.message; });
+    });
   }
 
   function drawSolve() {
     var C = S.cur, s = C.sheet, done = C.my.done, last = lastPage();
+    $('solve').classList.toggle('qv', C.view === 'q');
+    if (C.view === 'q') return drawQuestion();
     var left = s.questions.filter(function (q) { return !C.draft[q.no]; }).length;
     $('solve').innerHTML = '<div class="paper"><div class="ptools">'
       + '<button class="btn mut" id="back">← 목록</button>'
@@ -282,6 +337,7 @@
       + '<button class="btn ghost" id="next"' + (C.page >= last ? ' disabled' : '') + ' aria-label="다음 쪽">›</button>'
       + ['all', 'left', 'right'].map(function (c) { return '<button class="btn ' + (C.col === c ? '' : 'mut') + '" data-col="' + c + '" aria-pressed="' + (C.col === c) + '">' + { all: '전체', left: '왼쪽 단', right: '오른쪽 단' }[c] + '</button>'; }).join('')
       + (done && s.answerFrom ? '<button class="btn ghost" id="expl">정답·해설 쪽</button>' : '')
+      + (hasCrops(s) ? '<button class="btn" id="qmode">한 문제씩</button>' : '')
       + '</div><div class="pview"><div class="pframe ' + C.col + '"><img id="pimg" alt="' + esc(s.title) + ' ' + C.page + '쪽"></div></div></div>'
       + (s.kind === 'test' ? '<div class="answers"><div class="row" style="justify-content:space-between"><strong>' + esc(s.title) + '</strong>'
         + (done ? '<span class="chip">' + done.score + ' / ' + done.total + '</span>' : '') + '</div>'
@@ -295,9 +351,14 @@
     var C = S.cur, b = e.target.closest('button');
     if (!b || !C) return;
     if (b.id === 'back') { clearTimeout(saveTimer); if (!C.my.done) api('/draft', { method: 'PUT', body: { id: C.sheet.id, answers: C.draft } }); S.cur = null; return refresh(); }
-    if (b.id === 'prev') C.page -= 1;
+    if (b.id === 'qprev') C.qi -= 1;
+    else if (b.id === 'qnext' || b.id === 'qnext2') C.qi += 1;
+    else if (b.dataset.goq) C.qi = Number(b.dataset.goq);
+    else if (b.id === 'pagemode') { C.view = 'page'; C.page = C.sheet.questions[C.qi].page; }
+    else if (b.id === 'qmode') { C.view = 'q'; }
+    else if (b.id === 'prev') C.page -= 1;
     else if (b.id === 'next') C.page += 1;
-    else if (b.id === 'expl') C.page = C.sheet.answerFrom;
+    else if (b.id === 'expl') { C.view = 'page'; C.page = C.sheet.answerFrom; }
     else if (b.dataset.col) C.col = b.dataset.col;
     else if (b.dataset.pick) {
       var box = C.my.done ? (C.retry = C.retry || {}) : C.draft, no = b.dataset.no, cur = String(box[no] || '').replace(/[^1-5]/g, '');
