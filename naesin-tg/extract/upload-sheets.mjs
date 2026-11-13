@@ -55,7 +55,9 @@ if (process.argv[1] && import.meta.url === new URL('file://' + path.resolve(proc
     if (!r.ok) throw new Error(r.status + ' ' + (j.error || ''));
     return j;
   };
-  const token = (await call('/api/admin/login', login)).token;
+  let token;
+  try { token = (await call('/api/admin/login', login)).token; }
+  catch (e) { console.error('관리 로그인 실패: ' + e.message + ' — PIN(또는 아이디·비밀번호)을 확인해 주세요. 아무것도 올리지 않았어요.'); process.exit(1); }
   const have = new Set(((await call('/api/naesin-tg/admin/sheets', null, token)).sheets || []).map((e) => e.id));
   let ok = 0, skip = 0, fail = 0;
   for (const f of files) {
