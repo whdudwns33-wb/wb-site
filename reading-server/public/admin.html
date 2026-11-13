@@ -7,6 +7,9 @@
   <meta name="robots" content="noindex,nofollow">
   <title>WB 진로독서 · 관리</title>
   <style>
+    /* 원내 내신 서버에서는 진로독서 전용 항목을 숨긴다 — 같은 명부 화면을 두 앱이 함께 쓰기 때문 */
+    body.ns .rd-only{display:none!important}
+    table.nsr th:nth-child(n+3):nth-child(-n+13),table.nsr td:nth-child(n+3):nth-child(-n+13){display:none}
     :root{--navy:#173957;--blue:#087ba6;--sky:#eaf7fb;--bg:#f3f7f8;--line:#d9e5e9;--muted:#647784;--ink:#20384c;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b;--coral:#c9503c}
     *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
     header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff}
@@ -77,12 +80,12 @@
 </head>
 <body>
 <header><b>WB 진로독서 · 관리</b><small>강사용 현황판</small><span class="sp"></span>
-  <button class="hbtn" id="linkReview" onclick="location.href='/review.html'">지문 검수</button>
-  <button class="hbtn" onclick="location.href='/admin/vocab-review.html'">연상 검수함</button>
-  <button class="hbtn" onclick="location.href='/admin/metrics.html'">파일럿 지표</button>
-  <button class="hbtn" onclick="location.href='/admin/naesin-admin.html'">내신브레인</button>
-  <button class="hbtn" onclick="location.href='/admin/hanja-admin.html'">어휘브레인</button>
-  <button class="hbtn" onclick="location.href='/admin/letter-admin.html'">브레인레터</button>
+  <button class="hbtn rd-only" id="linkReview" onclick="location.href='/review.html'">지문 검수</button>
+  <button class="hbtn rd-only" onclick="location.href='/admin/vocab-review.html'">연상 검수함</button>
+  <button class="hbtn rd-only" onclick="location.href='/admin/metrics.html'">파일럿 지표</button>
+  <button class="hbtn" id="btnNaesin" onclick="location.href='/admin/naesin-admin.html'">내신브레인</button>
+  <button class="hbtn rd-only" onclick="location.href='/admin/hanja-admin.html'">어휘브레인</button>
+  <button class="hbtn rd-only" onclick="location.href='/admin/letter-admin.html'">브레인레터</button>
   <button class="hbtn" id="btnRefresh" hidden>새로고침</button>
   <button class="hbtn" id="btnLogout" hidden>로그아웃</button>
 </header>
@@ -147,6 +150,12 @@ function fmtLast(t){if(!t)return '—';const d=(Date.now()-new Date(t))/60000;
   if(d<2)return '방금';if(d<60)return Math.round(d)+'분 전';if(d<1440)return Math.round(d/60)+'시간 전';return Math.round(d/1440)+'일 전';}
 function render(){
   $('#btnRefresh').hidden=false;$('#btnLogout').hidden=false;
+  const NS=DATA.studentApp==='naesin';
+  document.body.classList.toggle('ns',NS);
+  document.title=NS?'WB 내신브레인 · 학생 명부':'WB 진로독서 · 관리';
+  $('header b').textContent=NS?'WB 내신브레인 · 학생 명부':'WB 진로독서 · 관리';
+  $('header small').textContent=NS?'학생 등록 · 연동 승인 · 백업':'강사용 현황판';
+  $('#btnNaesin').textContent=NS?'내신브레인 관리':'내신브레인';
   const all=DATA.students.slice();
   const classes=['전체',...new Set(all.map(s=>s.cls).filter(Boolean))];
   let list=FILTER==='전체'?all:all.filter(s=>s.cls===FILTER);
@@ -164,21 +173,21 @@ function render(){
       <span><button class="btn sm ghost" data-deny="${esc(x.nonce)}">거절</button>
       <button class="btn sm" data-appr="${esc(x.nonce)}">승인</button></span></div>`).join('')}
   </div>`:''}
-  <div class="card"><h2>오늘 현황</h2><div class="stats">
+  <div class="card"><h2>${NS?'학생 현황':'오늘 현황'}</h2><div class="stats">
     <div class="stat"><b>${all.length}</b><span>등록 학생</span></div>
     <div class="stat"><b>${linked.length}</b><span>앱 연동</span></div>
-    <div class="stat"><b>${doneToday} / ${linked.length}</b><span>오늘의 1지문 완료</span></div>
-    <div class="stat ${linked.length-doneToday>0?'warn':''}"><b>${linked.length-doneToday}</b><span>오늘 미수행</span></div>
-    <div class="stat ${DATA.vpending>0?'warn':''}"><b>${DATA.vpending||0}</b><span>연상 검수 대기</span></div>
-  </div><p class="muted">기준 ${new Date(DATA.time).toLocaleString('ko-KR')} · 미수행 학생이 위로 정렬됩니다. 학생 이름을 누르면 상세 기록이 열려요.</p></div>
+    <div class="stat rd-only"><b>${doneToday} / ${linked.length}</b><span>오늘의 1지문 완료</span></div>
+    <div class="stat rd-only ${linked.length-doneToday>0?'warn':''}"><b>${linked.length-doneToday}</b><span>오늘 미수행</span></div>
+    <div class="stat rd-only ${DATA.vpending>0?'warn':''}"><b>${DATA.vpending||0}</b><span>연상 검수 대기</span></div>
+  </div><p class="muted">기준 ${new Date(DATA.time).toLocaleString('ko-KR')} ${NS?'· 학습 기록은 「내신브레인 관리」의 성취도에서 봅니다.':'· 미수행 학생이 위로 정렬됩니다. 학생 이름을 누르면 상세 기록이 열려요.'}</p></div>
   <div class="card"><h2>학생 현황판</h2>
     <div class="filters">${classes.map(c=>`<button class="chip" data-f="${esc(c)}" aria-pressed="${FILTER===c}">${esc(c)}</button>`).join('')}
       ${list.length?`<button class="btn sm ghost" id="qrAll">${esc(FILTER)} QR 시트 (${list.length}명)</button>`:''}</div>
     <div id="qrAllBox"></div>
-    <div class="tbl"><table><thead><tr>
+    <div class="tbl"><table class="${NS?'nsr':''}"><thead><tr>
       <th>학생</th><th>반</th><th>읽는 글</th><th>오늘</th><th>연속</th><th>이번 주</th><th>완독</th><th>정답률</th><th>어휘</th><th>워드브레인</th><th>보고서</th><th>독서요약</th><th>훈련</th><th>마지막 활동</th></tr></thead><tbody>
       ${list.map(s=>`<tr>
-        <td><button class="namebtn" data-view="${esc(s.code)}">${esc(s.name||'(미등록)')}</button> <span class="muted">${esc(s.code)}</span></td>
+        <td><button class="namebtn" data-view="${esc(s.code)}">${esc(s.name||'(미등록)')}</button> <span class="muted">${esc(s.code)}</span>${NS?(s.linked?' <span class="tag ok">연동</span>':' <span class="tag muted">미연동</span>'):''}</td>
         <td>${esc(s.cls||'—')}</td>
         <td><select data-lv="${esc(s.code)}" ${s.name?'':'disabled'}>
           ${['','L1','L2','L3','L4'].map(l=>`<option value="${l}" ${s.level===l?'selected':''}>${l?LV[l]:'—'}</option>`).join('')}</select>
@@ -197,7 +206,7 @@ function render(){
       <label>이름<br><input id="fName" style="width:100%"></label>
       <label>학년<br><input id="fGrade" placeholder="예: 중2" style="width:100%"></label>
       <label>반<br><input id="fCls" placeholder="예: 월수금A" style="width:100%"></label>
-      <label>읽는 글<br><select id="fLv" style="width:100%"><option value="">자동(학년대로)</option><option value="L1">7세~초2</option><option value="L2">초3~6</option><option value="L3">중1~3</option><option value="L4">고1~3</option></select></label>
+      <label class="rd-only">읽는 글<br><select id="fLv" style="width:100%"><option value="">자동(학년대로)</option><option value="L1">7세~초2</option><option value="L2">초3~6</option><option value="L3">중1~3</option><option value="L4">고1~3</option></select></label>
       <button class="btn" id="fSave">저장</button>
     </div><p class="err" id="fErr"></p></div>
   <div class="card"><h2>반 명단 한꺼번에 등록</h2>
@@ -221,14 +230,14 @@ function render(){
       <button class="btn" id="bkNow">지금 전체 백업 내려받기</button>
       ${backups.length?backups.map(d=>`<button class="chip" data-bk="${esc(d)}">${esc(d)} 스냅샷</button>`).join(''):'<span class="muted">자동 스냅샷이 아직 없어요 — 매일 새벽에 만들어져요.</span>'}
     </div></div>
-  <div class="card"><h2>교재 코칭 원문</h2>
+  <div class="card rd-only"><h2>교재 코칭 원문</h2>
     <p class="muted">원문(코칭글)은 공개 저장소가 아니라 <b>서버에만</b> 저장돼요. 코칭 카드가 비어 보이면 여기서 원문 JSON(reading/textbook.json 형식)을 올려 주세요.</p>
     <div id="tbSrcStatus" class="muted" style="margin-top:6px">확인 중…</div>
     <div class="filters" style="margin:10px 0 0">
       <input type="file" id="tbSrcFile" accept=".json,application/json">
       <button class="btn" id="tbSrcUp" disabled>원문 업로드</button>
     </div></div>
-  <div class="card"><h2>학부모 주간 메시지</h2>
+  <div class="card rd-only"><h2>학부모 주간 메시지</h2>
     <p class="muted">연동된 모든 학생의 주간 리포트 발송 문구(링크 포함)를 한 번에 만들어요. 카톡·문자에 붙여넣어 학생별로 잘라 보내세요.</p>
     <div class="filters" style="margin:10px 0 0">
       <button class="btn" id="pmMake">메시지 만들기</button>
@@ -236,7 +245,7 @@ function render(){
       <span class="muted" id="pmInfo"></span>
     </div>
     <textarea id="pmOut" hidden style="width:100%;min-height:220px;margin-top:10px;padding:11px;border:1.5px solid #bfd7e1;border-radius:10px;font:inherit;font-size:13px;line-height:1.6"></textarea></div>`;
-  (async()=>{try{const s=await api('/admin/textbook-src');
+  (async()=>{if(NS)return;try{const s=await api('/admin/textbook-src');
     $('#tbSrcStatus').innerHTML=s.exists
       ?`<span class="tag ok">서버에 있음</span> 버전 ${esc(s.version||'-')} · 책 ${s.books.length}권 — ${s.books.map(b=>esc(b.id)+' '+b.lessons+'강').join(', ')}`
       :`<span class="tag bad">서버에 원문이 없어요</span> 코칭 카드가 비어 있습니다 — 아래에서 업로드해 주세요.`;
