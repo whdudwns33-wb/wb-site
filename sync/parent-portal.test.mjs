@@ -1267,6 +1267,22 @@ test('동의 저장은 CAS이고 네 번째 교환 뒤 활성 세션은 세 개�
   assert.equal((await call(db, { action: 'view' }, cookies[3])).status, 200);
 });
 
+test('같은 밀리초에 교환해도 가장 오래된 세션이 폐기된다', async () => {
+  const realNow = Date.now; const frozen = realNow(); Date.now = () => frozen;
+  try {
+    const db = new TestD1(); seed(db);
+    const cookies = [(await connected(db)).cookie];
+    for (let i = 0; i < 3; i++) {
+      const invite = await call(db, { auth: admin, action: 'invite', studentId: 'student-a' }, '', 'https://whdudwns33-wb.github.io');
+      const exchanged = await call(db, { action: 'exchange', code: invite.body.code });
+      assert.equal(exchanged.status, 200);
+      cookies.push(exchanged.cookie.split(';')[0]);
+    }
+    assert.equal((await call(db, { action: 'view' }, cookies[0])).status, 401);
+    for (const cookie of cookies.slice(1)) assert.equal((await call(db, { action: 'view' }, cookie)).status, 200);
+  } finally { Date.now = realNow; }
+});
+
 test('같은 1회 코드를 동시에 교환해도 세션은 하나만 생긴다', async () => {
   const db = new TestD1(); seed(db);
   const allowed = await call(db, { auth: admin, action: 'access_set', studentId: 'student-a', enabled: true,
