@@ -69,6 +69,12 @@ def extract(path):
             "width": round(page.rect.width, 1),
             "height": round(page.rect.height, 1),
             "lines": lines,
+            # 일부 상품은 원문자 선지·정답을 작은 그림으로 찍는다. 픽셀은 내보내지 않고
+            # 같은 그림인지와 지면 위치만 전달해 다음 단계가 반복 순서로 대조한다.
+            "images": [{"x": round(i["bbox"][0], 1), "y": round(i["bbox"][1], 1),
+                        "w": round(i["bbox"][2] - i["bbox"][0], 1),
+                        "h": round(i["bbox"][3] - i["bbox"][1], 1),
+                        "digest": i["digest"].hex()} for i in page.get_image_info(hashes=True)],
         })
     return {"file": path.split("/")[-1], "pages": pages}
 

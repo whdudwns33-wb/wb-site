@@ -52,6 +52,76 @@ t('시리즈는 파일명이 아니라 지면 내용으로 가른다', () => {
   assert.strictEqual(U.detectSeries(doc('아무 표시 없음')).series, null);
 });
 
+t('새 상품도 객관식 지면 구조가 확인되어야 단원집중 추출기로 보낸다', () => {
+  Object.entries(U.SERIES_LABEL).filter(([k]) => !['ihae', 'yoyak', 'danwon', 'seosul', 'concept1', 'concept2'].includes(k)).forEach(([key, label]) => {
+    const doc = { pages: [pg(1, [ln(45, [sp(60, '[' + label + ']')]),
+      ln(100, [sp(60, '1.', { size: 13.7, color: '#191919' })]), ln(120, [sp(70, '① 가상 선지')])]),
+      pg(2, [ln(100, [sp(60, '1) [정답] ①', { size: 7.9 })]), ln(120, [sp(60, '[해설] 가상 근거', { size: 7.9 })])])] };
+    assert.strictEqual(U.detectSeries(doc).series, key);
+    assert.strictEqual(U.detectSeries(doc).extractor, ['skill', 'solution', 'typical', 'concept'].includes(key) ? null : 'danwon');
+    doc.pages.pop();
+    assert.strictEqual(U.detectSeries(doc).extractor, null, '해설 없는 자료를 추측하면 안 된다');
+  });
+  assert.strictEqual(U.detectSeries({ pages: [pg(1, [ln(45, [sp(60, '[시험에 꼭 나오는 문제]')])])] }).series, 'must');
+  assert.strictEqual(U.detectSeries({ pages: [pg(1, [ln(45, [sp(60, '[개념 이해A]')])])] }).series, 'basic');
+});
+
+t('해설 번호가 정답과 한 span에 합쳐져도 읽고 저작권 고지는 제외한다', () => {
+  const lines = [ln(100, [sp(60, '13) [정답] ⑤', { size: 7.9 })]),
+    ln(130, [sp(60, '1) 제작연월일 :', { size: 5 })])];
+  assert.deepStrictEqual(U.solutionEntries(lines).map((x) => x.no), [13]);
+});
+
+t('지문 안내는 글·시·시조·다음을 받되 문항 발문을 시작점으로 삼지 않는다', () => {
+  ['글을', '시를', '시조를', ''].forEach((noun) => {
+    assert.strictEqual(U.passageStarts([ln(100, [sp(60, '※ 다음 ' + noun + ' 읽고 물음에 답하시오.')])]).length, 1);
+  });
+  assert.strictEqual(U.passageStarts([ln(100, [sp(60, '다음 시를 읽고 고르시오.')])]).length, 0);
+});
+
+t('그림 선지 번호는 두 문항의 동일한 다섯 그림 순서로만 복원한다', () => {
+  const make = (orders) => {
+    const lines = [], images = [];
+    orders.forEach((order, n) => {
+      lines.push(ln(80 + n * 130, [sp(60, (n + 1) + '.', { size: 13.7, color: '#191919' })]));
+      order.forEach((digest, i) => {
+        const y = 100 + n * 130 + i * 20;
+        lines.push(ln(y, [sp(84, '창작 선지 ' + i)]));
+        images.push({ x: 70, y: y + 4, w: 8.4, h: 8.4, digest });
+      });
+    });
+    lines.push(ln(650, [sp(60, '1) [정답] ', { size: 7.9 })]));
+    images.push({ x: 110, y: 653, w: 8.4, h: 8.4, digest: 'c' });
+    return { pages: [{ ...pg(1, lines), images }] };
+  };
+  const doc = make(['abcde', 'abcde'].map((s) => [...s]));
+  U.restoreChoiceImages(doc);
+  const symbols = () => doc.pages[0].lines.flatMap((l) => l.spans).filter((s) => s.imageDigest).map((s) => s.text);
+  assert.deepStrictEqual(symbols(), [...'①②③④⑤①②③④⑤③']);
+  U.restoreChoiceImages(doc);
+  assert.strictEqual(symbols().length, 11, '두 번 호출해도 중복 삽입하면 안 된다');
+  for (const orders of [['abcde'], ['abcde', 'abdce'], ['abcde', 'abcde', 'abdce', 'abdce']]) {
+    const ambiguous = make(orders.map((s) => [...s]));
+    U.restoreChoiceImages(ambiguous);
+    if (orders.length < 3) assert.ok(ambiguous.pages[0].lines.every((l) => l.spans.every((s) => !s.imageDigest || !s.text)));
+    else assert.ok(ambiguous.pages[0].lines.flatMap((l) => l.spans).filter((s) => ['c', 'd'].includes(s.imageDigest)).every((s) => !s.text));
+  }
+});
+
+t('개념완성 step1/step2와 본문 속 이해완성 연결 팁을 구별한다', () => {
+  const simple = (text) => ({ pages: [pg(1, [ln(100, [sp(60, text)])])] });
+  assert.strictEqual(U.detectSeries(simple('이해 전략 핵심 내용을 파악하자!!')).extractor, 'ihae');
+  assert.strictEqual(U.detectSeries(simple('풀이\x01 전략문제를\x01 푸는\x01 전략을 파악하자!!')).extractor, null);
+  assert.strictEqual(U.detectSeries(simple('[이해완성]에서 학습한 내용 기억나니?')).series, 'solution');
+  assert.strictEqual(U.detectSeries(simple('[활용 가이드] 이해완성 Review')).series, 'skill');
+});
+
+t('단원 회차 머리말을 출판사로 읽지 않는다', () => {
+  const doc = { pages: [pg(1, [ln(40, [sp(60, '국어1-1.별(10회)')])]),
+    pg(2, [ln(40, [sp(60, '천재(박영목)3-1')])])] };
+  assert.strictEqual(U.headerMeta(doc).publisher, '천재');
+});
+
 t('머리말 띠는 좁아야 한다 — 90으로 자르면 본문 첫 문항이 사라진다', () => {
   /* 실측: 러닝헤더 y 42~46, 첫 문항 번호 y 64.3 */
   assert.ok(U.HEAD_BAND < 64.3, `머리말 띠 ${U.HEAD_BAND} 가 본문을 먹는다`);

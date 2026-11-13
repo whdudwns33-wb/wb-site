@@ -32,7 +32,8 @@ const HERE = path.dirname(new URL(import.meta.url).pathname);
 function spansOf(file, cacheDir) {
   if (/\.json$/i.test(file)) return JSON.parse(fs.readFileSync(file, 'utf8'));
   const cache = path.join(cacheDir, path.basename(file).replace(/\.pdf$/i, '') + '.spans.json');
-  if (fs.existsSync(cache) && fs.statSync(cache).mtimeMs > fs.statSync(file).mtimeMs) {
+  if (fs.existsSync(cache) && fs.statSync(cache).mtimeMs > Math.max(fs.statSync(file).mtimeMs,
+    fs.statSync(path.join(HERE, 'pdf-spans.py')).mtimeMs)) {
     return JSON.parse(fs.readFileSync(cache, 'utf8'));
   }
   const out = execFileSync('python3', [path.join(HERE, 'pdf-spans.py'), file],
@@ -101,6 +102,16 @@ export function reanchor(w, anchorText) {
     if (start >= 0 && end > start) return line.slice(start, end);
   }
   return null;
+}
+
+export function reanchorSetMark(set, byId, mark) {
+  const hits = (set.works || []).filter((ref) => !mark.workId || ref.workId === mark.workId).map((ref) => {
+    const work = byId[ref.workId];
+    const anchorText = work && reanchor(ref.text ? { text: ref.text } : work, mark.anchorText);
+    return anchorText ? { ...mark, workId: ref.workId, anchorText } : null;
+  }).filter(Boolean);
+  /* 같은 기호가 여러 작품의 구절에 걸리면 첫 작품으로 임의 귀속하지 않는다. */
+  return new Set(hits.map((h) => h.workId)).size === 1 ? hits[0] : null;
 }
 
 /* 조각을 붙일 작품을 찾는다. 좌표 키가 있으면 그것으로, 없으면 작품명으로 잇는다 —
@@ -222,10 +233,31 @@ function textFromLines(lines, prose) {
 
 export function resolveSets(results, works, opts) {
   opts = opts || {};
+  const cleanTitle = (s) => String(s || '').replace(/^\s*\([가-하]\)\s*/, '').trim();
   const byTitle = {};
-  works.forEach((w) => { if (w.title) byTitle[w.title.trim()] = w; });
+  works.forEach((w) => { if (w.title) byTitle[cleanTitle(w.title)] = w; });
   const added = [], inferred = [], stillPending = [];
   let exN = 0;
+  /* 제목이 생략된 재수록은 폴더 안의 제목 있는 본문과 대조한다. 여러 작품에 일치하면
+     고르지 않는다. 파일·회차가 같다는 이유만으로 작품을 추측하지 않는다. */
+  const squash = (s) => String(s || '').replace(/[\s㉠-㉭]/g, '');
+  const bodies = works.filter((w) => w.title).map((w) => ({ title: cleanTitle(w.title), text: squash(workLines(w).join('')) }));
+  results.forEach((r) => ((r.out.review || {}).candidates || []).forEach((c) => {
+    if (c.kind === 'setText' && c.title) bodies.push({ title: cleanTitle(c.title), text: squash((c.body || c.lines || []).join('')) });
+  }));
+  results.filter((r) => r.series === 'concept1' && r.out.work.title).forEach((r) => {
+    /* 개념완성의 인용 구절도 작품을 특정하는 근거다. 전문이 없는 소설은 다른 문제지의
+       발췌가 이 구절들과 실제로 일치할 때만 연결한다. */
+    bodies.push({ title: cleanTitle(r.out.work.title), text: squash(U.plainText(r.doc)) });
+  });
+  function matchedTitle(c) {
+    const samples = [...new Set((c.lines || c.body || []).map(squash).filter((s) => s.length >= 10))];
+    const hits = new Set(bodies.filter((b) => {
+      const matched = samples.filter((s) => b.text.includes(s));
+      return matched.length >= 2 && matched.join('').length >= 30 || matched.some((s) => s.length >= 40);
+    }).map((b) => b.title));
+    return hits.size === 1 ? [...hits][0] : null;
+  }
 
   results.forEach((r) => {
     const review = r.out.review || {};
@@ -239,11 +271,11 @@ export function resolveSets(results, works, opts) {
     /* ② 규칙의 근거: 이 자료에서 제목이 있는 발췌 작품의 목록 */
     const titledExcerpts = new Set();
     pend.forEach((p) => (p.works || []).forEach((w) => {
-      if (w.kind === 'excerpt' && w.title) titledExcerpts.add(w.title.trim());
+      if (w.kind === 'excerpt' && w.title) titledExcerpts.add(cleanTitle(w.title));
     }));
     Object.keys(texts).forEach((k) => {
       const c = texts[k];
-      if ((c.kind2 === 'excerpt' || c.prose) && c.title) titledExcerpts.add(c.title.trim());
+      if ((c.kind2 === 'excerpt' || c.prose) && c.title) titledExcerpts.add(cleanTitle(c.title));
     });
     const soleExcerpt = titledExcerpts.size === 1 ? [...titledExcerpts][0] : null;
 
@@ -252,9 +284,12 @@ export function resolveSets(results, works, opts) {
       let ok = true;
       (p.works || []).forEach((w) => {
         const cand = texts[p.setId + '|' + (w.label || '')] || {};
-        let title = (w.title || cand.title || '').trim();
+        let title = cleanTitle(w.title || cand.title);
         let byInference = false;
-        if (!title && soleExcerpt) { title = soleExcerpt; byInference = true; }
+        let match = null;
+        if (!title) match = matchedTitle(cand);
+        const isExcerpt = w.kind === 'excerpt' || cand.kind2 === 'excerpt' || cand.prose;
+        if (!title && (match || isExcerpt && soleExcerpt)) { title = match || soleExcerpt; byInference = true; }
         if (!title) { ok = false; return; }
 
         let work = byTitle[title];
@@ -294,7 +329,8 @@ export function resolveSets(results, works, opts) {
         if (pre) ref.prefaceSummary = pre;
         if (byInference) {
           inferred.push({ setId: p.setId, label: ref.label, workId: work.workId, title,
-            why: '제목이 지면에 없어 이 자료의 유일한 발췌 작품으로 보았습니다 — 검수에서 확인하세요' });
+            why: match ? '제목이 생략된 본문이 폴더 안 제목 있는 본문과 유일하게 일치했습니다 — 검수에서 확인하세요'
+              : '제목이 지면에 없어 이 자료의 유일한 발췌 작품으로 보았습니다 — 검수에서 확인하세요' });
         }
         refs.push(ref);
       });
@@ -326,22 +362,27 @@ export function buildPack(dir, opts) {
   if (!files.length) errors.push('PDF가 없어요. 단원 폴더에 자료를 넣어 주세요.');
 
   const cacheDir = path.join(dir, '_spans');
-  const found = [];
+  const found = [], skipped = [];
   files.forEach((file) => {
     let doc;
     try { doc = spansOf(file, cacheDir); }
-    catch (e) { errors.push(`${path.basename(file)} 을 읽지 못했어요: ${String(e.message).slice(0, 120)}`); return; }
+    catch (e) { skipped.push({ file: path.basename(file), reason: '파일을 읽지 못했습니다: ' + String(e.message).slice(0, 120) }); return; }
+    if (!doc || !Array.isArray(doc.pages) || doc.pages.some((p) => !p || !Array.isArray(p.lines) ||
+      p.lines.some((l) => !l || !Array.isArray(l.spans)))) {
+      skipped.push({ file: path.basename(file), reason: 'PDF span 문서 형식이 아닙니다' }); return;
+    }
+    U.restoreChoiceImages(doc);
     const det = U.detectSeries(doc);
-    if (!det.series) {
+    if (!det.series || !det.extractor) {
       /* 판별 실패는 추측하지 않고 사람에게 넘긴다 — 엉뚱한 추출기에 넣으면 조용히 망가진다 */
-      errors.push(`${path.basename(file)} 의 시리즈를 판별하지 못했어요` +
-        (det.candidates && det.candidates.length ? ` (후보: ${det.candidates.join(', ')})` : '') +
-        '. 표지 쪽이 빠졌거나 새 상품군일 수 있어요 — README §1 을 보세요.');
+      skipped.push({ file: path.basename(file), series: det.series,
+        reason: det.series ? '현재 추출기가 읽는 문제+정답·해설 형식이 아닙니다' : '시리즈를 판별하지 못했습니다' });
       return;
     }
     if (!det.confident) warns.push(`${path.basename(file)}: 머리말 태그가 없어 색·마커로 판별했어요(${U.SERIES_LABEL[det.series]}). 결과를 한 번 더 보세요.`);
-    found.push({ file, doc, series: det.series });
+    found.push({ file, doc, series: det.series, extractor: det.extractor });
   });
+  if (skipped.length) warns.push(`앱에 아직 안 들어가는 자료 ${skipped.length}개(${skipped.map((s) => s.file).join(' · ')}) — 이유는 review.skipped 에 남겼습니다.`);
 
   /* ── 시리즈별 추출 ──
      **2패스다.** 문제집 계열은 지문 세트를 만들 때 '이 제목이 어느 workId 인가'를 알아야 하는데,
@@ -350,16 +391,23 @@ export function buildPack(dir, opts) {
   const scope = (metaTxt.scope || '').trim() || null;
   const results = [];
   const runIhae = (f) => {
-    try { results.push({ ...f, out: buildIhae(f.doc, { workId: 'TBD' }) }); }
+    try { results.push({ ...f, out: buildIhae(f.doc, { workId: 'TBD', concept: f.series === 'concept1' }) }); }
     catch (e) { errors.push(`${path.basename(f.file)}(이해완성) 추출 중 오류: ${String(e.message).slice(0, 200)}`); }
   };
-  found.filter((f) => f.series === 'ihae').forEach(runIhae);
+  found.filter((f) => f.extractor === 'ihae').forEach(runIhae);
 
   /* 1패스 결과로 작품 정본을 세우고 id를 정한다 */
   const works = [];
-  results.filter((r) => r.series === 'ihae').forEach((r, i) => {
+  results.filter((r) => r.extractor === 'ihae').forEach((r, i) => {
+    if (!r.out.work.title) {
+      r.out.review = { pending: [{ kind: 'work', reason: 'missing-title', file: path.basename(r.file),
+        why: '작품명이 없는 이해완성 개념 자료는 작품 정본으로 내보내지 않습니다', work: r.out.work }] };
+      warns.push(`${path.basename(r.file)}: 작품명이 없는 개념 자료를 review.pending 으로 옮겼어요.`);
+      return;
+    }
     /* 이해완성 머리말 '1-1.(1)저녁 항구' 의 좌표 문자열이 시리즈끼리의 조인 키다 */
-    const raw = U.plainText(r.doc).match(/(\d+-\d+\.\(\d+\)[^\s]{0,30})/);
+    const raw = r.doc.pages.flatMap((p) => p.lines.map((l) => U.joinSpans(l.spans))).join('\n')
+      .match(/(\d+-\d+\.\(\d+\)[^\n]{0,40})/);
     const workKey = raw ? raw[1] : r.out.work.title;
     const workId = workIdFor(workKey, i);
     const w = r.out.work;
@@ -372,13 +420,21 @@ export function buildPack(dir, opts) {
   works.forEach((w) => { if (w.title) workIds[w.title] = w.workId; });
 
   /* 2패스 — 이제 제목→workId 를 넘길 수 있다 */
-  found.filter((f) => f.series !== 'ihae').forEach((f) => {
+  const perSeries = {};
+  found.forEach((f) => { perSeries[f.extractor] = (perSeries[f.extractor] || 0) + 1; });
+  const seen = {};
+  found.filter((f) => f.extractor !== 'ihae').forEach((f) => {
     const base = path.basename(f.file);
-    const o = { workIds };
+    const o = { workIds, sourceSeries: U.SERIES_LABEL[f.series], sourceFile: base };
     if (scope) o.scope = scope;
+    /* 같은 시리즈 파일이 여럿이면(단원집중 1~5회, 서술형 01~03) 문항·세트 번호가 겹친다 — 파일마다 scope 를 가른다 */
+    if (perSeries[f.extractor] > 1) {
+      seen[f.extractor] = (seen[f.extractor] || 0) + 1;
+      o.scope = (scope ? scope + '-' : '') + 'f' + String(seen[f.extractor]).padStart(2, '0');
+    }
     try {
       if (f.series === 'yoyak') results.push({ ...f, out: buildYoyak(f.doc, o) });
-      else if (f.series === 'danwon') results.push({ ...f, out: buildDanwon(f.doc, o) });
+      else if (f.extractor === 'danwon') results.push({ ...f, out: buildDanwon(f.doc, o) });
       else if (f.series === 'seosul') results.push({ ...f, out: buildSeosul(f.doc, o) });
     } catch (e) {
       errors.push(`${base}(${U.SERIES_LABEL[f.series]}) 추출 중 오류: ${String(e.message).slice(0, 200)}`);
@@ -461,7 +517,36 @@ export function buildPack(dir, opts) {
   }
   solved.inferred.forEach((x) => warns.push(
     `${x.setId}${x.label ? ' ' + x.label : ''} 의 제목이 지면에 없어 '${x.title}' 로 보았습니다 —` +
-    ' 이 자료의 발췌 작품이 그것 하나뿐이라서예요. 검수(review.inferred)에서 확인하세요.'));
+    ` ${x.why}`));
+
+  /* 개념완성은 전문 대신 개념 표·인용 구절만 싣는다. 빈칸 정본을 유지하면서 읽기
+     화면이 비지 않게, 확인된 세트의 가장 긴 발췌를 쓰고 전문이 아니라는 출처를 남긴다. */
+  const reconstructedTexts = [];
+  works.filter((w) => w.hasCanon && !workLines(w).length).forEach((w) => {
+    const choices = [];
+    results.forEach((r) => {
+      (r.out.review && r.out.review.candidates || []).filter((c) => c.kind === 'setText' &&
+        String(c.title || '').replace(/^\s*\([가-하]\)\s*/, '').trim() === w.title.trim()).forEach((c) => {
+        const text = textFromLines(c.body || c.lines, c.prose || c.kind2 === 'excerpt');
+        if (text) choices.push({ text, series: r.series, setId: c.setId });
+      });
+      (r.out.sets || []).forEach((set) => {
+        const paragraphs = set.works.filter((ref) => ref.workId === w.workId && ref.text && ref.text.paragraphs)
+          .flatMap((ref) => ref.text.paragraphs);
+        if (paragraphs.length) choices.push({ text: { paragraphs }, series: r.series, setId: set.setId });
+      });
+    });
+    choices.sort((a, b) => JSON.stringify(b.text).length - JSON.stringify(a.text).length);
+    if (choices.length) {
+      w.text = choices[0].text;
+      w.textSource = { kind: 'excerpt', series: U.SERIES_LABEL[choices[0].series], setId: choices[0].setId };
+      if (w.text.paragraphs) w.kind = 'novel';
+      reconstructedTexts.push({ workId: w.workId, title: w.title, ...w.textSource });
+      warns.push(`${w.title}: 개념 자료에 전문이 없어 문제지의 가장 긴 발췌를 읽기 본문으로 담았어요 — 전문 복원은 아닙니다(review.reconstructedTexts).`);
+    } else {
+      warns.push(`${w.title}: 개념 빈칸은 있지만 읽기 본문을 못 찾았어요 — 작품 전문을 검수에서 보완하세요.`);
+    }
+  });
 
   /* ── 지문 세트·문항 ──
      **지문 없이 나가는 문항을 막는 게 여기 책임이다.** 추출기는 지문 세트가 미심쩍으면
@@ -479,15 +564,15 @@ export function buildPack(dir, opts) {
       if (Array.isArray(set.marks) && set.marks.length) {
         const kept = [];
         set.marks.forEach((mk) => {
-          const w = byId[mk.workId] || (set.works || []).map((ref) => byId[ref.workId]).filter(Boolean)[0];
+          const fixedMark = reanchorSetMark(set, byId, mk);
+          const w = byId[fixedMark && fixedMark.workId] || byId[mk.workId] || (set.works || []).map((ref) => byId[ref.workId]).filter(Boolean)[0];
           if (!w) { kept.push(mk); return; }
-          const fixed = reanchor(w, mk.anchorText);
-          if (!fixed) { unanchored.push({ workId: w.workId, title: w.title, series: r.series, setId: set.setId, mark: mk }); return; }
-          if (fixed !== mk.anchorText) {
+          if (!fixedMark) { unanchored.push({ workId: w.workId, title: w.title, series: r.series, setId: set.setId, mark: mk }); return; }
+          if (fixedMark.anchorText !== mk.anchorText) {
             reanchored.push({ workId: w.workId, title: w.title, series: r.series, setId: set.setId,
-              symbol: mk.symbol || '', from: mk.anchorText, to: fixed });
+              symbol: mk.symbol || '', from: mk.anchorText, to: fixedMark.anchorText });
           }
-          kept.push({ ...mk, anchorText: fixed });
+          kept.push(fixedMark);
         });
         set.marks = kept;
       }
@@ -503,7 +588,12 @@ export function buildPack(dir, opts) {
       const hasSet = it.setId && setIds[it.setId];
       const hasWork = it.workId && workIdSet[it.workId];
       if (!hasSet && !hasWork) {
-        dropped.push({ series: r.series, id: it.id, no: it.source && it.source.no, stem: String(it.stem || '').slice(0, 60) });
+        const unresolved = solved.stillPending.find((p) => p.setId === it.setId);
+        dropped.push({ series: r.series, file: path.basename(r.file || ''), id: it.id,
+          no: it.source && it.source.no, setId: it.setId || null,
+          reason: unresolved ? 'unresolved-set' : 'no-passage',
+          why: unresolved ? unresolved.why : '문항에 대응하는 지문 시작 표시/작품을 찾지 못했습니다',
+          stem: String(it.stem || '').slice(0, 60) });
         return;
       }
       items.push(it);
@@ -584,7 +674,7 @@ export function buildPack(dir, opts) {
   if (!works.length) errors.push('작품 정본이 없어요 — 이해완성 파일이 폴더에 있어야 합니다.');
 
   const review = {
-    packId, pending, unanchored, reanchored, dropped, mergeLog,
+    packId, pending, skipped, unanchored, reanchored, dropped, mergeLog, reconstructedTexts,
     stubWorks: solved.added, inferred: solved.inferred,
     candidates: results.flatMap((r) => ((r.out.review && r.out.review.candidates) || r.out.candidates || [])
       .map((c) => ({ series: r.series, ...c }))),
@@ -593,6 +683,33 @@ export function buildPack(dir, opts) {
     todo, warns,
   };
   return { packId, errors, warns, report, todo, pack, review, meta };
+}
+
+export function writePack(out, pack, review) {
+  const packDir = path.join(out, 'pack'), reviewDir = path.join(out, 'review');
+  fs.mkdirSync(path.join(packDir, 'works'), { recursive: true });
+  fs.mkdirSync(reviewDir, { recursive: true });
+  const files = new Map([['meta.json', pack.meta]]);
+  pack.works.forEach((w) => {
+    const clean = { ...w }; delete clean._workKey;
+    files.set('works/' + w.workId + '.json', { work: clean });
+  });
+  if (pack.sets.length) files.set('sets.json', { sets: pack.sets });
+  if (pack.items.length) files.set('items.json', { items: pack.items });
+  /* 재실행에서 줄어든 작품/문항 파일이 남으면 이전 결과까지 다시 검증·배포된다.
+     이번 출력에 없는 JSON은 지우지 않고 검수 쪽에 옮겨 수동 수정도 보존한다. */
+  const previous = fs.readdirSync(packDir).filter((f) => f.endsWith('.json'))
+    .concat(fs.readdirSync(path.join(packDir, 'works')).filter((f) => f.endsWith('.json')).map((f) => 'works/' + f));
+  const stale = previous.filter((f) => !files.has(f));
+  const archive = fs.mkdtempSync(path.join(reviewDir, 'previous-'));
+  stale.forEach((f) => {
+    fs.mkdirSync(path.dirname(path.join(archive, f)), { recursive: true });
+    fs.renameSync(path.join(packDir, f), path.join(archive, f));
+  });
+  if (!stale.length) fs.rmdirSync(archive);
+  files.forEach((json, file) => fs.writeFileSync(path.join(packDir, file), JSON.stringify(json, null, 1)));
+  fs.writeFileSync(path.join(reviewDir, 'review.json'), JSON.stringify({ ...review,
+    previousFiles: stale.map((f) => path.relative(reviewDir, path.join(archive, f))) }, null, 1));
 }
 
 /* ── CLI ── */
@@ -624,16 +741,7 @@ if (invokedDirectly) {
      works/ 한 겹만 읽으므로 review/ 는 검증에도 업로드에도 절대 섞이지 않는다. */
   const out = opt('out') || path.join(dir, '_build');
   const packDir = path.join(out, 'pack'), reviewDir = path.join(out, 'review');
-  fs.mkdirSync(path.join(packDir, 'works'), { recursive: true });
-  fs.mkdirSync(reviewDir, { recursive: true });
-  fs.writeFileSync(path.join(packDir, 'meta.json'), JSON.stringify(r.pack.meta, null, 1));
-  r.pack.works.forEach((w) => {
-    const clean = { ...w }; delete clean._workKey;      // 조인용 임시 키는 팩에 안 나간다
-    fs.writeFileSync(path.join(packDir, 'works', w.workId + '.json'), JSON.stringify({ work: clean }, null, 1));
-  });
-  if (r.pack.sets.length) fs.writeFileSync(path.join(packDir, 'sets.json'), JSON.stringify({ sets: r.pack.sets }, null, 1));
-  if (r.pack.items.length) fs.writeFileSync(path.join(packDir, 'items.json'), JSON.stringify({ items: r.pack.items }, null, 1));
-  fs.writeFileSync(path.join(reviewDir, 'review.json'), JSON.stringify(r.review, null, 1));
+  writePack(out, r.pack, r.review);
 
   say(`\n팩 초안 → ${packDir}\n검수 부속물 → ${reviewDir}  (팩에 섞이지 않습니다)`);
   say(`\n다음: node naesin-ko/pack-validate.mjs "${packDir}"  → 오류 0이면 관리 웹에 업로드\n`);
