@@ -22,7 +22,7 @@ function screen(roster = [], exams = [], results = []) {
   };
   const ctx = vm.createContext({
     localStorage: { getItem: () => null }, WBNaesinCoverage: COV, WBNAESINREADY: READY,
-    document: { querySelector: node, querySelectorAll: selector => selector === '#exPacks input:checked' ? [{ value: 'sample-L1' }] : [] },
+    document: { querySelector: node, querySelectorAll: selector => selector === '#exPacks input[data-pk]:checked' ? [{ value: 'sample-L1' }] : [] },
     confirm: text => { confirms.push(text); return true; },
     fetch: async (url, opt) => {
       requests.push({ url, ...opt });
