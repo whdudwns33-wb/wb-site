@@ -92,4 +92,25 @@ t('복수 정답 표시는 마지막 정답으로 덮어쓰지 않는다', () =>
   assert.deepEqual(out.review.candidates.find((c) => c.kind === 'choiceEvidence' && c.source.no === 1).printedAnswers, [3, 4]);
 });
 
+t('짙은 회색(#222222) 선지 본문도 읽고, 선지 본문이 비면 빈 발문 OX 대신 검수로 내린다', () => {
+  const darkDoc = puriFixture('solution');
+  darkDoc.pages[1].lines.flatMap((l) => l.spans)
+    .filter((s) => s.text.includes('창작 설명')).forEach((s) => { s.color = '#222222'; });
+  const darkOut = run('solution', darkDoc);
+  const ox = darkOut.items.filter((i) => i.format === 'ox');
+  assert.equal(ox.length, 4);
+  assert.ok(ox.every((i) => i.stem && i.stem.trim().length > 0));
+
+  const emptyChoiceDoc = puriFixture('solution');
+  emptyChoiceDoc.pages[1].lines.filter((l) => l.spans.some((s) => s.x >= 300)).forEach((l) => {
+    l.spans.forEach((s) => {
+      const m = s.text.match(/^([①-⑤])\s*/);
+      if (m) s.text = m[1];
+    });
+  });
+  const emptyOut = run('solution', emptyChoiceDoc);
+  assert.equal(emptyOut.items.filter((i) => i.format === 'ox').length, 0);
+  assert.ok(emptyOut.review.pending.some((p) => p.reason === 'incomplete-practice' && p.item.source.no === 4));
+});
+
 console.log(`OK — ${passed}개 통과`);

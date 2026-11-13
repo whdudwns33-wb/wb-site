@@ -54,11 +54,12 @@ export function joinSpans(spans) {
   let out = '';
   let prev = null;
   for (const s of spans) {
+    const clean = String(s.text == null ? '' : s.text).replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]+/g, ' ');
     if (prev) {
       const gap = s.x - (prev.x + prev.w);
-      if (gap >= (prev.size || 9) * 0.3 && !/\s$/.test(out) && !/^\s/.test(s.text)) out += ' ';
+      if (gap >= (prev.size || 9) * 0.3 && !/\s$/.test(out) && !/^\s/.test(clean)) out += ' ';
     }
-    out += s.text;
+    out += clean;
     prev = s;
   }
   return out;
@@ -138,6 +139,17 @@ export function practiceHalves(doc) {
   if (cut < 0) {
     const starts = sectionStarts(doc);
     if (starts.length === 2) cut = pages.findIndex((p) => p.no === starts[1]);
+  }
+  if (cut < 0 && pages.length >= 2) {
+    const coverTitle = (p) => p.lines.filter((l) => l.y < 90).map((l) =>
+      joinSpans(l.spans.filter((s) => s.color === '#000000' && (s.size || 0) >= 10.5)).trim()).filter(Boolean).join(' ');
+    const hasBadge = (p) => p.lines.some((l) => l.y < MAST_BAND &&
+      l.spans.some((s) => s.color === '#ffffff' && (s.size || 0) >= 9 && s.text.trim()));
+    const t0 = coverTitle(pages[0]);
+    if (t0) {
+      const hits = pages.map((p, i) => i > 0 && hasBadge(p) && coverTitle(p) === t0 ? i : -1).filter((i) => i > 0);
+      if (hits.length === 1) cut = hits[0];
+    }
   }
   if (cut <= 0) throw new Error('학생용/선생님용 경계를 확정하지 못했습니다 — 반복 표지·1번 문항을 확인하세요');
   return { student: pages.slice(0, cut), teacher: pages.slice(cut) };
@@ -358,7 +370,7 @@ export function colLeft(lines) {
 /* ── 절(작품·학생용/선생님용) 경계 ──
    마스트헤드('중2 | 국어')가 찍힌 쪽이 새 절의 시작이다. 이해완성의 학생/선생님 경계와
    요약노트의 작품 경계를 같은 신호 하나로 잡는다. 실측 이해완성 [1,8] · 요약노트 [1,4]. */
-const MASTHEAD = /(중|고)\s*\d\s*\|?\s*국어/;
+const MASTHEAD = /((중|고)\s*\d\s*\|?\s*국어|국어\s*\|?\s*(중|고)\s*\d)/;
 function mastGrade(page) {
   const spans = page.lines.filter((l) => l.y < MAST_BAND).flatMap((l) => l.spans);
   const level = spans.find((s) => /^(중|고)$/.test(s.text.trim()));
@@ -452,7 +464,7 @@ export function passageStarts(lines) {
   const out = [];
   for (const l of lines) {
     const t = joinSpans(l.spans).trim();
-    if (/^※\s*다음\s*(?:(?:글|시|시조|소설|수필|대화|자료|만화)(?:을|를))?\s*읽고/.test(t)) out.push({ y: l.y });
+    if (/^※\s*(?:다음|글|시|시조|소설|수필|대화|자료|만화|개요|내용|표|그림|\([가-하]\))[\s\S]*?(?:읽고|보고|답하시오)/.test(t)) out.push({ y: l.y });
   }
   return out;
 }
@@ -559,13 +571,13 @@ export function headerMeta(doc) {
       /* 마스트헤드와 단원 코드가 **한 줄에 같이** 온다('중2 국어 1.문학을 펼치면(01)').
          학년을 떼어 내고 남은 것을 코드로 읽는다 — 줄 시작에 앵커를 걸면 둘 다 놓친다. */
       let rest = t.replace(/^\[[^\]]+\]\s*/, '');
-      rest = rest.replace(/(중|고)\s*(\d)\s*\|?\s*국어\s*/, function (m0, a, b) {
-        if (!meta.grade) meta.grade = a + b;
+      rest = rest.replace(/(?:(중|고)\s*(\d)\s*\|?\s*국어|국어\s*\|?\s*(중|고)\s*(\d))\s*/, function (m0, a1, b1, a2, b2) {
+        if (!meta.grade) meta.grade = (a1 || a2) + (b1 || b2);
         meta.subject = '국어';
         return '';
       }).trim();
-      /* '1.문학을 펼치면(01)' · '1-1.시의 목소리(1회)' · '1-1.(1)저녁 항구' 세 모양이 온다 */
-      const code = rest.match(/^(\d+)(?:-(\d+))?\.\s*(?:\((\d+)\))?\s*(.+)$/);
+      /* '1.문학을 펼치면(01)' · '1-1.시의 목소리(1회)' · '1-1.(1)저녁 항구' · '2-1 국어의 음운 체계' 모양이 온다 */
+      const code = rest.match(/^(\d+)(?:-(\d+))?(?:\.|\s+)\s*(?:\((\d+)\))?\s*(.+)$/);
       if (code) {
         if (!meta.unit) meta.unit = code[1];
         if (code[2] && !meta.subUnit) meta.subUnit = code[1] + '-' + code[2];

@@ -233,9 +233,24 @@ function textFromLines(lines, prose) {
   return prose ? { paragraphs: xs } : { stanzas: [{ no: 1, lines: xs }] };
 }
 
+function tailCitation(lines) {
+  const xs = (lines || []).map((x) => String(x || '').trim()).filter(Boolean);
+  for (let i = xs.length - 1; i >= Math.max(0, xs.length - 2); i--) {
+    const ln = xs[i];
+    let m = ln.match(/^(?:[-―─]\s*)?([^,「<『()\d]{1,18}?)\s*,\s*(?:「([^」]{1,40})」|<([^>]{1,40})>|『([^』]{1,40})』)(?:\s*[-―─])?$/);
+    if (m) return { author: m[1].trim(), title: (m[2] || m[3] || m[4]).trim() };
+    m = ln.match(/^(?:[-―─]\s*)?(?:「([^」]{1,40})」|<([^>]{1,40})>|『([^』]{1,40})』)\s*,\s*([^,\-―─()\d]{1,18}?)(?:\s*[-―─])?$/);
+    if (m) return { title: (m[1] || m[2] || m[3]).trim(), author: m[4].trim() };
+  }
+  return null;
+}
+
 export function resolveSets(results, works, opts) {
   opts = opts || {};
   const cleanTitle = (s) => String(s || '').replace(/^\s*\([가-하]\)\s*/, '').trim();
+  const cleanRound = (s) => cleanTitle(s).replace(/^\d+(?:-\d+)?(?:\.|\s+)\s*(?:\(\d+\)\s*)?/, '')
+    .replace(/\s*\((?:\d+\s*회|0\d)\)\s*$/, '').trim();
+  const hasCanonWorks = works.some((w) => w.hasCanon);
   const byTitle = {};
   works.forEach((w) => { if (w.title) byTitle[cleanTitle(w.title)] = w; });
   const added = [], inferred = [], stillPending = [];
@@ -245,7 +260,12 @@ export function resolveSets(results, works, opts) {
   const squash = (s) => String(s || '').replace(/[\s㉠-㉭]/g, '');
   const bodies = works.filter((w) => w.title).map((w) => ({ title: cleanTitle(w.title), text: squash(workLines(w).join('')) }));
   results.forEach((r) => ((r.out.review || {}).candidates || []).forEach((c) => {
-    if (c.kind === 'setText' && c.title) bodies.push({ title: cleanTitle(c.title), text: squash((c.body || c.lines || []).join('')) });
+    if (c.kind !== 'setText') return;
+    if (!c.title) {
+      const cited = tailCitation(c.body || c.lines);
+      if (cited) { c.title = cited.title; if (!c.author && cited.author) c.author = cited.author; }
+    }
+    if (c.title) bodies.push({ title: cleanTitle(c.title), text: squash((c.body || c.lines || []).join('')) });
   }));
   results.filter((r) => r.series === 'concept1' && r.out.work.title).forEach((r) => {
     /* 개념완성의 인용 구절도 작품을 특정하는 근거다. 전문이 없는 소설은 다른 문제지의
@@ -265,6 +285,9 @@ export function resolveSets(results, works, opts) {
     const review = r.out.review || {};
     const pend = (review.pending || []).filter((p) => p.kind === 'set');
     if (!pend.length) return;
+    const sectionFallback = !hasCanonWorks && r.out.meta
+      ? cleanRound(r.out.meta.workTitle || r.out.meta.roundTitle || r.out.meta.unitTitle || '')
+      : '';
     /* 이 자료의 setText 후보 — 단원집중은 세트 본문을 pending 에 안 담고 후보로만 낸다 */
     const texts = {};
     (review.candidates || []).filter((c) => c.kind === 'setText').forEach((c) => {
@@ -286,12 +309,16 @@ export function resolveSets(results, works, opts) {
       let ok = true;
       (p.works || []).forEach((w) => {
         const cand = texts[p.setId + '|' + (w.label || '')] || {};
-        let title = cleanTitle(w.title || cand.title);
+        const cited = !w.title && !cand.title ? tailCitation(cand.body || cand.lines) : null;
+        let title = cleanTitle(w.title || cand.title || (cited && cited.title));
+        if (cited && cited.author && !w.author && !cand.author) cand.author = cited.author;
         let byInference = false;
         let match = null;
+        let bySection = false;
         if (!title) match = matchedTitle(cand);
         const isExcerpt = w.kind === 'excerpt' || cand.kind2 === 'excerpt' || cand.prose;
         if (!title && (match || isExcerpt && soleExcerpt)) { title = match || soleExcerpt; byInference = true; }
+        if (!title && sectionFallback) { title = sectionFallback; byInference = true; bySection = true; }
         if (!title) { ok = false; return; }
 
         let work = byTitle[title];
@@ -332,6 +359,7 @@ export function resolveSets(results, works, opts) {
         if (byInference) {
           inferred.push({ setId: p.setId, label: ref.label, workId: work.workId, title,
             why: match ? '제목이 생략된 본문이 폴더 안 제목 있는 본문과 유일하게 일치했습니다 — 검수에서 확인하세요'
+              : bySection ? '정본 없는 단원의 무제 지문을 소단원 제목으로 묶었습니다 — 검수에서 확인하세요'
               : '제목이 지면에 없어 이 자료의 유일한 발췌 작품으로 보았습니다 — 검수에서 확인하세요' });
         }
         refs.push(ref);
@@ -442,7 +470,15 @@ export function buildPack(dir, opts) {
       else if (f.extractor === 'puri') results.push({ ...f, out: buildPuri(f.doc, o) });
       else if (f.series === 'seosul') results.push({ ...f, out: buildSeosul(f.doc, o) });
     } catch (e) {
-      errors.push(`${base}(${U.SERIES_LABEL[f.series]}) 추출 중 오류: ${String(e.message).slice(0, 200)}`);
+      const msg = String(e.message).slice(0, 200);
+      /* 보조 상품(실력완성·풀이완성·대표유형·개념완성 step2) 파일 하나의 추출 실패는 단원 오류가 아니라
+         경고로 내리고 그 파일만 빼고 팩을 만든다(정본·단원집중·서술형 계열의 실패 정책은 그대로). */
+      if (f.extractor === 'basic' || f.extractor === 'puri') {
+        skipped.push({ file: base, series: f.series, reason: msg });
+        warns.push(`${base}(${U.SERIES_LABEL[f.series]}) 추출 중 오류(건너뜀): ${msg}`);
+      } else {
+        errors.push(`${base}(${U.SERIES_LABEL[f.series]}) 추출 중 오류: ${msg}`);
+      }
     }
   });
 
@@ -592,7 +628,8 @@ export function buildPack(dir, opts) {
     (r.out.items || []).forEach((it) => {
       const hasSet = it.setId && setIds[it.setId];
       const hasWork = it.workId && workIdSet[it.workId];
-      if (!hasSet && !hasWork) {
+      const needsPassage = Boolean(it.setId) || (/(?:윗글|이\s*글|\([가-하]\))/.test(it.stem || '') && !(it.bogi && it.bogi.text));
+      if (!hasSet && !hasWork && needsPassage) {
         const unresolved = solved.stillPending.find((p) => p.setId === it.setId);
         dropped.push({ series: r.series, file: path.basename(r.file || ''), id: it.id,
           no: it.source && it.source.no, setId: it.setId || null,
@@ -676,7 +713,11 @@ export function buildPack(dir, opts) {
   if (pending.length) {
     report.push(`검수 대기 ${pending.length}건 — 루브릭 미저작 서술형·대조 미달 등. 팩에 넣지 않았습니다.`);
   }
-  if (!works.length) errors.push('작품 정본이 없어요 — 이해완성 파일이 폴더에 있어야 합니다.');
+  if (!works.length && !items.length) {
+    errors.push('작품 정본이 없어요 — 이해완성 파일이 폴더에 있어야 합니다.');
+  } else if (!works.some((w) => w.hasCanon)) {
+    warns.push('정본 자료(이해완성/개념완성)가 없어 문항 전용 팩으로 만들었어요 — 정본 자료를 넣으면 개념 학습이 열립니다.');
+  }
 
   const review = {
     packId, pending, skipped, unanchored, reanchored, dropped, mergeLog, reconstructedTexts,

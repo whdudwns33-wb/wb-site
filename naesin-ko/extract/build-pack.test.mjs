@@ -330,4 +330,52 @@ t('새 네 상품을 폴더에서 자동 판별하고 기존 mc5·ox 계약으�
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
+t('보조 상품 파일 하나의 경계 실패는 경고로 내리고 문항 전용 팩(정본 0)도 통과시킨다', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ko-qonly-'));
+  const sp = (x, text, size = 9.1, color = '#000000') => ({ x, text, size, color, w: Math.min(text.length * 8, 200) });
+  const ln = (y, ...spans) => ({ y, spans });
+  const pg = (no, lines) => ({ no, width: 595, height: 842, lines });
+  try {
+    fs.writeFileSync(path.join(dir, '_meta.txt'), 'revision: 2015\n');
+    /* 정본(이해완성) 없이 단독 문항과 무제 지문 세트가 있는 단원집중 자료 */
+    const danwon = { pages: [
+      pg(1, [
+        ln(45, sp(60, '[단원집중]')),
+        ln(65, sp(60, '중3 | 국어', 11, '#ffffff'), sp(290, '2-1.음운의 체계와 특성(1회)', 10.5)),
+        ln(100, sp(60, '1.', 13.7, '#191919')),
+        ln(106, sp(86, '음운에 대한 설명으로 가장 적절한 것은?')),
+        ...['① 뜻 구별', '② 문장 성분', '③ 문단 중심', '④ 담화 맥락', '⑤ 매체 자료'].map((c, n) => ln(130 + n * 18, sp(70, c))),
+        ln(240, sp(60, '※ 다음을 읽고 물음에 답하시오.', 7.9)),
+        ln(265, sp(70, '국어의 자음은 소리 나는 위치와 방법에 따라 나뉜다.')),
+        ln(310, sp(60, '2.', 13.7, '#191919')),
+        ln(316, sp(86, '윗글의 내용과 일치하는 것은?')),
+        ...['① 모음 설명', '② 자음 분류', '③ 문장 짜임', '④ 높임 표현', '⑤ 시간 표현'].map((c, n) => ln(340 + n * 18, sp(70, c))),
+      ]),
+      pg(2, [
+        ln(100, sp(66, '1) [정답] ①', 7.9)),
+        ln(120, sp(66, '[해설] 음운은 뜻을 구별해 주는 소리의 가장 작은 단위이다.', 7.9)),
+        ln(160, sp(66, '2) [정답] ②', 7.9)),
+        ln(180, sp(66, '[해설] 자음의 분류 기준을 설명하고 있다.', 7.9)),
+      ]),
+    ] };
+    /* 학생/교사 경계를 확정할 수 없는 깨진 보조 상품(실력완성) 1개 */
+    const brokenSkill = basicFixture('실력완성');
+    brokenSkill.pages = brokenSkill.pages.slice(0, 1);
+    brokenSkill.pages[0].lines = brokenSkill.pages[0].lines.filter((l) => !l.spans.some((s) => s.text === '1.'));
+    fs.writeFileSync(path.join(dir, 'danwon.json'), JSON.stringify(danwon));
+    fs.writeFileSync(path.join(dir, 'broken-skill.json'), JSON.stringify(brokenSkill));
+
+    const result = buildPack(dir);
+    assert.deepStrictEqual(result.errors, []);
+    assert.strictEqual(result.pack.items.length, 2);
+    assert.strictEqual(result.pack.sets.length, 1);
+    assert.ok(result.pack.works.every((w) => !w.hasCanon));
+    assert.ok(result.review.skipped.some((s) => s.file === 'broken-skill.json'));
+    assert.ok(result.warns.some((w) => w.includes('broken-skill.json') && w.includes('추출 중 오류(건너뜀)')));
+    assert.ok(result.warns.some((w) => w.includes('문항 전용 팩')));
+    const checked = PC.checkPack({ ...result.pack.meta, works: result.pack.works, sets: result.pack.sets, items: result.pack.items });
+    assert.deepStrictEqual(checked.errors, []);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 console.log(`\nOK — ${passed}개 통과. 병합기는 자료 하나만 봐서는 못 하는 것을 한다.`);

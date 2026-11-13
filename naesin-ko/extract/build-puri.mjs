@@ -5,6 +5,8 @@ import * as U from './spans-util.mjs';
 const CIRCLED = '①②③④⑤';
 const RED = ['#d30000', '#ff0000'];
 const NOTE = ['#28448e', '#315f97'];
+const BODY_INK = ['#000000', '#222222', '#211d1e'];
+const isBodyInk = (c) => BODY_INK.includes(c);
 const join = (rows) => U.stripChrome(rows.map((r) => r.text).join(''));
 
 function examples(pages) {
@@ -25,7 +27,7 @@ function feedback(example) {
   let current = null;
   const answers = new Set();
   for (const row of example.rows) {
-    const marker = row.spans.find((s) => (s.color === '#000000' || RED.includes(s.color)) &&
+    const marker = row.spans.find((s) => (isBodyInk(s.color) || RED.includes(s.color)) &&
       s.size >= 8.5 && s.size <= 9.2 && /^[①-⑤]/.test(s.text.trim()));
     const symbol = marker && marker.text.trim()[0];
     if (symbol && CIRCLED.indexOf(symbol) === parts.length) {
@@ -33,14 +35,14 @@ function feedback(example) {
     }
     const correct = row.spans.find((s) => RED.includes(s.color) && s.size >= 8.5 && s.size <= 9.2 && /^[①-⑤]/.test(s.text.trim()));
     if (correct) answers.add(correct.text.trim()[0]);
-    const printed = U.joinSpans(row.spans).match(/\(?정답\s*([①-⑤](?:\s*[,·]\s*[①-⑤])*)\)?/);
+    const printed = U.joinSpans(row.spans).match(/\(?\정답\s*([①-⑤](?:\s*[,·]\s*[①-⑤])*)\)?/);
     if (printed) (printed[1].match(/[①-⑤]/g) || []).forEach((s) => answers.add(s));
     if (current) current.rows.push(row);
   }
   const perChoice = {}, evidence = [], flags = {};
   parts.forEach((part) => {
     const text = join(part.rows.map((r) => ({ text: U.joinSpans(r.spans.filter((s) => NOTE.includes(s.color))) })));
-    if (text) perChoice[part.no] = text.replace(/\(?정답\s*[①-⑤]\)?/g, '').replace(/^\s*[→↳]\s*/, '').trim();
+    if (text) perChoice[part.no] = text.replace(/\(?\정답\s*[①-⑤]\)?/g, '').replace(/^\s*[→↳]\s*/, '').trim();
     const marks = [...new Set((text.match(/[㉠-㉭]/g) || []))];
     evidence.push({ no: part.no, marks, text });
     const red = part.rows.flatMap((r) => r.spans).filter((s) => RED.includes(s.color)).map((s) => s.text).join('');
@@ -68,7 +70,7 @@ export function buildPuri(doc, opts = {}) {
       const first = U.exampleStarts(col)[0];
       if (!first) return [];
       return col.filter((r) => r.y >= U.MAST_BAND && r.y < first.y).map((r) => {
-        const spans = r.spans.filter((s) => s.size >= 8.5 && s.size <= 9.2 && s.color === '#000000');
+        const spans = r.spans.filter((s) => s.size >= 8.5 && s.size <= 9.2 && isBodyInk(s.color));
         return { text: U.joinSpans(spans), width: spans.length ? Math.max(...spans.map((s) => s.x + s.w)) - Math.min(...spans.map((s) => s.x)) : 0 };
       }).filter((r) => r.text.trim());
     });
@@ -86,7 +88,7 @@ export function buildPuri(doc, opts = {}) {
   student.forEach((ex, index) => {
     const source = { series, section: title || '', no: index + 1, page: ex.page, exampleNo: ex.exampleNo };
     if (opts.sourceFile || doc.file) source.file = opts.sourceFile || doc.file;
-    const rows = ex.rows.map((r) => ({ text: U.joinSpans(r.spans.filter((s) => s.size >= 8.5 && s.size <= 9.7 && s.color === '#000000')) }));
+    const rows = ex.rows.map((r) => ({ text: U.joinSpans(r.spans.filter((s) => s.size >= 8.5 && s.size <= 9.7 && isBodyInk(s.color))) }));
     const parsed = U.parseChoiceRows(rows);
     const stem = parsed.stem.replace(/^Q\d+\.\s*/, '');
     const answer = teacher.length === student.length && teacher[index] ? feedback(teacher[index])
@@ -104,9 +106,10 @@ export function buildPuri(doc, opts = {}) {
       const possible = Object.keys(answer.flags).filter((n) => answer.flags[n] === !isNegative);
       if (possible.length === 1) correct = Number(possible[0]);
     }
-    if (parsed.choices.length >= 2 && parsed.choices.length <= 5 && parsed.choices.every((c) => c.text) && stem && correct && correct <= parsed.choices.length) {
+    const hasChoices = parsed.choices.length >= 2 && parsed.choices.every((c) => c.text && c.text.trim());
+    if (hasChoices && parsed.choices.length <= 5 && stem && correct && correct <= parsed.choices.length) {
       item.answer = correct; items.push(item);
-    } else if (parsed.choices.length >= 2 && Object.keys(answer.flags).length === parsed.choices.length && stem) {
+    } else if (hasChoices && Object.keys(answer.flags).length === parsed.choices.length && stem) {
       parsed.choices.forEach((c) => items.push({ ...item, id: item.id + '-ox' + c.no, format: 'ox', choices: undefined,
         stem: U.escapeStem(c.text), answer: answer.flags[c.no], source: { ...source, choiceNo: c.no },
         explanation: { main: answer.perChoice[c.no] || '' } }));
