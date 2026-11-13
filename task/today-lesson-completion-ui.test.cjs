@@ -229,3 +229,12 @@ test('이관된 수업은 확인된 원수업 메모를 최근 3개만 읽기 �
   task.inheritedLessonMemos.studentId='other-student';assert.equal(api.previousTaskMemos('new-lesson','2026-11-12').length,1);
   task.inheritedLessonMemos.studentId='student-a';task.inheritedLessonMemos.sourceTaskId='wrong-source';assert.equal(api.previousTaskMemos('new-lesson','2026-11-12').length,1);
 });
+
+test('comment-only history is visible without rewriting stored notes', () => {
+  const start = source.indexOf('function previousTaskMemos(');
+  const end = source.indexOf('function previousTaskMemosProgressHtml(', start);
+  const check = { taskId: 'lesson-1', date: '2026-08-13', note: '', lessonMemo: { comment: '천천히 읽기' } };
+  const api = new Function('state', source.slice(start, end) + '\nreturn previousTaskMemos;')({ checks: { one: check } });
+  assert.equal(api('lesson-1', '2026-08-14')[0].note, '[코멘트]\n천천히 읽기');
+  assert.equal(check.note, '');
+});
