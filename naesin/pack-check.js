@@ -29,6 +29,66 @@ var WBPACKCHECK = (function () {
   function nonEmpty(s) { return typeof s === 'string' && s.trim().length > 0; }
   function isArr(a) { return Array.isArray(a); }
 
+  var pair = { en: 'string', ko: 'string' };
+  var strings = ['string'];
+  var rowShapes = {
+    words: { id: 'string', headword: 'string', pos: 'string', meaningKo: strings, sections: strings,
+      irregularForms: strings, example: pair, definition: pair,
+      senses: [{ senseNo: 'scalar', pos: 'string', meaningKo: 'string', example: pair }],
+      synonyms: strings, antonyms: strings, level: 'scalar', notes: 'texts' },
+    sentences: { seq: 'scalar', dayGroup: 'string', dayHeaderEn: 'string', dayHeaderKo: 'string', en: 'string', ko: 'string',
+      chunks: [pair], keywords: [pair], tokens: strings, verbForms: [{ base: 'string', answer: 'string' }],
+      grammarChoices: [{ options: strings, answerIdx: 'scalar' }], writingKeywords: strings, wordIds: strings,
+      grammarNotes: [{ target: 'string', note: 'string' }], notes: 'texts' },
+    oddOneItems: { id: 'string', dayGroup: 'string', kind: 'string', instructionKo: 'string',
+      sentences: [{ seq: 'scalar', text: 'string' }], options: strings, answerIdx: 'scalar', correction: 'string', explanationKo: 'string', notes: 'texts' },
+    checkItems: { id: 'string', slot: 'string', seq: 'scalar', promptKo: 'string', explanationKo: 'string',
+      choices: strings, answerIdx: 'scalar', textEn: 'string', blanks: [{ answers: 'texts', hintKo: 'string' }],
+      ko: 'string', answers: strings, keywords: strings, tokens: strings, notes: 'texts' },
+    dialogues: { id: 'string', title: 'string', section: 'string', lines: [{ speaker: 'string', en: 'string', ko: 'string' }], notes: 'texts' },
+    keyExpressions: { en: 'string', ko: 'string', blankAnswer: 'string' },
+    functions: { name: 'string', pattern: 'string', explainKo: 'string' },
+    vocabSidebar: pair,
+    readingQA: { q: 'string', a: 'string' },
+    patterns: { patternNo: 'scalar', title: 'string', conceptKo: 'string', grammarPoint: [strings],
+      textbookExamples: [{ en: 'string', ko: 'string', origin: 'string' }],
+      letsUseIt: [{ no: 'scalar', stem: 'string', ko: 'string', wordBank: strings, answers: strings }], notes: 'texts' },
+    items: { id: 'string', no: 'scalar', footnoteNo: 'scalar', source: 'string', section: 'string', formatType: 'string', instructionKo: 'string',
+      promptKo: 'string', stem: 'string', questionKo: 'string', question: 'string', isNegative: 'scalar', answerCount: 'scalar', sourceImages: strings, sourceImageRequired: 'boolean',
+      stimulus: { type: 'string', parts: [{ text: 'string' }] }, choices: [{ label: 'scalar', text: 'string', tuple: strings }],
+      answer: ['scalar'], explanationKo: 'string', targetRefs: [{ wordId: 'string', sentenceSeq: 'scalar', patternNo: 'scalar', dialogueId: 'string' }], notes: 'texts' },
+  };
+  var PACK_ARRAYS = Object.keys(rowShapes);
+  var packShape = { rights: { basis: 'string', holder: 'string', evidenceRef: 'string', studentUseAllowed: 'boolean', derivativeUseAllowed: 'boolean', externalAiAllowed: 'boolean', expiresAt: 'string', notes: 'string' }, packId: 'string', curriculum: 'string', textbook: 'string', grade: 'string', school: 'string', gradeSem: 'string', exam: 'string', lesson: 'scalar',
+    lessonTitle: 'string', source: 'string', contentMode: 'string', notes: 'texts', passage: { titleEn: 'string', titleKo: 'string' }, counts: {} };
+  PACK_ARRAYS.forEach(function (k) { packShape[k] = [rowShapes[k]]; packShape.counts[k] = 'scalar'; });
+  ['examples', 'definitions', 'polysemy', 'synAnt'].forEach(function (k) { packShape.counts[k] = 'scalar'; });
+
+  /* 검수 원천은 초안에만 산다 — 알려진 학생 필드 안에 감춰도 배포 관문에서 막는다. */
+  function checkShape(value, shape, at, c) {
+    if (value == null) return true;
+    var ok = true;
+    function bad(msg) { c.err('(공통)', at + ' ' + msg); ok = false; }
+    if (shape === 'texts' && typeof value === 'string') return true;
+    if (shape === 'texts') shape = strings;
+    if (typeof shape === 'string') {
+      if (shape === 'scalar' ? !(/^(string|number|boolean)$/.test(typeof value)) : typeof value !== shape)
+        bad('잘못된 필드 형태');
+    } else if (isArr(shape)) {
+      if (!isArr(value)) bad('는 배열이어야 함');
+      else value.forEach(function (v, i) {
+        if (v == null) { c.err('(공통)', at + '[' + i + '] 빈 행/값'); ok = false; }
+        else if (!checkShape(v, shape[0], at + '[' + i + ']', c)) ok = false;
+      });
+    } else if (!value || typeof value !== 'object' || isArr(value)) bad('객체이어야 함');
+    else Object.keys(value).forEach(function (key) {
+      if (!Object.prototype.hasOwnProperty.call(shape, key)) {
+        c.err('(공통)', (at ? at + '.' : '') + key + ' 학생 팩에 허용되지 않는 필드'); ok = false;
+      } else if (!checkShape(value[key], shape[key], at ? at + '.' + key : key, c)) ok = false;
+    });
+    return ok;
+  }
+
   /* 표기 비교용 정규화 — 굽은 따옴표·공백·대소문자를 지운다.
      원본 워크북은 인쇄 그대로 대소문자·구두점이 섞여 있어(예: 'soobin', 'big,')
      이 차이로 오류를 내면 정상 팩이 통과하지 못한다. */
@@ -88,9 +148,26 @@ var WBPACKCHECK = (function () {
          '2'나 4가 들어오면 엔진이 조용히 보통으로 눌러 읽어 태그가 없는 것과 같아진다. */
       if (w.level != null && w.level !== 1 && w.level !== 2 && w.level !== 3)
         c.err(S, at + ' level 은 1(기초)·2(보통)·3(심화) 중 하나여야 함 — 받은 값: ' + JSON.stringify(w.level));
-      if (isArr(w.senses)) w.senses.forEach(function (s, j) {
-        if (!nonEmpty(s && s.meaningKo)) c.err(S, at + ' senses[' + j + '] meaningKo 없음');
-      });
+      if (w.senses !== undefined && w.senses !== null) {
+        if (!isArr(w.senses) || w.senses.length > 3) c.err(S, at + ' senses 는 최대 3개 배열이어야 함');
+        else {
+          w.senses.forEach(function (s, j) {
+            var senseKeys = ['senseNo', 'pos', 'meaningKo', 'example'];
+            var exampleKeys = ['en', 'ko'];
+            if (!s || typeof s !== 'object' || isArr(s) || Object.keys(s).length !== senseKeys.length
+              || !senseKeys.every(function (key) { return Object.prototype.hasOwnProperty.call(s, key); })
+              || Object.keys(s).some(function (key) { return senseKeys.indexOf(key) < 0; })
+              || !Number.isInteger(s.senseNo) || s.senseNo !== j + 1 || s.senseNo > 3
+              || typeof s.pos !== 'string' || s.pos.length > 20 || !nonEmpty(s.meaningKo) || s.meaningKo.length > 1200
+              || !s.example || typeof s.example !== 'object' || isArr(s.example) || Object.keys(s.example).length !== exampleKeys.length
+              || !exampleKeys.every(function (key) { return Object.prototype.hasOwnProperty.call(s.example, key); })
+              || Object.keys(s.example).some(function (key) { return exampleKeys.indexOf(key) < 0; })
+              || !nonEmpty(s.example.en) || s.example.en.length > 1200 || !nonEmpty(s.example.ko) || s.example.ko.length > 1200) {
+              c.err(S, at + ' senses[' + j + '] 구조·순번·뜻·영한 예문이 올바르지 않음');
+            }
+          });
+        }
+      }
       /* 예문에 표제어가 안 보이면 예문 빈칸 문항이 만들어지지 않는다 — 굴절형까지 보므로 경고만 */
       if (w.example && nonEmpty(w.example.en) && nonEmpty(w.headword)) {
         var head = words1(w.headword).split(' ')[0];
@@ -311,12 +388,20 @@ var WBPACKCHECK = (function () {
 
   /* ── 대화문 ── */
   function checkDialogues(pack, c) {
+    (isArr(pack.keyExpressions) ? pack.keyExpressions : []).forEach(function (k, i) {
+      var at = 'keyExpressions[' + i + ']';
+      if (!(nonEmpty(k && k.en) && nonEmpty(k && k.ko))) c.err('keyExpressions', at + ' en/ko 불완전');
+      if (!nonEmpty(k && k.blankAnswer)) c.err('keyExpressions', at + ' blankAnswer 없음');
+      else if (nonEmpty(k.en) && k.en.toLowerCase().indexOf(k.blankAnswer.toLowerCase()) < 0)
+        c.err('keyExpressions', at + ' blankAnswer가 en에 없음');
+    });
     var list = pack.dialogues;
     if (!isArr(list)) return;
     var S = 'dialogues';
     if (!list.length) c.err(S, 'dialogues 비었음');
     var lines = 0;
     list.forEach(function (d, i) {
+      if (!isArr(d && d.lines) || !d.lines.length) c.err(S, 'dialogues[' + i + '] lines 비었음');
       (isArr(d && d.lines) ? d.lines : []).forEach(function (l, j) {
         lines += 1;
         if (!(nonEmpty(l && l.speaker) && nonEmpty(l && l.en) && nonEmpty(l && l.ko)))
@@ -347,21 +432,70 @@ var WBPACKCHECK = (function () {
     if (!isArr(list)) return;
     var S = sectionName || 'items';
     var heads = {};
+    var ids = new Set(), legacyKeys = new Set(), numberCounts = new Map();
+    list.forEach(function (it) { if (it) numberCounts.set(it.no, (numberCounts.get(it.no) || 0) + 1); });
+    var choiceKey = function (v) {
+      return typeof v === 'string' && v.trim() ? v : typeof v === 'number' && Number.isFinite(v) ? String(v) : null;
+    };
     (isArr(pack.words) ? pack.words : []).forEach(function (w) { if (w && nonEmpty(w.headword)) heads[words1(w.headword)] = true; });
     list.forEach(function (it, i) {
       var at = 'items[' + i + '](no ' + (it && it.no != null ? it.no : '?') + ')';
-      if (!it || typeof it !== 'object') { c.err(S, at + ' 객체가 아님'); return; }
-      if (!nonEmpty(it.formatType)) c.err(S, at + ' formatType 없음');
+      if (!it || typeof it !== 'object' || isArr(it)) { c.err(S, at + ' 객체가 아님'); return; }
+      if (it.sourceImages !== undefined && (!isArr(it.sourceImages) || !it.sourceImages.length || it.sourceImages.length > 3 || it.sourceImages.some(function(h){return typeof h !== 'string' || !/^[a-f0-9]{64}$/.test(h);}) || it.source === '00')) c.err(S, at + ' 원문 이미지 형식이 올바르지 않음');
+      if (it.sourceImageRequired && (!isArr(it.sourceImages) || !it.sourceImages.length)) c.err(S, at + ' 필수 원문 이미지가 없음');
+      if (Object.prototype.hasOwnProperty.call(it, 'id')) {
+        if (typeof it.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,59}$/.test(it.id)) c.err(S, at + ' id 형식이 올바르지 않음');
+        else if (ids.has(it.id)) c.err(S, at + ' id 중복: ' + it.id);
+        else ids.add(it.id);
+      } else {
+        var locator = JSON.stringify([it.source || '', it.section || '', it.no, it.footnoteNo == null ? null : it.footnoteNo]);
+        if (legacyKeys.has(locator)) c.err(S, at + ' 기존 문항 위치 복합키 중복');
+        legacyKeys.add(locator);
+        if (numberCounts.get(it.no) > 1) {
+          try {
+            var key = 'i:loc:' + [it.source || '', it.section || '', it.no, it.footnoteNo == null ? '' : it.footnoteNo].map(function (part) { return encodeURIComponent(String(part)); }).join(':');
+            if (key.length > 2048) c.err(S, at + ' 기존 문항 위치 식별자는 2048자 이하여야 함 — 고유 id를 붙여 재검수');
+          } catch (e) { c.err(S, at + ' 기존 문항 위치 식별자를 인코딩할 수 없음 — 고유 id를 붙여 재검수'); }
+        }
+      }
+      if (!Number.isInteger(it.no) || it.no < 1) c.err(S, at + ' no 는 양의 정수여야 함');
+      if (it.footnoteNo != null && (!Number.isInteger(it.footnoteNo) || it.footnoteNo < 1)) c.err(S, at + ' footnoteNo 는 양의 정수여야 함');
+      ['source', 'section'].forEach(function (key) { if (it[key] != null && !nonEmpty(it[key])) c.err(S, at + ' ' + key + ' 비었음'); });
+      if (!['mcq', 'mcq_multi', 'short'].includes(it.formatType)) c.err(S, at + ' 지원하지 않는 formatType');
+      var hasPrompt = ['instructionKo', 'promptKo', 'stem', 'questionKo', 'question'].some(function (key) { return nonEmpty(it[key]); });
+      var parts = it.stimulus && isArr(it.stimulus.parts) ? it.stimulus.parts : [];
+      if (!hasPrompt && !parts.some(function (part) { return part && nonEmpty(part.text); })) c.err(S, at + ' 문항문 또는 지문이 필요함');
       if (!isArr(it.answer) || !it.answer.length) { c.err(S, at + ' answer 비었음'); return; }
-      if (isArr(it.choices) && it.choices.length) {
-        var labels = {};
-        it.choices.forEach(function (ch) { labels[String(ch && ch.label)] = true; });
+      if (it.answerCount != null && (!Number.isInteger(it.answerCount) || it.answerCount < 1)) c.err(S, at + ' answerCount 는 양의 정수여야 함');
+      if (it.formatType === 'short') {
+        if (it.choices != null && (!isArr(it.choices) || it.choices.length)) c.err(S, at + ' 주관식 choices 는 비어 있어야 함');
+        var accepted = new Set();
         it.answer.forEach(function (a) {
-          if (!labels[String(a)]) c.err(S, at + ' 정답 "' + a + '"가 보기 label에 없음');
+          if (!nonEmpty(a)) { c.err(S, at + ' 주관식 answer 는 비어 있지 않은 문자열이어야 함'); return; }
+          var normalized = a.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+          if (accepted.has(normalized)) c.err(S, at + ' 주관식 허용 답안 중복');
+          accepted.add(normalized);
+        });
+      } else {
+        if (!isArr(it.choices) || it.choices.length < 2) { c.err(S, at + ' choices 부족'); return; }
+        var labels = new Set(), answers = new Set();
+        it.choices.forEach(function (ch) {
+          var key = ch && choiceKey(ch.label);
+          var text = ch && (typeof ch.text === 'string' ? ch.text : isArr(ch.tuple) && ch.tuple.length && ch.tuple.every(nonEmpty) ? ch.tuple.join(' - ') : '');
+          if (key === null || !nonEmpty(text)) c.err(S, at + ' 보기 label/text 불완전');
+          if (labels.has(key)) c.err(S, at + ' 보기 label 중복');
+          labels.add(key);
+        });
+        it.answer.forEach(function (a) {
+          var key = choiceKey(a);
+          if (key === null || !labels.has(key)) c.err(S, at + ' 정답 "' + a + '"가 보기 label에 없음');
+          if (answers.has(key)) c.err(S, at + ' 정답 중복');
+          answers.add(key);
         });
         if (it.answerCount != null && it.answer.length !== it.answerCount)
           c.err(S, at + ' answerCount(' + it.answerCount + ') ≠ 정답 수(' + it.answer.length + ')');
-      } else if (Object.keys(heads).length) {
+      }
+      if (it.formatType === 'short' && Object.keys(heads).length) {
         /* 보기 없는 주관식 정답이 낱말 하나면 단어 마스터와 대조한다 — 정답지 오탈자를 여기서 잡는다 */
         it.answer.forEach(function (a) {
           var k = words1(a);
@@ -374,12 +508,39 @@ var WBPACKCHECK = (function () {
   }
 
   /* ── 전체 ── */
+  function validIsoDay(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    var d = new Date(value + 'T00:00:00Z');
+    return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === value;
+  }
+
+  function rightsErrors(rights, today) {
+    var errors = [];
+    if (!rights || typeof rights !== 'object' || isArr(rights)) return ['권리 확인이 필요합니다.'];
+    var allowed = ['basis', 'holder', 'evidenceRef', 'studentUseAllowed', 'derivativeUseAllowed', 'externalAiAllowed', 'expiresAt', 'notes'];
+    Object.keys(rights).forEach(function (key) { if (allowed.indexOf(key) < 0) errors.push('권리 메타데이터에 허용되지 않는 필드가 있습니다.'); });
+    if (!['self_authored','open_license','licensed'].includes(rights.basis)) errors.push('권리 근거를 확인해야 합니다.');
+    if (typeof rights.holder !== 'string' || !nonEmpty(rights.holder) || rights.holder.length > 120) errors.push('권리자 확인이 필요합니다.');
+    if (rights.studentUseAllowed !== true || rights.derivativeUseAllowed !== true) errors.push('학생 이용 및 2차 제작 허용 확인이 필요합니다.');
+    if (typeof rights.externalAiAllowed !== 'boolean') errors.push('외부 AI 이용 여부를 확인해야 합니다.');
+    if (rights.evidenceRef !== undefined && (typeof rights.evidenceRef !== 'string' || rights.evidenceRef.length > 300)) errors.push('증빙 참조 형식이 올바르지 않습니다.');
+    if (rights.notes !== undefined && (typeof rights.notes !== 'string' || rights.notes.length > 500)) errors.push('권리 메모 형식이 올바르지 않습니다.');
+    if (['open_license','licensed'].includes(rights.basis) && !nonEmpty(rights.evidenceRef)) errors.push('증빙 참조가 필요합니다.');
+    // Expiration is a calendar-day contract; compare against KST when not explicitly injected.
+    var todayKst = today || new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    if (rights.expiresAt !== undefined && rights.expiresAt !== '' && (typeof rights.expiresAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(rights.expiresAt) || !validIsoDay(rights.expiresAt) || rights.expiresAt < todayKst)) errors.push('권리 증빙이 만료되었거나 날짜 형식이 올바르지 않습니다.');
+    return errors;
+  }
+
   function checkPack(pack, opts) {
     var c = collector(opts);
-    if (!pack || typeof pack !== 'object') {
+    if (!pack || typeof pack !== 'object' || isArr(pack)) {
       c.err('(공통)', '팩이 객체가 아님');
       return { errors: c.errors, warns: c.warns, summary: c.summary };
     }
+    if (!checkShape(pack, packShape, '', c))
+      return { errors: c.errors, warns: c.warns, summary: c.summary };
+    rightsErrors(pack.rights).forEach(function (msg) { c.err("rights", msg); });
     checkWords(pack, c);
     checkSentences(pack, c);
     checkOddOne(pack, c);
@@ -394,14 +555,17 @@ var WBPACKCHECK = (function () {
        (스튜디오 assemble 은 행이 0인 종류를 팩에서 아예 빼므로, 한 종류만 넣고 만들면
         정확히 이 상태가 나온다 — 실제로 오류 0·경고 0 으로 통과하던 구멍이다.) */
     REQUIRED_SECTIONS.forEach(function (r) {
+      if (pack.contentMode === 'questions' && isArr(pack[r.key])) return;
       if (!isArr(pack[r.key]) || !pack[r.key].length)
         c.err('(공통)', r.key + ' 가 비었음 — ' + r.why + ' (' + r.need + ' 자료가 필요하다)');
     });
+    if (pack.contentMode != null && pack.contentMode !== 'questions') c.err('(공통)', '알 수 없는 contentMode');
+    if (pack.contentMode === 'questions' && (!isArr(pack.items) || !pack.items.length)) c.err('items', '문제 전용 팩에는 검수된 문항이 필요함');
     return { errors: c.errors, warns: c.warns, summary: c.summary };
   }
 
   return {
-    checkPack: checkPack,
+    checkPack: checkPack, rightsErrors: rightsErrors,
     /* 섹션별 검사도 노출한다 — 스튜디오 검수 화면이 한 종류만 다시 검사할 때 쓴다 */
     checkWords: checkWords, checkSentences: checkSentences, checkOddOne: checkOddOne,
     checkCheckItems: checkCheckItems, checkDialogues: checkDialogues, checkPatterns: checkPatterns,
@@ -409,6 +573,7 @@ var WBPACKCHECK = (function () {
     collector: collector, flat: flat, words1: words1, nonEmpty: nonEmpty,
     CHECK_SLOTS: CHECK_SLOTS, STAGE_DAYGROUP_MAX: STAGE_DAYGROUP_MAX,
     REQUIRED_SECTIONS: REQUIRED_SECTIONS,
+    PACK_ARRAYS: PACK_ARRAYS,
   };
 })();
 
