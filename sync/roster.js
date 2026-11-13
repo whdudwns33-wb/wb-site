@@ -788,7 +788,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     document.roster.updated = new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
     try { document = validateRosterDocument(document); }
     catch (error) { return json({ ok: false, error: String(error && error.message || error) }, 400, origin); }
-    const updatedAt = Date.now();
+    const updatedAt = Math.max(Date.now(), expectedUpdatedAt + 1); // 같은 밀리초 수정도 CAS 버전이 바뀌게
     const guard = studentReferenceGuard(app, studentId);
     let changed;
     try {
@@ -1108,7 +1108,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     const orderConflicts = await activeBookOrderConflicts(env, app, document);
     if (orderConflicts.length) return json({ ok: false, code: 'ACTIVE_BOOK_ORDER_CONFLICT',
       error: '미완료 교재 주문이 있어 학생 이름이나 재원 상태를 지금 변경할 수 없습니다' }, 409, origin);
-    const updatedAt = Date.now();
+    const updatedAt = Math.max(Date.now(), expectedUpdatedAt + 1); // 같은 밀리초 수정도 CAS 버전이 바뀌게
     let changed;
     try {
       const rosterWrite = env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')

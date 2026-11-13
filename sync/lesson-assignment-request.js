@@ -379,10 +379,12 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
   const statements = [...scheduleGuards];
   if (details) {
     roster.document.roster.updated = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(now));
+    // 같은 밀리초 수정도 CAS 버전이 바뀌게(roster.js·lesson-change-request.js 와 같은 규칙)
+    const rosterUpdatedAt = Math.max(now, Number(roster.updatedAt || 0) + 1);
     statements.push(env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
-      .bind(JSON.stringify(roster.document), now, app, roster.updatedAt));
+      .bind(JSON.stringify(roster.document), rosterUpdatedAt, app, roster.updatedAt));
     statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_assignment_roster',
-      [requestKey, revision, studentId, roster.updatedAt, now].join('\n'), now));
+      [requestKey, revision, studentId, roster.updatedAt, rosterUpdatedAt].join('\n'), rosterUpdatedAt));
   }
   if (taskStatement) {
     statements.push(taskStatement);
