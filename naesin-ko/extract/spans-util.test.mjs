@@ -279,6 +279,40 @@ t('머리말 메타는 마스트헤드와 단원 코드가 한 줄에 와도 둘
   const w = U.headerMeta({ pages: [pg(1, [ln(69.4, [sp(102, '중2 국어 1-1.(1)모래시계')])])] });
   assert.strictEqual(w.workTitle, '모래시계');
   assert.strictEqual(w.subUnit, '1-1');
+  /* 제어문자(\x01)·역순 마스트헤드('국어 | 중1')·점 대신 공백으로 띄운 소단원 코드('2-1 국어의 음운 체계')도 읽는다 */
+  const rev = U.headerMeta({ pages: [pg(1, [ln(69.4, [sp(60, '국어\x01 |\x01 중1', { size: 11, color: '#ffffff' }),
+    sp(290, '2-1 우리말의 소리', { size: 11 })])])] });
+  assert.strictEqual(rev.grade, '중1');
+  assert.strictEqual(rev.subUnit, '2-1');
+  assert.strictEqual(rev.roundTitle, '우리말의 소리');
+});
+
+t('마스트헤드에 제어문자·역순 표기·배지 오식이 있어도 학생용/선생님용 경계를 가른다', () => {
+  const ctrlDoc = { pages: [
+    pg(1, [ln(69, [sp(60, '중1\x01 |\x01 국어', { size: 11, color: '#ffffff' }), sp(290, '1-1.창작 단원', { size: 11 })])]),
+    pg(2, [ln(120, [sp(60, '본문 쪽')])]),
+    pg(3, [ln(69, [sp(60, '국어\x01 |\x01 중1', { size: 11, color: '#ffffff' }), sp(290, '1-1.창작 단원', { size: 11 })])]),
+  ] };
+  assert.deepStrictEqual(U.sectionStarts(ctrlDoc), [1, 3]);
+  assert.strictEqual(U.practiceHalves(ctrlDoc).student.length, 2);
+
+  /* 학생용 표지 배지에 오식('독서와 작문')이 있어도 표지 제목이 두 번만 반복되면 경계로 잡는다 */
+  const typoDoc = { pages: [
+    pg(1, [ln(69, [sp(60, '독서와 작문', { size: 10, color: '#ffffff' }), sp(290, '1-1.공감하며 대화하기', { size: 11 })])]),
+    pg(2, [ln(120, [sp(60, '학생용 본문')])]),
+    pg(3, [ln(69, [sp(60, '중2\x01 |\x01 국어', { size: 11, color: '#ffffff' }), sp(290, '1-1.공감하며 대화하기', { size: 11 })])]),
+    pg(4, [ln(120, [sp(60, '교사용 본문')])]),
+  ] };
+  const halves = U.practiceHalves(typoDoc);
+  assert.strictEqual(halves.student.length, 2);
+  assert.strictEqual(halves.teacher.length, 2);
+});
+
+t('지문 시작 표시는 다음을·(가)~(다)를·표를 보고까지 포함하되 개념 소제목은 제외한다', () => {
+  ['※ 다음을 읽고 물음에 답하시오.', '※ (가)~(다)를 읽고 물음에 답하시오.', '※ 표를 보고 물음에 답하시오.'].forEach((hdr) => {
+    assert.strictEqual(U.passageStarts([ln(100, [sp(60, hdr)])]).length, 1, hdr);
+  });
+  assert.strictEqual(U.passageStarts([ln(100, [sp(60, '※ 국어의 자음 체계')])]).length, 0);
 });
 
 console.log(`\nOK — ${passed}개 통과. 상수는 전부 실측값이다 — 새 출판사 자료가 오면 --colors 를 먼저 돌린다.`);
