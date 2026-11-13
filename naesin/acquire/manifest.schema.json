@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Local EXAM4YOU acquisition manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "root",
+    "createdAt",
+    "updatedAt",
+    "rows"
+  ],
+  "properties": {
+    "version": {
+      "enum": [
+        1
+      ]
+    },
+    "root": {
+      "type": "string"
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "updatedAt": {
+      "type": "string"
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "curriculum",
+          "grade",
+          "publisher",
+          "unitRawLabel",
+          "unitCode",
+          "material",
+          "variant",
+          "source",
+          "status",
+          "rawPath",
+          "canonicalPath",
+          "bytes",
+          "sha256",
+          "pageCount",
+          "createdAt",
+          "updatedAt",
+          "scannedAt",
+          "verifiedAt",
+          "attempts",
+          "error"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "curriculum": {
+            "enum": [
+              "2022",
+              "2015",
+              null
+            ]
+          },
+          "grade": {
+            "enum": [
+              "m1",
+              "m2",
+              "m3",
+              null
+            ]
+          },
+          "publisher": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unitRawLabel": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unitCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^(L([1-9]|1[0-2])|SL[12]?|SR[12]?)$"
+          },
+          "material": {
+            "type": "string"
+          },
+          "variant": {
+            "enum": [
+              "student",
+              "teacher",
+              "integrated",
+              "stage-1",
+              "stage-2",
+              "stage-3",
+              "stage-4",
+              "stage-5",
+              "stage-6",
+              "stage-7",
+              "stage-8",
+              "stage-9",
+              "stage-10",
+              "unknown"
+            ]
+          },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "listingId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "catalogLabel": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "observedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "status": {
+            "enum": [
+              "unknown",
+              "available",
+              "downloaded",
+              "verified",
+              "not_available",
+              "blocked",
+              "error"
+            ]
+          },
+          "rawPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "canonicalPath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "pageCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "scannedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "verifiedAt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
