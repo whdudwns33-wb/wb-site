@@ -150,7 +150,7 @@ async function loadPack(env, app, packId) {
 async function usageRows(env, app, packId) {
   const result = await env.DB.prepare(
     'SELECT entry_id,source_type,source_ref,source_date,attendance_event,delta,consumption_group_id,reason_code,actor_id,created_at ' +
-    'FROM session_pack_usage WHERE app=? AND pack_id=? ORDER BY created_at,entry_id'
+    'FROM session_pack_usage WHERE app=? AND pack_id=? ORDER BY created_at,expected_revision,entry_id'
   ).bind(app, packId).all();
   return result.results || [];
 }
