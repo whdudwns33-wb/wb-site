@@ -41,11 +41,11 @@
 <main id="app"></main>
 <script src="/admin/admin-login.js"></script>
 <script>
-/* WB 탐구브레인 관리 웹 — 문제지 올리기·정답 확인·시험 배정·현황.
+/* WB 탐구브레인 관리 웹 — 문제지 올리기·정답 확인·시험 배정·과제·현황.
    문제지 파일은 `node naesin-tg/extract/build-sheet.mjs <PDF>` 가 만든 JSON 이다(쪽 그림 포함).
    정답은 여기서 강사가 번호별로 넣고, 다 찬 뒤에만 학생에게 열 수 있다(서버가 같은 규칙으로 막는다). */
 let TOKEN = localStorage.getItem('wbr.admin.token') || null;
-let SHEETS = [], UP = null, MSG = '', OV = null, DETAIL = null;
+let SHEETS = [], UP = null, MSG = '', OV = null, DETAIL = null, TASKS = [];
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const SUBJ = { science: '과학', social: '사회', history: '역사', ethics: '도덕' };
@@ -66,7 +66,7 @@ function renderLogin(msg) {
 
 async function refresh() {
   if (!TOKEN) return renderLogin();
-  try { SHEETS = (await api('/admin/sheets')).sheets; OV = await api('/admin/overview'); } catch (e) { if (e.message !== 'auth') MSG = e.message; else return; }
+  try { SHEETS = (await api('/admin/sheets')).sheets; OV = await api('/admin/overview'); TASKS = (await api('/admin/tasks')).tasks; } catch (e) { if (e.message !== 'auth') MSG = e.message; else return; }
   render();
 }
 
@@ -106,7 +106,18 @@ function render() {
       + '<td><button class="btn sm ghost" data-edit="' + esc(s.id) + '">고치기</button> <button class="btn sm ghost" data-del="' + esc(s.id) + '">지우기</button></td></tr>').join('')
     + '</tbody></table>'
     + '<h2 style="margin-top:16px">시험 배정</h2><p class="muted">위에서 고른 자료를 시험 범위로 줍니다. 대상을 비우면 반 공통입니다. 저장하면 이전 배정을 바꿉니다.</p>'
-    + '<div class="grid"><label>대상(학생 코드, 비우면 반 공통)<input id="x_scope"></label><label>시험 이름<input id="x_title" placeholder="2학기 기말"></label><label>시험일<input id="x_date" type="date"></label><button class="btn" id="assign" style="align-self:end">배정 저장</button></div></div>'
+    + '<div class="grid"><label>대상(학생 코드, 비우면 반 공통)<input id="x_scope"></label><label>시험 이름<input id="x_title" placeholder="2학기 기말"></label><label>시험일<input id="x_date" type="date"></label><button class="btn" id="assign" style="align-self:end">배정 저장</button></div>'
+    + '<h2 style="margin-top:16px">과제 내기</h2><p class="muted">위에서 고른 문제지(읽기 자료 제외, 10개까지)를 시험 범위와 따로 숙제로 줍니다. 과제는 여러 건 동시에 걸 수 있고, 학생 화면에서는 마감 7일 뒤에 숨습니다.</p>'
+    + '<div class="grid"><label>과제 이름<input id="k_title" placeholder="7-2 단원 숙제"></label><label>마감일<input id="k_due" type="date"></label>'
+    + '<label>대상<select id="k_kind"><option value="all">전체</option><option value="cls">반</option><option value="codes">학생 코드</option></select></label>'
+    + '<label>반 이름 또는 학생 코드(쉼표로)<input id="k_who" placeholder="중2 A반 / st-1, st-2"></label><button class="btn" id="task" style="align-self:end">과제 내기</button></div></div>'
+    + '<div class="card"><h2>과제 ' + TASKS.length + '건</h2>' + (TASKS.length ? '<table><thead><tr><th>과제</th><th>마감</th><th>대상</th><th>제출</th><th>안 낸 학생</th><th></th></tr></thead><tbody>'
+      + TASKS.map((t) => '<tr><td><b>' + esc(t.title) + '</b><br><span class="muted">' + t.sheetIds.map((id) => esc((SHEETS.find((s) => s.id === id) || { title: id }).title)).join(' · ') + '</span></td><td>' + esc(t.due) + '</td>'
+        + '<td>' + (t.target.kind === 'all' ? '전체 <span class="muted">(앱을 연 학생)</span>' : t.target.kind === 'cls' ? esc(t.target.cls) : esc(t.target.codes.join(', '))) + '</td>'
+        + '<td><span class="tag' + (t.status.submitted < t.status.targets ? ' warn' : '') + '">' + t.status.submitted + ' / ' + t.status.targets + '</span></td>'
+        + '<td>' + (t.status.missing.map((m) => esc(m.name || m.code)).join(', ') || '<span class="muted">없음</span>') + '</td>'
+        + '<td><button class="btn sm ghost" data-tdel="' + esc(t.id) + '">지우기</button></td></tr>').join('') + '</tbody></table>'
+      : '<p class="muted">낸 과제가 없습니다.</p>') + '</div>'
     + '<div class="card"><h2>현황</h2>' + (OV && OV.students.length ? '<div style="overflow-x:auto"><table><thead><tr><th>학생</th>' + tests.map((s) => '<th>' + esc(s.title) + '</th>').join('') + '</tr></thead><tbody>'
       + OV.students.map((st) => '<tr><td><b>' + esc(st.name || st.code) + '</b><br><span class="muted">' + esc(st.cls) + '</span></td>' + tests.map((s) => '<td>' + cell(st, s.id) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>'
       : '<p class="muted">아직 제출한 학생이 없습니다.</p>')
@@ -166,6 +177,14 @@ document.addEventListener('click', async (e) => {
       const r = await post('/admin/exam', { scope: $('#x_scope').value.trim() || 'default', title: $('#x_title').value, examDate: $('#x_date').value, sheetIds: ids });
       MSG = '배정했습니다: ' + (r.scope === 'default' ? '반 공통' : r.scope) + ' · ' + ids.length + '건'; return refresh();
     }
+    if (b.id === 'task') {
+      const ids = [...document.querySelectorAll('.pick:checked')].map((x) => x.value);
+      const kind = $('#k_kind').value, whoV = $('#k_who').value.trim();
+      const target = kind === 'all' ? { kind } : kind === 'cls' ? { kind, cls: whoV } : { kind, codes: whoV.split(/[,\s]+/).filter(Boolean) };
+      await post('/admin/task', { title: $('#k_title').value, due: $('#k_due').value, sheetIds: ids, target });
+      MSG = '과제를 냈습니다: ' + $('#k_title').value.trim() + ' · 문제지 ' + ids.length + '건'; return refresh();
+    }
+    if (b.dataset.tdel) { if (!confirm('과제를 지웁니다. 학생의 풀이 기록은 남습니다. 지울까요?')) return; await post('/admin/task-delete', { id: b.dataset.tdel }); MSG = '과제를 지웠습니다.'; return refresh(); }
     if (b.dataset.code) { DETAIL = (await api('/admin/student?code=' + encodeURIComponent(b.dataset.code) + '&id=' + encodeURIComponent(b.dataset.id))).student; return render(); }
     if (b.dataset.verdict) { await post('/admin/essay', { code: DETAIL.code, id: DETAIL.id, no: Number(b.dataset.no), verdict: b.dataset.verdict }); DETAIL.essays[b.dataset.no].verdict = b.dataset.verdict; return refresh(); }
   } catch (err) { if (err.message !== 'auth') { MSG = '!' + err.message; render(); } }
