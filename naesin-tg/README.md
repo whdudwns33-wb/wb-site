@@ -18,7 +18,7 @@ naesin-tg/
     make-sample.mjs   sheet-sample.json 을 다시 만든다
 reading-server/
   naesin-tg-api.mjs            /api/naesin-tg/* (worker.mjs·server.mjs 양쪽에 등록)
-  public/naesin-tg-admin.html  관리 웹 — 올리기·정답 입력·열기/닫기·시험 배정·현황·서술형 확정
+  public/naesin-tg-admin.html  관리 웹 — 올리기·정답 입력·열기/닫기·시험 배정·과제·반별/학생별 현황·서술형 확정
 ```
 
 ## 자료를 넣는 순서
@@ -48,14 +48,16 @@ reading-server/
 · `GET /page?id=&n=` → `{page:{n,data}}` · `PUT /draft` · `POST /submit` → `{result}` · `POST /retry` → `{retry}` · `POST /essay`
 
 관리: `GET /admin/sheets` · `POST /admin/sheet {id, sheet}` · `POST /admin/page {id, n, data}`(1.4MB) · `POST /admin/sheet-delete`
-· `GET/POST /admin/exam` · `GET /admin/tasks` → `{tasks}`(과제마다 `status: {targets, submitted, missing}`) · `POST /admin/task {id?, title, due, sheetIds, target}` · `POST /admin/task-delete {id}` · `GET /admin/overview` · `GET /admin/student?code=&id=` · `POST /admin/essay`
+· `GET/POST /admin/exam` · `GET /admin/tasks` → `{tasks}`(과제마다 `status: {targets, submitted, missing}`) · `POST /admin/task {id?, title, due, sheetIds, target}` · `POST /admin/task-delete {id}` · `GET /admin/class?cls=` → `{class, classes}`(cls 를 비우면 반 목록만) · `GET /admin/overview` · `GET /admin/student?code=&id=` · `POST /admin/essay`
 
 ## 현재 상태 (v0, 2026-11-12)
 
 있는 것: 위 전부, 서버 테스트(`node reading-server/naesin-tg-api.test.mjs`).
 과제 배정(2026-11-12): 과제 목록은 `naesintg:tasks` 한 키. 「전체」 대상의 제출 현황은 탐구브레인을 한 번이라도 연 학생만 센다(등록 학생 전원을 세면 다른 앱만 쓰는 학생이 "안 냄"으로 잡힌다).
 아직 없는 것: 실제 족보닷컴 문제지로 한 시험(계정에 내려받기 권한이 없었다) · 과제 고치기 화면(서버는 `id` 로 고치기를 받는다) · 알림·반복 과제 ·
-반별 현황 묶음 · 인쇄 · 이용권이 끝났을 때 자료를 지우는 절차.
+인쇄 · 이용권이 끝났을 때 자료를 지우는 절차.
+
+반별 현황(2026-11-13): 분모는 **등록 학생 가운데 그 반 전원**(앱을 안 연 학생도 "안 냄"). 번호별 오답률은 **처음 제출 때** 틀린 수 ÷ 제출 수 — 뒤에 다시 맞혀도 처음 틀린 것으로 센다(수업에서 다룰 번호를 고르는 용도). 서술형은 빠진다.
 
 백업(2026-11-13): 야간 스냅샷·관리 내려받기의 `naesinTg` 칸에 학생 기록·시험 배정·과제·문제지 목록(메타)이 담긴다.
 문제지 본문(강사가 넣은 정답 포함)과 쪽 그림은 구매 자료라 담지 않는다 — 복구할 때는 원본 문제지 파일을 다시 올리고 정답을 다시 넣는다.

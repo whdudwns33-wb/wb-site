@@ -45,7 +45,7 @@
    문제지 파일은 `node naesin-tg/extract/build-sheet.mjs <PDF>` 가 만든 JSON 이다(쪽 그림 포함).
    정답은 여기서 강사가 번호별로 넣고, 다 찬 뒤에만 학생에게 열 수 있다(서버가 같은 규칙으로 막는다). */
 let TOKEN = localStorage.getItem('wbr.admin.token') || null;
-let SHEETS = [], UP = null, MSG = '', OV = null, DETAIL = null, TASKS = [];
+let SHEETS = [], UP = null, MSG = '', OV = null, DETAIL = null, TASKS = [], CLASSES = [], CLS = null, CLSSHEET = null;
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const SUBJ = { science: '과학', social: '사회', history: '역사', ethics: '도덕' };
@@ -66,7 +66,7 @@ function renderLogin(msg) {
 
 async function refresh() {
   if (!TOKEN) return renderLogin();
-  try { SHEETS = (await api('/admin/sheets')).sheets; OV = await api('/admin/overview'); TASKS = (await api('/admin/tasks')).tasks; } catch (e) { if (e.message !== 'auth') MSG = e.message; else return; }
+  try { SHEETS = (await api('/admin/sheets')).sheets; OV = await api('/admin/overview'); TASKS = (await api('/admin/tasks')).tasks; CLASSES = (await api('/admin/class')).classes; if (CLS) CLS = (await api('/admin/class?cls=' + encodeURIComponent(CLS.cls))).class; } catch (e) { if (e.message !== 'auth') MSG = e.message; else return; }
   render();
 }
 
@@ -118,10 +118,25 @@ function render() {
         + '<td>' + (t.status.missing.map((m) => esc(m.name || m.code)).join(', ') || '<span class="muted">없음</span>') + '</td>'
         + '<td><button class="btn sm ghost" data-tdel="' + esc(t.id) + '">지우기</button></td></tr>').join('') + '</tbody></table>'
       : '<p class="muted">낸 과제가 없습니다.</p>') + '</div>'
-    + '<div class="card"><h2>현황</h2>' + (OV && OV.students.length ? '<div style="overflow-x:auto"><table><thead><tr><th>학생</th>' + tests.map((s) => '<th>' + esc(s.title) + '</th>').join('') + '</tr></thead><tbody>'
+    + '<div class="card"><h2>현황</h2>' + classHtml() + '<h2 style="margin-top:16px">학생별</h2>' + (OV && OV.students.length ? '<div style="overflow-x:auto"><table><thead><tr><th>학생</th>' + tests.map((s) => '<th>' + esc(s.title) + '</th>').join('') + '</tr></thead><tbody>'
       + OV.students.map((st) => '<tr><td><b>' + esc(st.name || st.code) + '</b><br><span class="muted">' + esc(st.cls) + '</span></td>' + tests.map((s) => '<td>' + cell(st, s.id) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>'
       : '<p class="muted">아직 제출한 학생이 없습니다.</p>')
     + (DETAIL ? detailHtml() : '') + '</div>';
+}
+
+/* 반별 현황 — 분모는 그 반 등록 학생 전원. 번호별 오답률은 처음 제출 기준이라 수업에서 다룰 번호를 고를 때 쓴다. */
+function classHtml() {
+  const sel = '<label style="max-width:260px">반<select id="c_cls"><option value="">반을 고르세요</option>' + CLASSES.map((c) => '<option' + (CLS && CLS.cls === c ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></label>';
+  if (!CLS) return sel;
+  const rows = CLS.sheets.filter((x) => x.submitted).concat(CLS.sheets.filter((x) => !x.submitted));
+  return sel + '<p class="muted">' + esc(CLS.cls) + ' · 등록 학생 ' + CLS.members + '명 기준. 문제지 줄을 누르면 많이 틀린 번호가 나옵니다.</p>'
+    + '<table><thead><tr><th>문제지</th><th>제출</th><th>평균 정답률</th><th>남은 오답</th><th>서술형 확정 대기</th></tr></thead><tbody>'
+    + rows.map((x) => '<tr><td><button class="btn sm ghost" data-csheet="' + esc(x.id) + '">' + esc(x.title) + '</button></td><td><span class="tag' + (x.submitted < x.members ? ' warn' : '') + '">' + x.submitted + ' / ' + x.members + '</span></td>'
+      + '<td>' + (x.rate == null ? '<span class="muted">–</span>' : x.rate + '%') + '</td><td>' + x.wrongOpen + '</td><td>' + x.essayHold + '</td></tr>').join('') + '</tbody></table>'
+    + (CLSSHEET ? (() => { const x = CLS.sheets.find((y) => y.id === CLSSHEET); if (!x) return '';
+      return '<h2 style="margin-top:14px">' + esc(x.title) + ' · 많이 틀린 번호</h2>' + (x.wrongByNo.length
+        ? '<p>' + x.wrongByNo.map((w) => '<span class="tag ' + (w.rate >= 50 ? 'bad' : 'warn') + '">' + w.no + '번 ' + w.wrong + '명 (' + w.rate + '%)</span>').join(' ') + '</p><p class="muted">처음 제출 때 틀린 학생 수 ÷ 제출 학생 수. 서술형은 빠집니다.</p>'
+        : '<p class="muted">' + (x.submitted ? '처음 제출에서 모두 맞혔습니다.' : '아직 제출한 학생이 없습니다.') + '</p>'); })() : '');
 }
 
 function detailHtml() {
@@ -163,6 +178,10 @@ document.addEventListener('change', (e) => {
       if (!j.id || !j.sheet || !Array.isArray(j.pages)) throw new Error('build-sheet.mjs 가 만든 파일이 아니에요.');
       j.sheet.questions = j.sheet.questions || []; j.sheet.pages = j.pages.length; UP = j; MSG = ''; render();
     }).catch((err) => { MSG = '!' + err.message; render(); });
+  } else if (e.target.id === 'c_cls') {
+    const v = e.target.value; CLSSHEET = null;
+    (v ? api('/admin/class?cls=' + encodeURIComponent(v)).then((r) => { CLS = r.class; }) : Promise.resolve(CLS = null))
+      .then(render).catch((err) => { if (err.message !== 'auth') { MSG = '!' + err.message; render(); } });
   } else if (UP && ['f_count', 'f_answerFrom', 'f_kind'].includes(e.target.id)) { readForm(); render(); }
 });
 document.addEventListener('click', async (e) => {
@@ -185,6 +204,7 @@ document.addEventListener('click', async (e) => {
       MSG = '과제를 냈습니다: ' + $('#k_title').value.trim() + ' · 문제지 ' + ids.length + '건'; return refresh();
     }
     if (b.dataset.tdel) { if (!confirm('과제를 지웁니다. 학생의 풀이 기록은 남습니다. 지울까요?')) return; await post('/admin/task-delete', { id: b.dataset.tdel }); MSG = '과제를 지웠습니다.'; return refresh(); }
+    if (b.dataset.csheet) { CLSSHEET = CLSSHEET === b.dataset.csheet ? null : b.dataset.csheet; return render(); }
     if (b.dataset.code) { DETAIL = (await api('/admin/student?code=' + encodeURIComponent(b.dataset.code) + '&id=' + encodeURIComponent(b.dataset.id))).student; return render(); }
     if (b.dataset.verdict) { await post('/admin/essay', { code: DETAIL.code, id: DETAIL.id, no: Number(b.dataset.no), verdict: b.dataset.verdict }); DETAIL.essays[b.dataset.no].verdict = b.dataset.verdict; return refresh(); }
   } catch (err) { if (err.message !== 'auth') { MSG = '!' + err.message; render(); } }
