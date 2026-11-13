@@ -80,6 +80,7 @@ function readStream(pages, sizes) {
 
 export function buildDanwon(doc, opts) {
   opts = opts || {};
+  U.restoreChoiceImages(doc);
   const pages = (doc && doc.pages) || [];
   const meta = U.headerMeta(doc);
   const sizes = opts.bodySizes || BODY_SIZES;
@@ -88,6 +89,7 @@ export function buildDanwon(doc, opts) {
   const scope = String(opts.scope || meta.subUnit || 'u').replace(/[^A-Za-z0-9-]+/g, '-');
   const workIds = opts.workIds || {};          // 제목 → workId. 이해완성이 정한 id를 사람이 넘긴다.
   const section = opts.section || meta.roundTitle || '';
+  const sourceSeries = opts.sourceSeries || '단원집중';
 
   const report = [], todo = [], candidates = [], pending = [];
   const sets = [], items = [], patches = [];
@@ -96,8 +98,8 @@ export function buildDanwon(doc, opts) {
      '마지막으로 문항 번호가 찍힌 쪽 다음부터 해설'. 쪽 수가 달라져도 산다(실측 문제 7 · 해설 3). */
   let lastProblem = -1;
   pages.forEach((p, i) => { if (U.itemMarkers(p.lines).length) lastProblem = i; });
-  const problemPages = pages.slice(0, lastProblem + 1);
-  const solutionPages = pages.slice(lastProblem + 1);
+  const problemPages = opts.solutions ? pages : pages.slice(0, lastProblem + 1);
+  const solutionPages = opts.solutions ? [] : pages.slice(lastProblem + 1);
 
   /* ── 문항쪽 스트림에 표지 달기 ── */
   const ps = readStream(problemPages, sizes);
@@ -145,23 +147,27 @@ export function buildDanwon(doc, opts) {
     rows.forEach((r) => {
       const body = r.spans.filter((s) => sizes.indexOf(s.size) >= 0);
       if (!body.length) return;
-      const label = U.passageLabels([{ y: r.y, spans: body }]);
-      if (label.length) { cur = { label: label[0].label, rows: [], page: r.page }; blocks.push(cur); return; }
+      const label = r.text.match(/^\s*(\([가-하]\))\s*/);
+      if (label) { cur = { label: label[1], rows: [], page: r.page }; blocks.push(cur); }
       if (!cur) { cur = { label: '', rows: [], page: r.page }; blocks.push(cur); }
       const isAuthor = body.length === 1 &&
         (body[0].x - (leftOf[r.page + r.col] || 0)) >= AUTHOR_DX && body[0].w < AUTHOR_W;
-      cur.rows.push({ text: U.stripChrome(r.text), isAuthor, page: r.page });
+      cur.rows.push({ text: label ? r.text.slice(label[0].length) : r.text,
+        isAuthor: !label && isAuthor, page: r.page,
+        width: Math.max(...body.map((s) => s.x + s.w)) - Math.min(...body.map((s) => s.x)) });
     });
     return blocks.map((b) => {
+      b.rows = b.rows.filter((x) => x.text.trim());
       const ai = b.rows.findIndex((x) => x.isAuthor);
       /* 제목은 '가운데 정렬인가'가 아니라 '작가 줄 바로 앞인가'로 잡는다 — 가운데 정렬로 잡으면
          좌측 정렬된 시조 제목 하나를 놓쳐 6/7 이 된다(실측). */
       const author = ai >= 0 ? b.rows[ai].text : '';
       const title = ai > 0 ? b.rows[ai - 1].text : '';
-      const lines = b.rows
-        .filter((x, i) => !x.isAuthor && i !== ai - 1 && x.text)
-        .map((x) => x.text);
-      return { label: b.label, title, author, lines, page: b.page };
+      const bodyRows = b.rows.filter((x, i) => !x.isAuthor && i !== ai - 1 && x.text);
+      const lines = bodyRows.map((x) => U.stripChrome(x.text));
+      const prose = b.rows.length > 0 && b.rows.filter((x) => x.width > (pages[0].width || 595) * 0.3).length / b.rows.length >= 0.35;
+      return { label: b.label, title, author, lines, prose,
+        paragraphs: U.paragraphsFromRows(bodyRows), page: b.page };
     });
   }
 
@@ -181,48 +187,29 @@ export function buildDanwon(doc, opts) {
     if (row.setStart) { curSet = regions.filter((g) => g.at === i)[0] || curSet; return; }
     if (row.itemNo == null) return;
     let end = i + 1;
-    while (end < ps.length && ps[end].page === row.page && ps[end].col === row.col && !isEvent(ps[end])) end += 1;
+    while (end < ps.length && !isEvent(ps[end])) end += 1;
     blocks.push({ no: row.itemNo, set: curSet, page: row.page, col: row.col, rows: ps.slice(i, end) });
   });
 
-  function parseItem(b) {
-    const rows = b.rows.filter((r) => r.text);
-    let bogiAt = -1, firstChoice = -1, want = 0;
-    const chIdx = [];
-    rows.forEach((r, i) => {
-      const t = r.text.trim();
-      if (bogiAt < 0 && t === '<보기>') bogiAt = i;
-      /* 선지는 **다음 번호가 맞을 때만** 새 선지로 본다. 그냥 '원문자로 시작하면 새 선지'로
-         잡으면 <보기> 본문이나 이어지는 줄의 첫 글자에 걸린다. */
-      if (want < 5 && t.indexOf(CIRCLED[want]) === 0) {
-        if (firstChoice < 0) firstChoice = i;
-        chIdx.push(i); want += 1;
-      }
-    });
-    const stemEnd = bogiAt >= 0 ? bogiAt : (firstChoice >= 0 ? firstChoice : rows.length);
-    const stem = joinRows(rows.slice(0, stemEnd));
-    const bogi = bogiAt >= 0
-      ? joinRows(rows.slice(bogiAt + 1, firstChoice >= 0 ? firstChoice : rows.length)) : '';
-    const choices = chIdx.map((at, k) => ({
-      no: k + 1,
-      text: joinRows(rows.slice(at, chIdx[k + 1] == null ? rows.length : chIdx[k + 1]))
-        .replace(new RegExp('^' + CIRCLED[k] + '\\s*'), ''),
-    }));
-    return { stem, bogi, choices };
-  }
+  const parseItem = (b) => U.parseChoiceRows(b.rows);
 
   /* ── 정답·해설 ──
      해설은 단과 쪽을 넘어 흐른다(p8 좌단 맨 아래 → p8 우단 맨 위 → p9 좌단 맨 위).
      블록 단위가 아니라 **스트림 단위**로 잘라야 한다. */
   const ss = readStream(solutionPages, sizes);
+  ss.forEach((row) => {
+    const label = U.joinSpans(row.spans.filter((s) => s.size === 7)).trim();
+    if (label === '정답') row.text = row.text.replace(/^(\s*\d+\))?\s*/, (m, no) => (no || '') + '[정답] ');
+    else if (/^(오답\s*point|1등급\s*공략\s*Tip)$/.test(label)) row.text = '[해설] ' + row.text;
+  });
   const entryAt = {};
   solutionPages.forEach((page) => {
     U.splitColumns(page).forEach((lines, ci) => {
       U.solutionEntries(lines).forEach((e) => { entryAt[page.no + (ci ? 'R' : 'L') + ':' + e.y] = e.no; });
     });
   });
-  const solutions = {};
-  const solOrder = [];
+  const solutions = { ...(opts.solutions || {}) };
+  const solOrder = Object.keys(solutions);
   ss.forEach((row, i) => {
     const no = entryAt[row.page + row.col + ':' + row.y];
     if (no == null) return;
@@ -258,7 +245,8 @@ export function buildDanwon(doc, opts) {
   const setOf = {};        // regions.no → {setId, workId(단독일 때만)}
   regions.forEach((g) => {
     const setId = 's-dj-' + scope + '-' + pad2(g.no);
-    const refs = g.works.map((w) => ({ label: w.label, workId: workIds[w.title] || '', kind: 'full' }));
+    const refs = g.works.map((w) => ({ label: w.label, workId: workIds[w.title] || '', kind: w.prose ? 'excerpt' : 'full',
+      ...(w.prose ? { text: { paragraphs: w.paragraphs } } : {}) }));
     const marks = [];
     g.works.forEach((w) => {
       w.lines.forEach((ln) => {
@@ -268,7 +256,8 @@ export function buildDanwon(doc, opts) {
         });
       });
       candidates.push({ kind: 'setText', setId, label: w.label, title: w.title,
-        author: w.author, page: w.page, lines: w.lines });
+        author: w.author, page: w.page, lines: w.lines, prose: w.prose,
+        body: w.prose ? w.paragraphs : w.lines, kind2: w.prose ? 'excerpt' : 'full' });
       if (w.title || w.author) {
         candidates.push({ kind: 'attribution', setId, label: w.label,
           title: w.title, author: w.author, page: w.page });
@@ -288,7 +277,7 @@ export function buildDanwon(doc, opts) {
       pending.push({ kind: 'set', setId,
         why: 'workId 를 못 찾은 작품이 있다 — --work "제목=workId" 로 넘기면 팩에 들어간다',
         works: g.works.map((w) => ({ label: w.label, title: w.title, author: w.author,
-          workId: workIds[w.title] || null, lines: w.lines.length })) });
+          workId: workIds[w.title] || null, kind: w.prose ? 'excerpt' : 'full', lines: w.lines.length })) });
     }
   });
 
@@ -317,7 +306,7 @@ export function buildDanwon(doc, opts) {
     const patch = { workKey: p.workKey, title: p.title };
     if (p.author) patch.author = p.author;
     if (p.marks.length) patch.marks = p.marks;
-    patch.source = { series: '단원집중', section, instances: p.instances };
+    patch.source = { series: sourceSeries, section, instances: p.instances };
     patches.push(patch);
   });
 
@@ -339,7 +328,8 @@ export function buildDanwon(doc, opts) {
     let stem = U.escapeStem(plainStem);
     if (isNegative) stem = stem.replace(NEGATIVE, (s) => s.replace(/(않은|아닌)/, '<b>$1</b>'));
 
-    const src = { series: '단원집중', section, no: b.no };
+    const src = { series: sourceSeries, section, no: b.no };
+    if (opts.sourceFile) src.file = opts.sourceFile;
     if (zbId) src.zbId = zbId;
     const ref = b.set ? setOf[b.set.no] : null;
 
@@ -378,13 +368,24 @@ export function buildDanwon(doc, opts) {
     if (sol) {
       const ansNo = CIRCLED.indexOf((sol.answer || '').trim()) + 1;
       if (ansNo) it.answer = ansNo;
-      const sp = splitPerChoice(sol.body || '');
+      const sp = sol.perChoice ? { main: sol.body || '', per: { ...sol.perChoice }, count: Object.keys(sol.perChoice).length }
+        : splitPerChoice(sol.body || '');
       perCount += sp.count;
       /* 정답 선지에는 마커가 안 붙는다 — 앞 산문이 그 역할을 한다. main 과 perChoice[정답]
          양쪽에 넣어야 '선지별 해설 누락' 경고가 안 뜨고 학생 오답 피드백도 맞는다. */
       const per = sp.per;
       if (ansNo && !per[ansNo]) per[ansNo] = sp.main;
       it.explanation = { main: sp.main, perChoice: per };
+    }
+    if (it.choices.length !== 5 || it.choices.some((c) => !c.text.trim()) ||
+        !it.choices.some((c) => c.no === it.answer) || !it.stem.trim()) {
+      const multiple = sol && (sol.answer.match(/[①-⑤]/g) || []).length > 1;
+      pending.push({ kind: 'item', reason: multiple ? 'multi-answer' : 'incomplete-mc5',
+        why: multiple ? '복수 정답 문항입니다 — 현재 mc5는 정답 하나만 표현하므로 검수로 남깁니다'
+          : '선지 다섯 개·정답·발문을 모두 확정하지 못했습니다 — 지면과 대조한 뒤 넣으세요',
+        rawAnswer: sol ? sol.answer : null, item: it });
+      todo.push(`${it.id}: 불완전한 객관식을 review.pending 으로 옮겼다(선지 ${it.choices.length} · 정답 ${it.answer || '?'})`);
+      return;
     }
     items.push(it);
   });
@@ -469,12 +470,14 @@ if (invokedDirectly) {
   });
 
   const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
+  U.restoreChoiceImages(doc);
   const det = U.detectSeries(doc);
-  if (det.series && det.series !== 'danwon') {
+  if (det.series && det.extractor !== 'danwon') {
     console.error(`이 파일은 단원집중이 아니라 '${U.SERIES_LABEL[det.series]}' 입니다 — 맞는 추출기를 쓰세요.`);
     process.exit(2);
   }
-  const out = buildDanwon(doc, { scope: opt('scope'), section: opt('section'), workIds });
+  const out = buildDanwon(doc, { scope: opt('scope'), section: opt('section'), workIds,
+    sourceSeries: U.SERIES_LABEL[det.series], sourceFile: doc.file });
 
   /* 검수 부속물은 **팩과 다른 파일**로 나간다. 같은 파일에 넣으면 assemble 이 팩 루트로 복사하고
      관리 웹이 그대로 POST 해 학생 기기까지 간다(실측 팩의 16%가 그것이었다). */
