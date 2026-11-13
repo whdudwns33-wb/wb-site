@@ -23,6 +23,7 @@ function screen(opt = {}) {
     if (url === '/api/login') return reply({ nonce: 'own-pending', name: '자체 학생' });
     if (url.startsWith('/api/login/status')) return reply({ pending: true });
     if (url === '/api/naesin/exam') return reply({ exam: { packIds: [] } });
+    if (url === '/api/naesin-tg/sheets') return reply({ sheets: [] });
     if (url === '/api/pull') return reply({ state: null, level: null });
     if (url === './version.json') return reply({ v: 'own-version' });
     if (url.startsWith('./articles-')) return reply({ articles: [], diagnostics: {} });
@@ -172,5 +173,20 @@ function noReading(ui) {
       assert.equal(JSON.parse(ui.store.get('wbr.auth')).token, other.token); assert.deepEqual(ui.location.replaced, []); noReading(ui);
     }
   });
-  console.log(`\nOK — 영어 학생 연동 ${passed}/${passed}`);
+  await t('탐구브레인 입구(?app=naesin-tg)는 승인 뒤 탐구브레인으로, 기존 연동은 탐구 API 로만 확인하고 돌아간다', async () => {
+    const ui = screen({ search: '?app=naesin-tg' }); await ui.boot;
+    assert.equal(ui.document.title, 'WB 탐구브레인 · 학생 연동'); assert.match(ui.node('#app').innerHTML, /탐구브레인 학생 연동/);
+    assert.ok(!ui.node('#app').innerHTML.includes('이 PC 서버'), '탐구브레인은 워커에 저장되므로 PC 서버 안내를 하지 않는다');
+    await ui.syncRequest('OWN-A');
+    ui.setFetch(async url => { assert.match(url, /^\/api\/login\/status\?/); return reply({ student: account, token: account.token }); });
+    await ui.syncPoll(true);
+    assert.deepEqual(ui.location.replaced, ['/naesin-tg/']); noReading(ui);
+    const back = screen({ search: '?app=naesin-tg', auth: account }); await back.boot;
+    assert.deepEqual(back.requests.map(r => r.url), ['/api/health', '/api/naesin-tg/sheets']);
+    assert.deepEqual(back.location.replaced, ['/naesin-tg/']); noReading(back);
+  });
+  await t('모르는 app 값(프로토타입 이름 포함)은 연동 모드로 들어가지 않는다', async () => {
+    for (const search of ['?app=constructor', '?app=haru']) { const ui = screen({ search }); await ui.boot; assert.equal(ui.get().NAESIN_LINK, false); }
+  });
+  console.log(`\nOK — 영어·탐구 학생 연동 ${passed}/${passed}`);
 })().catch(e => { console.error(e); process.exitCode = 1; });

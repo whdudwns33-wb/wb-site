@@ -157,7 +157,7 @@
     var v = $('view');
     if (S.err === 'login') {
       $('hstat').innerHTML = '';
-      v.innerHTML = '<div class="card"><h3>로그인이 필요해요</h3><p>학원에서 받은 코드로 먼저 로그인해 주세요. 한 번 로그인하면 영어·국어 앱과 같이 쓸 수 있어요.</p><a class="btn" style="display:inline-block;text-decoration:none" href="/">로그인하러 가기</a></div>';
+      v.innerHTML = '<div class="card"><h3>로그인이 필요해요</h3><p>학원에서 받은 코드로 먼저 로그인해 주세요. 한 번 로그인하면 영어·국어 앱과 같이 쓸 수 있어요.</p><a class="btn" style="display:inline-block;text-decoration:none" href="/?app=naesin-tg">로그인하러 가기</a></div>';
       return;
     }
     if (S.err) { v.innerHTML = '<div class="card"><h3>잠깐 문제가 생겼어요</h3><p>' + esc(S.err) + '</p><button class="btn" id="again">다시 불러오기</button></div>'; $('again').onclick = refresh; return; }
