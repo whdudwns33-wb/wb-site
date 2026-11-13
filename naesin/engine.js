@@ -36,17 +36,16 @@ var WBNAESIN = (function () {
 
   /* 로컬 달력 날짜 'YYYY-MM-DD' — '다른 날' 판정은 전부 이 문자열 비교로 한다 */
   function localDate(now) {
-    var d = new Date(ms(now));
-    var m = d.getMonth() + 1, day = d.getDate();
-    return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+    var d = new Date(ms(now) + 9 * 3600000);
+    var m = d.getUTCMonth() + 1, day = d.getUTCDate();
+    return d.getUTCFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
   }
 
-  /* 'YYYY-MM-DD'까지 남은 로컬 일수 (오늘=0, 내일=1, 지났으면 음수) */
+  /* 남은 일수는 KST 달력 날짜 간 UTC 자정 경계 차이로 계산한다. */
   function daysUntil(ymd, now) {
     var p = String(ymd).split('-');
-    var target = new Date(+p[0], +p[1] - 1, +p[2]).getTime();
-    var d = new Date(ms(now));
-    var today = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    var target = Date.UTC(+p[0], +p[1] - 1, +p[2]);
+    var today = Date.parse(localDate(now) + 'T00:00:00Z');
     return Math.round((target - today) / DAY);
   }
 
@@ -139,7 +138,7 @@ var WBNAESIN = (function () {
     s.needsSpellCheck = false;   // 철자까지 쳐냈으면 재검증 끝
     if (!s.reached) {
       s.reached = true; s.reachedAt = now; s.lastCriterionDate = d; s.lastCriterionAt = now;
-    } else if (s.lastCriterionDate !== d &&
+    } else if ((s.due == null || now >= s.due) && s.lastCriterionDate !== d &&
       (s.lastCriterionAt == null || now - s.lastCriterionAt >= CRITERION_GAP_MS)) {
       s.relearnCount = Math.min(RELEARN_TARGET, s.relearnCount + 1);
       s.lastCriterionDate = d; s.lastCriterionAt = now;
@@ -349,7 +348,7 @@ var WBNAESIN = (function () {
         if (s.due <= now) out.review.push(c);                  // D-7 전 — 만기면 복습(SRS 유지)
         return;
       }
-      if (ctx.mode !== 'exam' && s.due > now) return;           // 연습·시험 후는 due 기준
+      if (s.due > now) return;                                  // 모든 모드에서 due 전 안정화 금지
       out.relearn.push(c);
       out.rotations += RELEARN_TARGET - s.relearnCount;
     });
@@ -582,6 +581,12 @@ var WBNAESIN = (function () {
       done: done, total: ids.length, day: day == null ? '' : String(day) };
   }
 
+  /* 누적 백지는 새 기록의 passed 또는 검증 가능한 legacy 100%만 완료로 친다. */
+  function isCumulativeComplete(record) {
+    if (!record || typeof record !== 'object') return false;
+    if (typeof record.passed === 'boolean') return record.passed;
+    return record.score === 100 && record.okCount === record.total && record.total > 0;
+  }
   /* 청크 트랙을 돌릴 재료가 있는 단락인가 — 직독직해 청크(chunks[])가 정본이다 */
   function hasChunks(g) {
     return !!g && g.sentences.some(function (sen) {
@@ -596,6 +601,7 @@ var WBNAESIN = (function () {
     states = states || {};
     var g = groupOf(pack, day);
     if (!hasChunks(g)) return { open: true, reason: 'no-chunk', day: day, stage: 0, total: g ? g.sentences.length : 0 };
+    if (g.sentences.some(function (sen) { return !Array.isArray(sen.chunks) || !sen.chunks.length; })) return { open: true, reason: 'partial-chunk', day: day, stage: 0, total: g.sentences.length };
     var s = states[chunkId(g.day)];
     var st = s ? stageOf(s) : 1;
     if (s && s.reached) return { open: true, reason: 'reached', day: g.day, stage: st, total: g.sentences.length };
@@ -691,7 +697,7 @@ var WBNAESIN = (function () {
     if (allPara && open) {
       var cum = (rec && rec.cumulative) || null;
       var i = 0;
-      while (i < groups.length && cum && Object.prototype.hasOwnProperty.call(cum, groups[i].day)) i += 1;
+      while (i < groups.length && cum && isCumulativeComplete(cum[groups[i].day])) i += 1;
       if (i < groups.length) out.tail.push({ kind: 'cumulative', lastDay: groups[i].day });
       else if (!(rec && rec.check)) out.tail.push({ kind: 'check' });   // 최종 점검은 누적을 다 밟은 뒤
     }
@@ -737,8 +743,8 @@ var WBNAESIN = (function () {
     });
     if (!groups.length) return out;
     var cum = rec && rec.cumulative, i = 0;
-    while (i < groups.length && cum && Object.prototype.hasOwnProperty.call(cum, groups[i].day)) i += 1;
-    out.tailDays = (groups.length - i) + ((rec && rec.check) ? 0 : 1);
+    while (i < groups.length && cum && isCumulativeComplete(cum[groups[i].day])) i += 1;
+    out.tailDays = (groups.length - i) + ((i === groups.length && rec && rec.check) ? 0 : 1);
     return out;
   }
 
@@ -1082,11 +1088,11 @@ var WBNAESIN = (function () {
       /* 누적은 1일차 → 1+2일차 → … 이므로 앞에서부터 이어진 기록만 센다 — 중간이 비면
          거기서 멈춘다(뒤 기록만 있는 것은 순서를 건너뛴 값이라 진행으로 안 본다). */
       for (var i = 0; i < groups.length; i++) {
-        if (!Object.prototype.hasOwnProperty.call(cum, groups[i].day)) break;
+        if (!isCumulativeComplete(cum[groups[i].day])) break;
         out.cumulative = i + 1;
       }
     }
-    if (rec && rec.check) out.check = { correct: intOf(rec.check.correct), total: intOf(rec.check.total) };
+    if (out.cumulative === groups.length && groups.length > 0 && rec && rec.check) out.check = { correct: intOf(rec.check.correct), total: intOf(rec.check.total) };
     return out;
   }
 
@@ -1177,7 +1183,7 @@ var WBNAESIN = (function () {
     STAGE_MAX: STAGE_MAX, RELEARN_TARGET: RELEARN_TARGET,
     CUE_MAX: CUE_MAX, PARA_STEPS: PARA_STEPS,
     localDate: localDate, daysUntil: daysUntil, sentenceId: sentenceId,
-    chunkId: chunkId, paraId: paraId, dayGroups: dayGroups,
+    chunkId: chunkId, paraId: paraId, dayGroups: dayGroups, isCumulativeComplete: isCumulativeComplete,
     createState: createState, recordQuiz: recordQuiz, recordCriterion: recordCriterion,
     stability: stability, isStable: isStable, isDone: isDone,
     stageOf: stageOf, stageMaxOf: stageMaxOf, cueOf: cueOf, isCueStage: isCueStage,

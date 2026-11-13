@@ -46,15 +46,17 @@ var WBVoice = (function () {
     return lat ? 'en' : 'ko';                // 라틴만 있을 때만 영어
   }
 
-  function voiceFor(lang) {
+  function voiceFor(lang, opt) {
     var want = (lang || 'ko').slice(0, 2).toLowerCase();
-    var vs = allVoices().filter(function (v) { return (v.lang || '').slice(0, 2).toLowerCase() === want; });
+    var vs = allVoices().filter(function (v) {
+      return (v.lang || '').slice(0, 2).toLowerCase() === want && (!(opt && opt.localOnly) || v.localService === true);
+    });
     if (!vs.length) return null;
     var def = vs.filter(function (v) { return v.default; })[0];
     return def || vs[0];
   }
 
-  function hasVoice(lang) { return !!voiceFor(lang); }
+  function hasVoice(lang, opt) { return !!voiceFor(lang, opt); }
 
   var current = null, startWatch = null;
 
@@ -73,20 +75,110 @@ var WBVoice = (function () {
     if (opt.onerror) opt.onerror(why); else if (opt.onend) opt.onend();
   }
 
+  /* PC 사전 생성과 학생 재생이 반드시 같은 경계로 문장을 나눈다. */
+  function audioParts(text) {
+    var parts = [], rest = String(text || '').trim();
+    /* 긴 추출 본문도 서버 상한을 넘기지 않고, 다음 부분은 재생 중 준비한다. */
+    while (rest.length > 180) {
+      var head = rest.slice(0, 181), cut = head.lastIndexOf(' '), marks = /[.!?;,]\s+/g, match;
+      while ((match = marks.exec(head))) if (match.index > 90) cut = match.index + 1;
+      if (cut < 1) cut = 180;
+      parts.push(rest.slice(0, cut)); rest = rest.slice(cut).trim();
+    }
+    if (rest) parts.push(rest);
+    return parts;
+  }
+
+  function joinAudio(blobs) {
+    if (blobs.length === 1) return Promise.resolve(blobs[0]);
+    return Promise.all(blobs.map(function (blob) { return blob.arrayBuffer(); })).then(function (buffers) {
+      var size = 0, chunks = buffers.map(function (buffer) {
+        var v = new DataView(buffer), n = buffer.byteLength;
+        // PC가 만드는 PCM 24kHz·16비트·모노 WAV만 합쳐 헤더·본문 길이를 다시 맞춘다.
+        if (n < 44 || n > 6000000 || v.getUint32(0) !== 0x52494646 || v.getUint32(4, true) !== n - 8
+          || v.getUint32(8) !== 0x57415645 || v.getUint32(12) !== 0x666d7420 || v.getUint32(16, true) !== 16
+          || v.getUint16(20, true) !== 1 || v.getUint16(22, true) !== 1 || v.getUint32(24, true) !== 24000
+          || v.getUint32(28, true) !== 48000 || v.getUint16(32, true) !== 2 || v.getUint16(34, true) !== 16
+          || v.getUint32(36) !== 0x64617461 || v.getUint32(40, true) !== n - 44 || n % 2) throw new Error('invalid-audio');
+        size += n - 44;
+        if (size > 64000000) throw new Error('audio-too-large');
+        return new Uint8Array(buffer, 44);
+      });
+      var header = buffers[0].slice(0, 44), view = new DataView(header);
+      view.setUint32(4, size + 36, true); view.setUint32(40, size, true);
+      return new Blob([header].concat(chunks), { type: 'audio/wav' });
+    });
+  }
+
+  /* 구간 종료 이벤트가 늦어져도 끊기지 않게 임시 메모리에서 하나의 WAV로 합친다. */
+  function speakAudio(body, opt) {
+    stop();
+    var audio = new Audio(), controller = new AbortController(), url = null, started = false;
+    var parts = audioParts(body), blobs = new Array(parts.length), index = 0, audioBytes = 0;
+    var rate = Math.min(2, Math.max(0.5, opt.rate == null ? 1 : opt.rate));
+    audio.playbackRate = rate;
+    var handle = { cancel: function () {
+      controller.abort(); blobs = []; audio.pause(); audio.removeAttribute('src');
+      if (url) { URL.revokeObjectURL(url); url = null; }
+    } };
+    current = handle;
+    function finish(why) {
+      if (current !== handle) return;
+      current = null; clearTimeout(startWatch); startWatch = null; handle.cancel();
+      if (why) ttsError(opt, why); else if (opt.onend) opt.onend();
+    }
+    audio.onplaying = function () {
+      if (current !== handle || started) return;
+      started = true; clearTimeout(startWatch); startWatch = null;
+      if (opt.onstart) opt.onstart();
+    };
+    audio.onended = function () { finish(); };
+    audio.onerror = function () { finish('audio-failed'); };
+    function collect() {
+      if (current !== handle || index >= parts.length) return Promise.resolve();
+      var i = index++;
+      return Promise.resolve().then(function () {
+        return current === handle ? opt.audioSource(parts[i], 1, controller.signal) : null;
+      }).then(function (blob) {
+        if (current !== handle) return;
+        if (parts.length > 1) {
+          if (!blob || !Number.isFinite(blob.size) || blob.size < 44 || blob.size > 6000000) throw new Error('invalid-audio');
+          audioBytes += blob.size;
+          if (audioBytes > 64000000) throw new Error('audio-too-large');
+        }
+        blobs[i] = blob; return collect();
+      });
+    }
+    startWatch = setTimeout(function () { finish('start-timeout'); }, opt.startTimeout || 45000);
+    if (opt.onloading) opt.onloading();
+    // 한 학생의 긴 본문이 동시 요청을 독점하지 않도록 두 개씩 받는다.
+    Promise.all([collect(), collect()]).then(function () {
+      if (current === handle) return joinAudio(blobs);
+    }).then(function (blob) {
+      if (current !== handle) return;
+      blobs = []; url = URL.createObjectURL(blob); audio.src = url;
+      return audio.play();
+    }).catch(function (e) { finish(e && e.code === 'AUDIO_PREPARING' ? 'audio-preparing' : 'audio-failed'); });
+    return handle;
+  }
+
   /* 한 덩어리를 읽는다. onend는 끝났을 때 한 번만 부른다(중단 시엔 부르지 않는다). */
   function speak(text, opt) {
     opt = opt || {};
     var s = synth();
     var body = String(text || '').trim();
     if (!body) { if (opt.onend) opt.onend(); return null; }
+    if (opt.audioSource) return speakAudio(body, opt);
     if (!ttsSupported()) { ttsError(opt, 'unsupported'); return null; }
     if (current || s.speaking || s.pending) stop();
 
     var lang = opt.lang || langOf(body);
     var u;
     try {
+      var v = voiceFor(lang, opt);
+      /* 구매 자료 호출은 로컬 음성 없을 때 기본(원격일 수 있는) 음성으로 넘기지 않는다. */
+      if (opt.localOnly && !v) { ttsError(opt, 'local-voice-unavailable'); return null; }
       u = new SpeechSynthesisUtterance(body);
-      var v = voiceFor(lang);
       if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = lang === 'en' ? 'en-US' : lang === 'ko' ? 'ko-KR' : lang; }
       u.rate = Math.min(2, Math.max(0.5, opt.rate == null ? 1 : opt.rate));
       u.pitch = opt.pitch == null ? 1 : opt.pitch;
@@ -122,6 +214,7 @@ var WBVoice = (function () {
 
   function stop() {
     var s = synth();
+    if (current && current.cancel) current.cancel();
     current = null; clearTimeout(startWatch); startWatch = null;
     if (s) { try { s.cancel(); } catch (e) {} }
   }
@@ -136,7 +229,7 @@ var WBVoice = (function () {
       if (cancelled) return;
       if (i >= items.length) { if (opt.onend) opt.onend(); return; }
       utterance = speak(items[i++], {
-        rate: opt.rate, lang: opt.lang, startTimeout: opt.startTimeout, onstart: opt.onstart, onend: step,
+        rate: opt.rate, lang: opt.lang, localOnly: opt.localOnly, audioSource: opt.audioSource, onloading: opt.onloading, startTimeout: opt.startTimeout, onstart: opt.onstart, onend: step,
         onerror: function (why) { cancelled = true; ttsError(opt, why); },
       });
     }
@@ -210,7 +303,7 @@ var WBVoice = (function () {
 
   return {
     ttsSupported: ttsSupported, onReady: onReady, hasVoice: hasVoice, voiceFor: voiceFor, unlock: unlock,
-    langOf: langOf, speak: speak, speakSeq: speakSeq, stop: stop, isSpeaking: isSpeaking,
+    langOf: langOf, audioParts: audioParts, speak: speak, speakSeq: speakSeq, stop: stop, isSpeaking: isSpeaking,
     recSupported: recSupported, pickMime: pickMime, Recorder: Recorder, clock: clock,
   };
 })();

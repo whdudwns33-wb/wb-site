@@ -37,8 +37,8 @@ const SCHEMA_HINT = {
     + `"verbForms":[{"base":"arrive","answer":"arrived"}],"grammarChoices":[{"options":["a","b"],"answerIdx":1}],`
     + `"writingKeywords":["finally"]}]}`,
   dialogues: `{"dialogues":[{"id":"d-1","section":"Listen & Speak","lines":[{"speaker":"A","en":"...","ko":"..."}]}],`
-    + `"keyExpressions":[{"en":"...","ko":"..."}],"vocabSidebar":[{"en":"...","ko":"..."}],"readingQA":[{"q":"...","a":"..."}]}`,
-  patterns: `{"patterns":[{"patternNo":1,"title":"지각동사+목적어+v-ing","conceptKo":"...","textbookExamples":["..."]}]}`,
+    + `"keyExpressions":[{"en":"...","ko":"...","blankAnswer":"..."}],"vocabSidebar":[{"en":"...","ko":"..."}],"readingQA":[{"q":"...","a":"..."}]}`,
+  patterns: `{"patterns":[{"patternNo":1,"title":"지각동사+목적어+v-ing","conceptKo":"...","textbookExamples":[{"en":"...","ko":"...","origin":"textbook"}]}]}`,
   items: `{"items":[{"no":1,"formatType":"mcq","promptKo":"...","stem":"...","choices":[{"label":"1","text":"..."}],`
     + `"answer":["1"],"answerCount":1,"explanationKo":"..."}]}`,
 };
