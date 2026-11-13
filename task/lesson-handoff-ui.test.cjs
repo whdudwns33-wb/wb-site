@@ -553,3 +553,15 @@ test('cancelled handoffs stay in manager history but never render as received to
   assert.ok(history.includes('인계 취소'));
   assert.equal(env.api.lessonHandoffRows('2026-08-30').length, 4);
 });
+
+test('received lesson renders escaped read-only history from server without local source task access', () => {
+  const env = harness();
+  env.state.tasks = [];
+  const rendered = env.api.lessonHandoffCardHtml(handoff({ previousMemos: [
+    { date: '2026-08-28', note: '<img src=x onerror=alert(1)>', sourceStaffName: '이전교사' }
+  ] }), 'recipient');
+  assert.match(rendered, /이전 수업 메모/);
+  assert.match(rendered, /최신순 3개 · 읽기 전용/);
+  assert.match(rendered, /&lt;img/);
+  assert.doesNotMatch(rendered, /<img src=x/);
+});
