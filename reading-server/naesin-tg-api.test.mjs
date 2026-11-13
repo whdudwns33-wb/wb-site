@@ -196,6 +196,19 @@ await t('과제 — 시험 범위 밖 문제지도 대상 학생에게만 열리
   clock = saved;
 });
 
+await t('반별 현황 — 반 전원이 분모, 번호별 오답률은 처음 제출 기준', async () => {
+  assert.strictEqual((await call(S1, 'GET', '/admin/class?cls=중2 A반')).status, 403);
+  assert.deepStrictEqual((await call(ADMIN, 'GET', '/admin/class')).body, { class: null, classes: ['중2 A반', '중2 B반'] });
+  const c = (await call(ADMIN, 'GET', '/admin/class?cls=' + encodeURIComponent('중2 A반'))).body.class;
+  assert.strictEqual(c.members, 2);
+  const s = c.sheets.find((x) => x.id === 'sc-1');
+  /* st-1 만 냈다: 1·3번 맞고 2번 틀림(뒤에 다시 맞혔어도 처음 틀린 것으로 센다), 4번 서술형은 뺀다 */
+  assert.deepStrictEqual([s.members, s.submitted, s.rate], [2, 1, 67]);
+  assert.deepStrictEqual(s.wrongByNo, [{ no: 2, wrong: 1, rate: 100 }]);
+  assert.strictEqual((await call(ADMIN, 'GET', '/admin/class?cls=' + encodeURIComponent('중2 B반'))).body.class.sheets[0].submitted, 0);
+  assert.ok(!JSON.stringify(c).includes('전류가 흐르기'), '반 현황에 답안 원문이 실린다');
+});
+
 await t('닫으면 학생에게서 사라지고, 지우면 쪽 그림도 지워진다', async () => {
   await call(ADMIN, 'POST', '/admin/sheet', { id: 'sc-1', sheet: { ...SHEET, open: false } });
   assert.deepStrictEqual((await call(S2, 'GET', '/sheets')).body.sheets, []);

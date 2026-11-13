@@ -426,6 +426,37 @@ export async function handleNaesinTg(ctx) {
     return j(200, { ok: true });
   }
 
+  /* 반별 현황 — 등록 학생 가운데 그 반 전원이 분모(앱을 안 연 학생도 "안 냄"). 문제지마다 제출·평균 정답률·남은 오답·
+     확정 안 된 서술형, 그리고 번호별 오답률(처음 제출 때 틀린 수 ÷ 제출 수, 서술형 제외 — 수업에서 다룰 번호를 고른다).
+     cls 를 비우면 반 목록만 준다. 답안 원문은 싣지 않는다. */
+  if (p === '/api/naesin-tg/admin/class' && method === 'GET') {
+    const roster = [];
+    for (const c of await store.listStudentCodes()) { const s = await store.getStudent(c); if (s) roster.push(s); }
+    const classes = [...new Set(roster.map((s) => s.cls).filter(Boolean))].sort();
+    const cls = q('cls');
+    if (!cls) return j(200, { class: null, classes });
+    const members = roster.filter((s) => s.cls === cls);
+    const states = [];
+    for (const s of members) states.push((await stateOf(store, s.code)).sheets);
+    const sheets = [];
+    for (const e of ((await store.getSheetIds()) || []).filter((x) => x.kind === 'test')) {
+      let submitted = 0, score = 0, total = 0, wrongOpenSum = 0, essayHold = 0;
+      const wrongByNo = {};
+      for (const ss of states) {
+        const my = ss[e.id];
+        if (!my || !my.done) continue;
+        const pg = progressOf(my);
+        submitted += 1; score += pg.score; total += pg.total; wrongOpenSum += pg.wrongOpen; essayHold += pg.essayHold;
+        for (const [no, ok] of Object.entries(my.done.marks || {})) if (ok === false) wrongByNo[no] = (wrongByNo[no] || 0) + 1;
+      }
+      sheets.push({ id: e.id, title: e.title, step: e.step, members: members.length, submitted,
+        rate: total ? Math.round((score / total) * 100) : null, wrongOpen: wrongOpenSum, essayHold,
+        wrongByNo: Object.entries(wrongByNo).map(([no, n]) => ({ no: Number(no), wrong: n, rate: Math.round((n / submitted) * 100) }))
+          .sort((a, b) => b.wrong - a.wrong || a.no - b.no) });
+    }
+    return j(200, { class: { cls, members: members.length, sheets }, classes });
+  }
+
   /* 반 현황 — 학생마다 문제지별 점수·남은 오답·확정 안 된 서술형 수. 답안 원문은 싣지 않는다. */
   if (p === '/api/naesin-tg/admin/overview' && method === 'GET') {
     const students = [];
