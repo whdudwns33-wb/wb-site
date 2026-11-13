@@ -196,6 +196,8 @@ CLI 로 저작하고 싶으면 `review.json` 의 `pending[]` 항목에 `rubric` 
 | 직전 요약노트 | 요약 빈칸 · vocab · checklist · examPoints(★) · 개관 대조 | `build-yoyak.mjs` |
 | 단원집중 | PassageSet · 객관식 Item(선지별 해설·부정발문·&lt;보기&gt;) · 작가 · ㉠ | `build-danwon.mjs` |
 | 서술형 공략 | 서술형 Item(조건·모범답안·채점 요소) · 발췌 지문 · 작가 | `build-seosul.mjs` |
+| 실력완성·대표유형 | 학생용 문제 + 교사용 인라인 정답·선지별 해설 → mc5, 루브릭 미확정 essay는 검수 | `build-basic.mjs` |
+| 풀이완성·개념완성 step2 | 예제 → mc5/명시된 OX, 근거 기호·첨삭·하단 전략 안내는 검수 보존 | `build-puri.mjs` |
 
 `build-pack.mjs`가 지면 내용으로 맞는 추출기를 부른다. **파일명으로 판별하지 않는다.**
 
@@ -213,10 +215,19 @@ CLI 로 저작하고 싶으면 `review.json` 의 `pending[]` 항목에 `rubric` 
   머리말·학생/선생 짝·이해 전략 내용을 함께 확인하며 첫 쪽 표와 Q 빈칸도 수거한다.
   전문이 없는 자료는 확인된 문제지 발췌를 읽기 본문으로 담고 `textSource.kind:'excerpt'`와
   `review.reconstructedTexts`에 남긴다. **전문을 복원했다는 뜻은 아니다.**
-- 풀이완성·실력완성·대표유형·개념완성 step2는 별도 추출기가 필요하다.
-  모르는 상품·못 읽는 파일도 단원 전체를 멈추지 않고
+- 실력완성·대표유형은 문항 1번의 재등장과 반복 표지로 학생용/교사용을 나눈다.
+  교사용이 더 길어도 단순 절반으로 자르지 않는다. 실력완성의 빨강/파랑 첨삭과
+  대표유형의 정답표·인라인 해설을 기존 mc5 문항으로 합친다. 대표유형의 자연어 채점기준은
+  `review.candidates`의 `teacherSolution`·`inlineTeacher`에 보존하고 keywords 루브릭을 임의로 만들지 않는다.
+- 풀이완성·개념완성 step2는 학생용 발문·선지와 교사용 정답을 대조한다. 보통 예제는 mc5,
+  단일 정답이 없고 모든 선지에 OX가 명시된 경우는 독립 ox 문항으로 바꾼다.
+  실제 4선지 문항은 4개를 유지한다(현행 mc5 화면·채점기는 처리하고 검증기는 선지 수 경고만 낸다).
+  근거 기호·고쳐 쓰기 첨삭은 `choiceEvidence`, 하단 안내·표의 텍스트는 `strategyNotes`에 남긴다.
+  선지별 근거 기호를 직접 입력하거나 선지를 고쳐 쓰는 학생 UI는 이번에 만들지 않았다.
+- 모르는 상품·못 읽는 파일도 단원 전체를 멈추지 않고
   `앱에 아직 안 들어가는 자료 N개(이름)` 경고와 `review.skipped`로 남긴다.
   Final모의고사는 여러 단원을 걸친 시험지이므로 이번 단원 팩 범위 밖이다.
+  자료별 인식 수·교사용 대조 수·추출/대기 수는 `review.files`에서 확인한다.
 - 제목이 생략된 재수록은 폴더 안 제목 있는 본문과의 유일한 문자열 대조로 연결한다.
   본문과 같은 span에 붙은 (가)/(나) 라벨을 보존하고, 단·쪽을 넘는 선지와 한 줄의 여러 선지를 읽는다.
   지문을 확정하지 못한 문항은 `review.dropped`에 파일·setId·이유를 남긴다.
@@ -285,6 +296,8 @@ node naesin-ko/extract/build-ihae.test.mjs
 node naesin-ko/extract/build-yoyak.test.mjs
 node naesin-ko/extract/build-danwon.test.mjs
 node naesin-ko/extract/build-seosul.test.mjs
+node naesin-ko/extract/build-basic.test.mjs   # 실력완성·대표유형 학생/교사 비대칭, 인라인 해설
+node naesin-ko/extract/build-puri.test.mjs    # 풀이 예제·그림 선지·4선지·OX·근거 보존
 node naesin-ko/extract/build-pack.test.mjs   # 병합기(빈칸 병합·앵커 정렬·id 규약)
 ```
 

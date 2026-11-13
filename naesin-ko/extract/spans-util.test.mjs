@@ -58,9 +58,10 @@ t('새 상품도 객관식 지면 구조가 확인되어야 단원집중 추출�
       ln(100, [sp(60, '1.', { size: 13.7, color: '#191919' })]), ln(120, [sp(70, '① 가상 선지')])]),
       pg(2, [ln(100, [sp(60, '1) [정답] ①', { size: 7.9 })]), ln(120, [sp(60, '[해설] 가상 근거', { size: 7.9 })])])] };
     assert.strictEqual(U.detectSeries(doc).series, key);
-    assert.strictEqual(U.detectSeries(doc).extractor, ['skill', 'solution', 'typical', 'concept'].includes(key) ? null : 'danwon');
+    const extractor = { skill: 'basic', solution: 'puri', typical: 'basic', concept: null }[key];
+    assert.strictEqual(U.detectSeries(doc).extractor, extractor === undefined ? 'danwon' : extractor);
     doc.pages.pop();
-    assert.strictEqual(U.detectSeries(doc).extractor, null, '해설 없는 자료를 추측하면 안 된다');
+    assert.strictEqual(U.detectSeries(doc).extractor, extractor === undefined ? null : extractor, '권말 해설형과 인라인 해설형을 구별해야 한다');
   });
   assert.strictEqual(U.detectSeries({ pages: [pg(1, [ln(45, [sp(60, '[시험에 꼭 나오는 문제]')])])] }).series, 'must');
   assert.strictEqual(U.detectSeries({ pages: [pg(1, [ln(45, [sp(60, '[개념 이해A]')])])] }).series, 'basic');
@@ -111,7 +112,7 @@ t('그림 선지 번호는 두 문항의 동일한 다섯 그림 순서로만 �
 t('개념완성 step1/step2와 본문 속 이해완성 연결 팁을 구별한다', () => {
   const simple = (text) => ({ pages: [pg(1, [ln(100, [sp(60, text)])])] });
   assert.strictEqual(U.detectSeries(simple('이해 전략 핵심 내용을 파악하자!!')).extractor, 'ihae');
-  assert.strictEqual(U.detectSeries(simple('풀이\x01 전략문제를\x01 푸는\x01 전략을 파악하자!!')).extractor, null);
+  assert.strictEqual(U.detectSeries(simple('풀이\x01 전략문제를\x01 푸는\x01 전략을 파악하자!!')).extractor, 'puri');
   assert.strictEqual(U.detectSeries(simple('[이해완성]에서 학습한 내용 기억나니?')).series, 'solution');
   assert.strictEqual(U.detectSeries(simple('[활용 가이드] 이해완성 Review')).series, 'skill');
 });
