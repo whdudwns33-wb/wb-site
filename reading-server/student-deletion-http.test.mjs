@@ -95,7 +95,10 @@ try{
   assert.equal(failedUpload.status,500);assert.equal(failedUpload.body.code,'STORE_WRITE_FAILED');
   assert.equal((await req('/api/naesin/admin/pack?id='+sample.packId)).body.pack.lessonTitle,'Own updated sample');
   await fs.rmdir(packFile+'.tmp');
-  assert.ok(JSON.parse(await fs.readFile(path.join(data,'private-backups','db-'+day+'.json'),'utf8')).students.NEW001);
+  // 당일 복구점은 저장 응답을 막지 않도록 뒤에서 쓴다(snapshotIfNeeded) — 임시 파일 → 이름 바꾸기라 보이면 완성본이다.
+  const privateBackup=path.join(data,'private-backups','db-'+day+'.json');
+  for(const until=Date.now()+20000;Date.now()<until;await new Promise(r=>setTimeout(r,50)))try{await fs.access(privateBackup);break;}catch{}
+  assert.ok(JSON.parse(await fs.readFile(privateBackup,'utf8')).students.NEW001);
   await stop();await start();assert.equal((await req('/api/naesin/state',{token:removedToken})).status,401);
   for(let i=0;i<20;i++){const saved=await req('/api/naesin/state',{token:keys[i]});assert.equal(saved.status,200);assert.equal(saved.body.state.packs[pack.packId].ownRound,6);}
   assert.equal((await req('/api/admin/student/NEW001')).status,200);
