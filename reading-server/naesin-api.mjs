@@ -696,7 +696,15 @@ export async function handleNaesin(ctx) {
   }
 
   if (p === '/api/naesin/admin/packs' && method === 'GET') {
-    return j(200, { packs: (await store.getPackIds()) || [], time: nowIso() });
+    /* meta: 관리 화면이 팩 id 대신 「중3 · NE능률(김성곤) · 1과」로 보이게 학년·교과서·단원·문항 수만 함께 준다(학생 정보 없음).
+       원내 PC 저장소는 메모리 조회라 팩이 수백 개여도 싸다. packs 배열은 그대로 둔다(래핑 계약). */
+    const ids = (await store.getPackIds()) || [], meta = {};
+    for (const id of ids) {
+      const rec = await store.getPack(id), pk = rec && rec.pack;
+      if (pk) meta[id] = { grade: pk.grade || null, curriculum: pk.curriculum || null, textbook: pk.textbook || null, lesson: pk.lesson ?? null,
+        lessonTitle: pk.lessonTitle || null, items: Array.isArray(pk.items) ? pk.items.length : 0, updatedAt: rec.updatedAt || null };
+    }
+    return j(200, { packs: ids, meta, time: nowIso() });
   }
 
   /* 학생 → 교과서 지정 (팩 커버리지용). 응답 키는 경로 명사와 같다(래핑 계약, 절대 규칙 4).

@@ -95,17 +95,74 @@
     .scatter .fit{stroke:var(--coral);stroke-width:1.5;stroke-dasharray:5 4;opacity:.8}
     .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:800;margin:2px 0 0}
     .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+    /* 2026-11-13 정리: 머리 줄 고정 + 구역 이동 줄, 상태(hover·focus) 통일, 팩 목록을 학년→교과서→단원으로 */
+    body{font-size:15px}
+    ::selection{background:#bfe3f1;color:var(--ink)}
+    :focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+    .topbar{position:sticky;top:0;z-index:20;box-shadow:0 2px 8px #0f2a4014}
+    header{padding:12px 20px}
+    header nav.apps{display:flex;gap:6px;flex-wrap:wrap}
+    .hbtn{min-height:36px;font-weight:700;transition:background .15s}
+    .hbtn:hover{background:#ffffff1a}
+    .secnav{display:flex;gap:2px;overflow-x:auto;padding:0 14px;background:#fff;border-bottom:1px solid var(--line);scrollbar-width:none}
+    .secnav[hidden]{display:none}
+    .secnav a{flex:none;padding:10px 12px;color:var(--muted);font-size:13.5px;font-weight:800;text-decoration:none;border-bottom:2px solid transparent}
+    .secnav a:hover{color:var(--navy)}
+    .secnav a[aria-current="true"]{color:var(--navy);border-bottom-color:var(--blue)}
+    main section,main>div>.card{scroll-margin-top:110px}
+    .card{padding:18px 20px;margin-bottom:16px}
+    h2{font-size:18px;letter-spacing:-.01em}
+    h2 small{margin-left:6px;color:var(--muted);font-size:12.5px;font-weight:700}
+    .btn{transition:filter .15s,background .15s}
+    .btn:not(:disabled):hover{filter:brightness(.93)}
+    .btn.ghost:not(:disabled):hover,.btn.danger:not(:disabled):hover{filter:none;background:var(--sky)}
+    .btn.danger:not(:disabled):hover{background:#fff0ef}
+    .chip{transition:background .15s,border-color .15s}
+    .chip:hover{border-color:var(--blue)}
+    td,.stat b{font-variant-numeric:tabular-nums}
+    /* 팩 목록 — 교과서 한 줄에 단원 칸을 늘어놓는다. 색이 곧 배정 상태다 */
+    .pk-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:4px 0 10px}
+    .pk-tools input[type=search]{flex:1;min-width:200px;min-height:38px}
+    .pk-sum{display:flex;gap:14px;flex-wrap:wrap;margin:2px 0 10px;font-size:13px;color:var(--muted);font-weight:700}
+    .pk-sum b{color:var(--navy)}
+    .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;background:var(--ok)}
+    .dot.warn{background:#d9892b}.dot.muted{background:#a9bcc7}
+    .pkg{display:grid;grid-template-columns:minmax(170px,230px) 1fr;gap:6px 14px;padding:10px 0;border-top:1px solid var(--line);align-items:start}
+    .pkg:first-child{border-top:0}
+    .pkg-h b{display:block;color:var(--navy);font-size:14.5px}
+    .pkg-h span{font-size:12px;color:var(--muted);font-weight:700}
+    .pkg-u{display:flex;gap:6px;flex-wrap:wrap}
+    .unit{min-height:32px;padding:3px 11px;border-radius:8px;border:1.5px solid #bfe0d4;background:#f1faf6;color:var(--ok);font-size:13px;font-weight:800}
+    .unit.warn{border-color:#f0cfa6;background:#fff7ec;color:var(--warn)}
+    .unit.muted{border-color:var(--line);background:#f5f8f9;color:var(--muted)}
+    .unit:hover{border-color:var(--blue)}
+    .unit[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+    .pk-detail{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:10px 12px;border-radius:10px;background:#f5f9fb;font-size:13px}
+    .pk-detail code{font-size:12px;color:var(--muted)}
+    .pk-detail .sp{flex:1}
+    /* 시험 범위 고르기 — 교과서마다 「전체」와 단원 칸 */
+    .pick{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:4px 12px;margin-top:4px;background:#fff}
+    .pick .pkg{grid-template-columns:minmax(150px,210px) 1fr;padding:8px 0}
+    .pick label.ck{margin:0;padding:3px 9px;border:1.5px solid var(--line);border-radius:8px;font-size:13px;font-weight:800;color:var(--navy);cursor:pointer}
+    .pick label.ck:has(input:checked){background:var(--sky);border-color:var(--blue)}
+    .pick label.all{color:var(--muted)}
+    @media(max-width:700px){.pkg,.pick .pkg{grid-template-columns:1fr}.topbar{position:static}}
     @media(max-width:600px){header{flex-wrap:wrap}header b,header small{flex-basis:100%}header .sp{display:none}.grid-form input{max-width:100%}}
   </style>
 </head>
 <body>
-<header><b>WB 내신브레인 · 관리</b><small>팩 업로드 · 시험 등록 · 성취도 · 시험 결과</small><span class="sp"></span>
+<div class="topbar"><header><b>WB 내신브레인 · 관리</b><small>팩 · 배정 · 성취도 · 시험 결과</small><span class="sp"></span>
+  <nav class="apps" aria-label="내신브레인 화면">
   <button class="hbtn" onclick="location.href='/admin/naesin-live.html'">수업 화면</button>
   <button class="hbtn" onclick="location.href='/admin/naesin-studio.html'">팩 제작</button>
-  <button class="hbtn" onclick="location.href='/admin/'">진로독서 관리</button>
+  <button class="hbtn" onclick="location.href='/admin/'" title="학생 등록·반 명단·연동 승인">학생 명부</button>
   <button class="hbtn" id="btnRefresh" hidden>새로고침</button>
-  <button class="hbtn" id="btnLogout" hidden>로그아웃</button>
+  <button class="hbtn" id="btnLogout" hidden>로그아웃</button></nav>
 </header>
+<nav class="secnav" id="secnav" aria-label="이 화면의 구역" hidden>
+  <a href="#ovArea">성취도</a><a href="#taskArea">오늘 과제</a><a href="#packCard">레슨 팩</a><a href="#examArea">학습·시험 배정</a>
+  <a href="#coverArea">팩 커버리지</a><a href="#bookArea">교과서별 준비</a><a href="#resultArea">시험 결과</a><a href="#analysisArea">성과 분석</a><a href="#reportArea">문항 신고</a>
+</nav></div>
 <div class="banner" id="banner" role="alert" hidden><span id="bannerMsg"></span><span class="sp"></span><button class="btn sm ghost" id="bannerRetry">다시 시도</button></div>
 <main><div id="audioPreparation" class="card" role="status" aria-live="polite" hidden></div><div id="app"></div></main>
 <script src="/admin/admin-login.js"></script>
@@ -123,6 +180,40 @@
 const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let TOKEN=localStorage.getItem('wbr.admin.token')||null;
+/* 팩 이름 — 팩 id(2015-m3-p01-m3-L1-questions)는 사람이 못 읽는다. 서버가 주는 팩 정보(meta: 학년·교과서)로
+   「중3 · NE능률(김성곤) · 1과」를 만든다. 정보가 없는 서버(워커)면 id 조각에서 짐작하고, 그래도 모르면 id 를 그대로 둔다. */
+let PACK_META={},PACK_GRADE='전체',PACK_Q='',PACK_OPEN='';
+
+const PUB_KO={ne:'NE능률',ybm:'YBM',donga:'동아',chunjae:'천재',visang:'비상',jihak:'지학사',miraen:'미래엔',kumsung:'금성'};
+function packInfo(id){
+  const m=PACK_META[id]||{};
+  const g=String(m.grade||(/-(m[123])-/.exec(id)||[])[1]||'');
+  const grade=GRADE_KO[g]||g||'기타';
+  let book=m.textbook;
+  if(!book){const v=/^\d{4}-([a-z]+)-([a-z]+)-m[123]-/.exec(id);book=v?(PUB_KO[v[1]]||v[1])+'('+v[2]+')':'교과서 미상';}
+  const u=/-(?:L(\d+)|SL(\d*)|SR(\d*))-[a-z]+$/.exec(id);
+  const unit=!u?(m.lessonTitle||id):u[1]?u[1]+'과':u[2]!==undefined?'스페셜 레슨'+(u[2]?' '+u[2]:''):'스페셜 리딩'+(u[3]?' '+u[3]:'');
+  const order=!u?999:u[1]?+u[1]:u[2]!==undefined?100+(+u[2]||0):110+(+u[3]||0);
+  const cur=String(m.curriculum||(/^(\d{4})-/.exec(id)||[])[1]||'');
+  return {id,grade,book,unit,order,cur,label:grade+' · '+book+' · '+unit,items:m.items,updatedAt:m.updatedAt};
+}
+const packLabel=id=>packInfo(id).label;
+/* 학년 → 교과서 → 단원 순서로 묶는다 */
+function packGroups(ids){
+  const g=new Map();
+  for(const id of ids){const p=packInfo(id),k=p.grade+'|'+p.book+'|'+p.cur;if(!g.has(k))g.set(k,{grade:p.grade,book:p.book,cur:p.cur,packs:[]});g.get(k).packs.push(p);}
+  return [...g.values()].map(x=>(x.packs.sort((a,b)=>a.order-b.order),x))
+    .sort((a,b)=>a.grade.localeCompare(b.grade,'ko')||a.book.localeCompare(b.book,'ko')||a.cur.localeCompare(b.cur));
+}
+const curKo=c=>c?c+' 개정':'';
+/* 표 칸용 — 팩이 수백 개라도 교과서 단위로 접어 한두 줄로 */
+function packSummary(ids){
+  const gs=packGroups(ids);
+  if(gs.length>6){const by={};for(const g of gs)(by[g.grade]=by[g.grade]||[]).push(g);
+    return Object.entries(by).map(([gr,list])=>`<span class="tag muted" title="${esc(list.map(g=>g.book+' '+g.packs.length+'개').join('\n'))}">${esc(gr)} 교과서 ${list.length}종 · ${list.reduce((n,g)=>n+g.packs.length,0)}개 단원</span>`).join(' ');}
+  return gs.map(g=>`<span class="tag muted" title="${esc(g.packs.map(p=>p.unit+' — '+p.id).join('\n'))}">${esc(g.grade+' '+g.book)} · ${g.packs.length===1?esc(g.packs[0].unit):g.packs.length+'개 단원'}</span>`).join(' ');
+}
+const setMeta=pk=>{PACK_META=pk&&pk.meta&&typeof pk.meta==='object'?pk.meta:{};};
 let OV=null,PACKS=[],FILTER='전체',TASK=null,EXAMS=null,ROSTER=[],REPORTS=null;
 let TASK_SCOPE='default',TASK_LOADING=false,TASK_BUSY=false,TASK_READ=0;
 /* 교과서 지정표(계약: /naesin/admin/books → {books}) — null 은 '아직 못 받았다'로 {} 와 구분한다.
@@ -189,7 +280,7 @@ function showBanner(msg){$('#bannerMsg').textContent=msg;$('#banner').hidden=fal
 function hideBanner(){$('#banner').hidden=true;}
 
 function renderLogin(msg){
-  $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;ASSEMBLED=null;hideBanner();
+  $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;$('#secnav').hidden=true;ASSEMBLED=null;hideBanner();
   /* 로그인 폼은 공용 모듈이 그린다(아이디·비밀번호 기본, PIN 갈래로 전환) — reading-server/public/admin-login.js */
   $('#app').innerHTML='<div class="card" id="loginCard"><h2>강사 로그인</h2><div id="loginHost"></div></div>';
   WBAdminLogin.mount({host:'#loginHost',message:msg||'',classes:{btn:'btn'},onToken:function(t){TOKEN=t;try{localStorage.setItem('wbr.admin.token',TOKEN);}catch(e){}refresh();}});
@@ -234,7 +325,7 @@ function packCounts(p){
 function ensureShell(){
   if($('#ovArea'))return;
   $('#app').innerHTML=`<section id="ovArea"></section><section id="taskArea"></section>
-  <div class="card"><h2>레슨 팩</h2>
+  <div class="card" id="packCard"><h2>레슨 팩</h2>
     <p class="muted">추출 JSON 파일들(pack·words·sentences·dialogues·patterns·items)을 <b>한꺼번에 선택</b>하면 병합·검증 후 업로드합니다. 팩 콘텐츠는 서버 저장소에만 저장돼요(저장소·정적 파일에 안 남음).</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <input type="file" id="packFiles" accept=".json,application/json" multiple>
@@ -243,15 +334,15 @@ function ensureShell(){
     <div id="packPreview"></div>
     <div id="packList"></div>
   </div>
-  <section id="bookArea"></section>
+  <section id="examArea"></section>
   <section id="coverArea"></section>
-  <section id="examArea"></section><section id="resultArea"></section><section id="analysisArea"></section>
+  <section id="bookArea"></section><section id="resultArea"></section><section id="analysisArea"></section>
   <section id="reportArea"></section>`;
   $('#packFiles').onchange=onPackFiles;
   $('#btnUpload').onclick=uploadPack;
 }
 function render(){
-  $('#btnRefresh').hidden=false;$('#btnLogout').hidden=false;
+  $('#btnRefresh').hidden=false;$('#btnLogout').hidden=false;$('#secnav').hidden=false;
   ensureShell();
   renderOverview();renderTask();renderPackList();renderBooks();renderCoverage();renderExamForm();renderExamList();renderResults();renderAnalysis();renderReports();
 }
@@ -472,19 +563,42 @@ async function saveTask(){
 /* ── 레슨 팩 ── */
 /* 올렸다고 학생이 받는 게 아니다 — 시험 범위에 든 팩만 서빙된다(계약 3). 전부 '배포됨'으로
    보여 주면 미배정 팩을 올려 두고 끝난 줄 알게 되므로, 배정 여부를 그 자리에서 구분한다. */
+function packState(id,idle){return !EXAMS?'muted':idle.has(id)?'warn':'ok';}
 function renderPackList(){
   const idle=new Set(EXAMS?unassignedPacks(EXAMS,PACKS):[]);
-  $('#packList').innerHTML=`<h3>업로드된 팩 ${PACKS.length}개</h3>
-    ${PACKS.length?PACKS.map(id=>{
-      const tag=!EXAMS?'<span class="tag muted">올림</span>'
-        :idle.has(id)?'<span class="tag warn" title="어느 시험 범위에도 없어서 학생은 받지 못해요">미배정</span>'
-        :'<span class="tag ok">배정됨</span>';
-      return `<div class="packrow"><b>${esc(id)}</b><span>${tag} <button class="btn sm danger" data-del="${esc(id)}">삭제</button></span></div>`;
-    }).join(''):'<p class="muted">아직 없어요.</p>'}
+  const grades=['전체',...[...new Set(PACKS.map(id=>packInfo(id).grade))].sort((a,b)=>a.localeCompare(b,'ko'))];
+  if(!grades.includes(PACK_GRADE))PACK_GRADE='전체';
+  const books=packGroups(PACKS).length;
+  /* 검색칸은 다시 그리지 않는다 — 글자를 칠 때마다 칸이 새로 생기면 입력이 끊긴다 */
+  $('#packList').innerHTML=`<h3>업로드된 팩</h3>
+    <div class="pk-sum"><span><b>${num(PACKS.length)}</b>개 단원 · 교과서 <b>${num(books)}</b>종</span>
+      ${EXAMS?`<span><i class="dot"></i>배정됨 ${num(PACKS.length-idle.size)}</span><span><i class="dot warn"></i>미배정 ${num(idle.size)}</span>`:''}</div>
+    ${PACKS.length?`<div class="pk-tools">${grades.map(g=>`<button class="chip" data-pg="${esc(g)}" aria-pressed="${g===PACK_GRADE}">${esc(g)}</button>`).join('')}
+      <input type="search" id="packQ" placeholder="교과서·저자·단원 찾기 (예: 동아, 김기택, 3과)" value="${esc(PACK_Q)}" aria-label="팩 찾기"></div>
+      <div id="pkGroups"></div>`:'<p class="muted">아직 올린 팩이 없어요. 위에서 추출 JSON 파일을 골라 올리세요.</p>'}
     <div id="packOut"></div>`;
-  document.querySelectorAll('#packList [data-del]').forEach(b=>b.onclick=()=>deletePack(b.dataset.del));
+  document.querySelectorAll('#packList [data-pg]').forEach(b=>b.onclick=()=>{PACK_GRADE=b.dataset.pg;renderPackList();});
+  const q=$('#packQ');if(q)q.oninput=()=>{PACK_Q=q.value;renderPackGroups(idle);};
+  renderPackGroups(idle);
 }
-async function loadPacks(){PACKS=((await api('/naesin/admin/packs')).packs||[]).map(String);}
+function renderPackGroups(idle){
+  const el=$('#pkGroups');if(!el)return;
+  const q=PACK_Q.trim().toLowerCase();
+  const groups=packGroups(PACKS).filter(g=>PACK_GRADE==='전체'||g.grade===PACK_GRADE)
+    .map(g=>q?{...g,packs:g.packs.filter(p=>(p.label+' '+curKo(g.cur)+' '+p.id).toLowerCase().includes(q))}:g).filter(g=>g.packs.length);
+  el.innerHTML=groups.length?groups.map(g=>{
+    const open=g.packs.find(p=>p.id===PACK_OPEN);
+    return `<div class="pkg"><div class="pkg-h"><b>${esc(g.book)}</b><span>${esc(g.grade)}${g.cur?' · '+esc(curKo(g.cur)):''} · ${g.packs.length}개 단원</span></div>
+      <div class="pkg-u">${g.packs.map(p=>`<button class="unit ${packState(p.id,idle)}" data-pk="${esc(p.id)}" aria-pressed="${p.id===PACK_OPEN}" title="${esc(p.id)}">${esc(p.unit)}</button>`).join('')}</div>
+      ${open?`<div class="pk-detail"><b>${esc(open.label)}</b>
+        ${packState(open.id,idle)==='warn'?'<span class="tag warn">미배정 — 학생은 아직 받지 못해요</span>':packState(open.id,idle)==='ok'?'<span class="tag ok">배정됨</span>':''}
+        ${open.items!=null?'<span>문항 '+num(open.items).toLocaleString()+'개</span>':''}${open.updatedAt?'<span class="muted">'+esc(fmtLast(open.updatedAt))+' 올림</span>':''}
+        <code>${esc(open.id)}</code><span class="sp"></span><button class="btn sm danger" data-del="${esc(open.id)}">이 팩 삭제</button></div>`:''}</div>`;
+  }).join(''):'<p class="muted">찾는 팩이 없어요. 학년을 「전체」로 바꾸거나 다른 말로 찾아보세요.</p>';
+  el.querySelectorAll('[data-pk]').forEach(b=>b.onclick=()=>{PACK_OPEN=PACK_OPEN===b.dataset.pk?'':b.dataset.pk;renderPackGroups(idle);});
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>deletePack(b.dataset.del));
+}
+async function loadPacks(){const pk=await api('/naesin/admin/packs');setMeta(pk);PACKS=(pk.packs||[]).map(String);}
 async function onPackFiles(){
   ASSEMBLED=null;$('#btnUpload').disabled=true;
   const files=[...$('#packFiles').files];
@@ -523,11 +637,11 @@ async function uploadPack(){
   }
 }
 async function deletePack(id){
-  if(!confirm(`팩 "${id}"을(를) 서버에서 삭제할까요? 학생 앱에서 더 이상 열 수 없습니다.`))return;
+  if(!confirm(`팩 「${packLabel(id)}」(${id})을(를) 서버에서 삭제할까요? 학생 앱에서 더 이상 열 수 없습니다.`))return;
   try{
     await api('/naesin/admin/pack',{method:'DELETE',body:JSON.stringify({id})});
     await loadPacks();renderPackList();renderExamForm();
-    $('#packOut').innerHTML=`<div class="issues ok">삭제 완료 — ${esc(id)}</div>`;
+    PACK_OPEN='';$('#packOut').innerHTML=`<div class="issues ok">삭제 완료 — ${esc(packLabel(id))}</div>`;
   }catch(e){
     if(isAuth(e))return;
     /* 409 = 어떤 배정이 아직 이 팩을 가리킨다 — 어느 배정인지 이름으로 보여 줘야 해제하러 갈 수 있다 */
@@ -561,8 +675,9 @@ function renderExamForm(){
       <label id="exCodeWrap" hidden>학생 코드<br><input id="exCode" placeholder="예: stu-0123" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
       <label>시험일<br><input type="date" id="exDate"></label>
       <label>단어 마감 (시험 D-n)<br><input type="number" id="exWdd" min="${WDD_MIN}" max="${WDD_MAX}" value="${WDD_DEFAULT}" style="width:90px"></label>
-      <div style="grid-column:span 2"><span class="muted">시험 범위 팩</span><br><span id="exPacks">
-        ${PACKS.length?PACKS.map(id=>`<label class="ck"><input type="checkbox" value="${esc(id)}">${esc(id)}</label>`).join(''):'<span class="muted">먼저 팩을 업로드하세요</span>'}</span></div>
+      <div style="grid-column:1/-1"><span class="muted">시험 범위 팩 — 교과서의 「전체」를 누르면 그 교과서 단원이 모두 골라져요</span><br><span id="exPacks">
+        ${PACKS.length?'<div class="pick">'+packGroups(PACKS).map((g,i)=>`<div class="pkg"><div class="pkg-h"><b>${esc(g.book)}</b><span>${esc(g.grade)}${g.cur?' · '+esc(curKo(g.cur)):''}</span></div>
+          <div class="pkg-u"><label class="ck all"><input type="checkbox" data-pall="${i}">전체</label>${g.packs.map(p=>`<label class="ck" title="${esc(p.id)}"><input type="checkbox" data-pk data-pg="${i}" value="${esc(p.id)}">${esc(p.unit)}</label>`).join('')}</div></div>`).join('')+'</div>':'<span class="muted">먼저 팩을 업로드하세요</span>'}</span></div>
       <button class="btn" id="btnExam" ${PACKS.length?'':'disabled'}>배정 저장</button>
     </div>
     <div id="examOut" role="status" aria-live="polite"></div>
@@ -572,6 +687,7 @@ function renderExamForm(){
   $('#exScope').onchange=()=>{const w=$('#exCodeWrap');w.hidden=$('#exScope').value!=='__code';if(!w.hidden)$('#exCode').focus();};
   $('#exMode').onchange=()=>{const practice=$('#exMode').value==='practice';$('#exDate').disabled=practice;$('#exWdd').disabled=practice;};
   $('#btnExam').onclick=saveExam;
+  document.querySelectorAll('#exPacks [data-pall]').forEach(a=>a.onchange=()=>document.querySelectorAll('#exPacks input[data-pg="'+a.dataset.pall+'"]').forEach(c=>{c.checked=a.checked;}));
 }
 async function loadExams(){
   const r=await api('/naesin/admin/exams').catch(optional);
@@ -597,7 +713,7 @@ function renderExamList(){
       const note=ex.scope==='default'?'':String(ex.scope).startsWith('cls:')?(expired?'만료되어 전체 공통을 따름':'학생 개별 다음 · 전체 공통보다 우선'):(expired?'만료되어 반 배정 → 전체 공통을 따름':'반 배정·전체 공통보다 우선');
       return `<tr class="${expired?'expired':''}" data-scope="${esc(ex.scope)}"><td><b>${esc(scopeLabel(ex.scope))}</b>${note?'<br><span class="muted">'+esc(note)+'</span>':''}</td>
         <td>${ex.mode==='practice'?'미정':esc(ex.examDate)}</td><td>${ddTag}</td>
-        <td style="white-space:normal">${packs.map(id=>`<span class="tag muted">${esc(id)}</span>`).join(' ')||'—'}</td>
+        <td style="white-space:normal">${packSummary(packs)||'—'}</td>
         <td>${ex.mode==='practice'?'마감 없음':'D-'+(wdd==null?WDD_DEFAULT+' <span class="muted">(기본)</span>':wdd)}</td>
         <td class="muted">${fmtLast(ex.updatedAt)}</td>
         <td><button class="btn sm danger" data-unassign="${esc(ex.scope)}">해제</button></td></tr>`;}).join('')}
@@ -610,7 +726,7 @@ async function saveExam(){
   const scope=sel==='__code'?$('#exCode').value.trim():sel;
   const practice=$('#exMode').value==='practice';
   const examDate=practice?'':$('#exDate').value;
-  const packIds=[...document.querySelectorAll('#exPacks input:checked')].map(i=>i.value);
+  const packIds=[...document.querySelectorAll('#exPacks input[data-pk]:checked')].map(i=>i.value);
   const wddRaw=$('#exWdd').value.trim();
   const isClass=scope.startsWith('cls:');
   if(isClass&&(!COV||COV.classScope(scope.slice(4))!==scope))return out('<p class="err">반 이름을 확인하고 다시 선택하세요.</p>');
@@ -1126,7 +1242,7 @@ function renderCoverage(){
       <th>배정</th><th>시험일</th><th>D-day</th><th>필요한 팩</th><th>없는 팩</th></tr></thead><tbody>
       ${rows.map(r=>{
         const miss=r.missing.length
-          ? `<b class="${r.warn?'err':''}">${r.missing.map(esc).join(', ')}</b>`
+          ? `<b class="${r.warn?'err':''}">${r.missing.map(id=>`<span title="${esc(id)}">${esc(packLabel(id))}</span>`).join(', ')}</b>`
           : '<span class="tag ok">준비됨</span>';
         const dd=r.expired?'<span class="tag muted">지남</span>'
           :r.dday==null?'—'
@@ -1134,7 +1250,7 @@ function renderCoverage(){
           :`<span class="tag">D-${num(r.dday)}</span>`;
         return `<tr class="${r.warn?'hot':r.expired?'expired':''}"><td><b>${esc(scopeLabel(r.scope))}</b>${r.name?'<br><span class="muted">'+esc(r.name)+'</span>':''}</td>
           <td>${esc(r.examDate)}</td><td>${dd}</td>
-          <td style="white-space:normal">${r.need.map(id=>`<span class="tag muted">${esc(id)}</span>`).join(' ')||'—'}</td>
+          <td style="white-space:normal">${packSummary(r.need)||'—'}</td>
           <td style="white-space:normal">${miss}</td></tr>`;
       }).join('')}</tbody></table></div>`;
   }
@@ -1184,7 +1300,7 @@ function renderReports(){
           ${memos?`<div style="flex:1 0 100%;margin-top:4px">${memos}</div>`:''}</div>`;
       }).join('');
       const done=(Array.isArray(p.reports)?p.reports:[]).filter(r=>r.resolved);
-      return `<div style="margin-top:12px"><b>${esc(p.packId)}</b>
+      return `<div style="margin-top:12px"><b title="${esc(p.packId)}">${esc(packLabel(p.packId))}</b>
         <span class="tag bad">미처리 ${num(p.openCount)}</span>
         <span class="tag muted">누적 ${num(p.total)}</span>
         ${items}
@@ -1232,7 +1348,7 @@ async function refresh(){
       api('/naesin/admin/results').catch(optional),   // 시험 결과 + 성과 분석 (계약 R2)
       api('/naesin/admin/reports').catch(optional),   // 문항 신고 — 팩 정오표의 원천
       api('/naesin/admin/books').catch(optional)]);   // 교과서 지정표 — 커버리지 카드의 입력
-    OV=ov;PACKS=(Array.isArray(pk.packs)?pk.packs:[]).map(String);
+    OV=ov;setMeta(pk);PACKS=(Array.isArray(pk.packs)?pk.packs:[]).map(String);
     if(taskScope===TASK_SCOPE&&taskRead===TASK_READ){TASK=(tk&&tk.task&&tk.task.date)?tk.task:null;TASK_LOADING=!tk;}
     EXAMS=ex&&Array.isArray(ex.exams)?ex.exams:null;
     if(EXAMS&&typeof ex.today==='string')EXAMS.today=ex.today;
@@ -1249,6 +1365,9 @@ async function refresh(){
   }
 }
 $('#btnRefresh').onclick=refresh;
+/* 구역 이동 줄: 화면 위쪽에 걸린 구역을 표시한다 */
+addEventListener('scroll',()=>{let cur=null;for(const a of document.querySelectorAll('#secnav a')){const t=document.querySelector(a.getAttribute('href'));if(t&&t.offsetHeight&&t.getBoundingClientRect().top<140)cur=a;}
+  document.querySelectorAll('#secnav a').forEach(a=>a.setAttribute('aria-current',String(a===cur)));},{passive:true});
 setInterval(refreshAudioStatus,30000);
 $('#bannerRetry').onclick=refresh;
 $('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
