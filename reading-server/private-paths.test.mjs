@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import {privatePaths} from './private-paths.mjs';
-const dir=fs.mkdtempSync('/private/tmp/wb-private-paths-'), data=path.join(dir,'internal','data'), resources=path.join(dir,'external');
+const dir=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'wb-private-paths-')), data=path.join(dir,'internal','data'), resources=path.join(dir,'external');
 fs.mkdirSync(data,{recursive:true});
 try {
   assert.deepEqual(privatePaths(data,''),{materials:path.join(dir,'internal','naesin-materials'),audio:path.join(data,'naesin-audio')});

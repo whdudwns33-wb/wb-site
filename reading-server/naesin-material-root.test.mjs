@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {readQuestionImage} from './naesin-local-materials.mjs';
-const temp=fs.mkdtempSync('/private/tmp/wb-naesin-root-');
+const temp=fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()),'wb-naesin-root-'));
 const data=path.join(temp,'internal','naesin-server'), ext=path.join(temp,'external','materials');
 const png=Buffer.from('89504e470d0a1a0a','hex'), hash=crypto.createHash('sha256').update(png).digest('hex');
 const original=process.env.WB_NAESIN_MATERIALS_DIR;
