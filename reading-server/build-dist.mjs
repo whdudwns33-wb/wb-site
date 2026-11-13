@@ -77,9 +77,9 @@ const NAESINKO_FILES = ['index.html', 'engine.js', 'grade.js', 'gen.js', 'pack-c
 for (const f of NAESINKO_FILES) fs.copyFileSync(path.join(NAESINKO, f), path.join(DIST, 'naesin-ko', f));
 fs.copyFileSync(SHARED, path.join(DIST, 'naesin-ko', 'voice.js'));
 /* 탐구브레인 (naesin-tg/) — 화면 껍데기뿐이다. 문제지·쪽 그림·정답은 KV 에만 있고 서버가 채점한다.
-   서비스 워커가 없다: 지면을 기기에 쌓아 두지 않으려고 일부러 뺐다. */
+   서비스 워커는 앱 설치용으로 셸만 캐시하고 /api/ 는 건드리지 않는다 — 지면을 기기에 쌓지 않는다. */
 fs.mkdirSync(path.join(DIST, 'naesin-tg'), { recursive: true });
-for (const f of ['index.html', 'icon.svg']) fs.copyFileSync(path.join(ROOT, '..', 'naesin-tg', f), path.join(DIST, 'naesin-tg', f));
+for (const f of ['index.html', 'sw.js', 'manifest.webmanifest', 'icon.svg']) fs.copyFileSync(path.join(ROOT, '..', 'naesin-tg', f), path.join(DIST, 'naesin-tg', f));
 /* 하루브레인 (haru/) — 같은 오리진 /haru/ 에서 서빙해야 학생 코드·API가 공유된다.
    앱 껍데기·순수 로직·atoms.json·공개 준비 안내와 검토용 자체 샘플(preview.js)만 싣는다. 운영 팩·대응표·플랜·시험지는 dist 에 없다(설계안 §5-0). */
 const HARU = path.join(ROOT, '..', 'haru');
@@ -197,6 +197,9 @@ const kTag = stampSW(path.join(DIST, 'naesin-ko', 'sw.js'),
     'concepts.json', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'naesin-ko', f)), 'wbk-shell');
 
+const tTag = stampSW(path.join(DIST, 'naesin-tg', 'sw.js'),
+  ['index.html', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, 'naesin-tg', f)), 'wbt-shell');
+
 const cTag = stampSW(path.join(DIST, 'chunk', 'sw.js'),
   ['index.html', 'print.html', 'voice.js', 'rules.js', 'sched.js', 'lessons.js', 'passages.js', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'chunk', f)), 'wbc-shell');
@@ -243,4 +246,4 @@ if (broken.length) {
 }
 
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
-console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', hTag, '·', cTag, '·', lTag, '·', jTag);
+console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', tTag, '·', hTag, '·', cTag, '·', lTag, '·', jTag);
