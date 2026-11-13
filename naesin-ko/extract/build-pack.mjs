@@ -363,7 +363,8 @@ export function buildPack(dir, opts) {
     .map((f) => path.join(dir, f));
   if (!files.length) errors.push('PDF가 없어요. 단원 폴더에 자료를 넣어 주세요.');
 
-  const cacheDir = path.join(dir, '_spans');
+  /* --out 을 주면 캐시도 그쪽에 — 드라이브 단원 폴더에 추출 글자가 쌓여 동기화되지 않게 */
+  const cacheDir = (opts && opts.spansDir) || path.join(dir, '_spans');
   const found = [], skipped = [];
   files.forEach((file) => {
     let doc;
@@ -732,7 +733,7 @@ if (invokedDirectly) {
   }
   if (!fs.existsSync(dir)) { console.error(`폴더가 없어요: ${dir}`); process.exit(1); }
 
-  const r = buildPack(dir);
+  const r = buildPack(dir, opt('out') ? { spansDir: path.join(opt('out'), '_spans') } : undefined);
   const say = (s) => process.stderr.write(s + '\n');
   say('\n[단원 팩 초안]');
   r.report.forEach((x) => say('  ' + x));
