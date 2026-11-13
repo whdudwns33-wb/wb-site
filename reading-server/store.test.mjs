@@ -29,11 +29,13 @@ const fixture = {
   letter: { issues: { issue: { issue: { id: 'issue', title: '자체 창작 호' } } }, states: { test: record },
     push: { test: { endpoint: 'https://example.invalid/test' } }, calendar: { testOnly: true }, images: { image: { id: 'image', credit: '자체 제작' } } },
   naesin: { packs: { en: { body: 'test-only-pack-content' } }, packIds: ['en'], states: { test: record } },
-  hanja: { books: { book: { body: 'test-only-pack-content' } }, index: [{ id: 'book' }], states: { test: record } }
+  hanja: { books: { book: { body: 'test-only-pack-content' } }, index: [{ id: 'book' }], states: { test: record } },
+  naesinTg: { sheets: { s: { sheet: { questions: [{ answer: 'test-only-pack-content' }] } } }, pages: { 's:1': 'test-only-pack-content' },
+    sheetIds: [{ id: 's' }], states: { test: record }, exams: { default: { sheetIds: ['s'] } }, tasks: [{ id: 't-1', title: '자체 과제' }] }
 };
 
 function checkBackup(body) {
-  for (const app of ['naesinKo', 'haru', 'chunk', 'letter', 'naesin', 'hanja']) {
+  for (const app of ['naesinKo', 'haru', 'chunk', 'letter', 'naesin', 'hanja', 'naesinTg']) {
     assert.ok(body[app], app + ' 백업이 빠졌다');
     assert.deepEqual(body[app].states.test, record, app + ' 학생 기록이 빠졌다');
   }
@@ -42,6 +44,7 @@ function checkBackup(body) {
   for (const field of ['summaries', 'assigns', 'customs']) assert.deepEqual(body.chunk[field], fixture.chunk[field]);
   for (const field of ['issues', 'push', 'calendar']) assert.deepEqual(body.letter[field], fixture.letter[field]);
   assert.deepEqual(body.letter.images, Object.values(fixture.letter.images));
+  for (const field of ['sheetIds', 'exams', 'tasks']) assert.deepEqual(body.naesinTg[field], fixture.naesinTg[field]);
   assert.deepEqual(body.naesinKo.packIds, ['ko']);
   assert.deepEqual(body.haru.packIds, ['haru']);
   assert.ok(!JSON.stringify(body).includes('test-only-pack-content'), '구매 팩·단어장 본문이 백업에 실렸다');

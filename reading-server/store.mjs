@@ -57,6 +57,12 @@ export function hanjaSnapshot(h) {
     tasks: src.tasks || {}, remaps: src.remaps || {}, strokes: src.strokes || null };
 }
 
+/* 탐구브레인 칸의 스냅샷 — 문제지 본문(sheets)·쪽 그림(pages)은 구매 자료라 뺀다. 워커 fullDump 의 naesinTg 와 같은 모양. */
+export function naesinTgSnapshot(t) {
+  const src = t || {};
+  return { sheetIds: src.sheetIds || [], states: src.states || {}, exams: src.exams || {}, tasks: src.tasks || [] };
+}
+
 /* 스냅샷에 담을 것 — 학생 기록만이 아니라 강사가 손으로 만든 것(교재 검수·발행 상태)까지.
    이게 빠지면 복구했을 때 낱말 검수를 처음부터 다시 해야 한다. */
 export function snapshotBody() {
@@ -66,7 +72,7 @@ export function snapshotBody() {
     textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin),
     naesinKo: { packIds: ko.packIds || Object.keys(ko.packs || {}), states: ko.states || {}, summaries: ko.summaries || {},
       reviews: ko.reviews || {}, overlays: ko.overlays || {}, exams: ko.exams || {}, tasks: ko.tasks || {} },
-    textbookSrc: db.textbookSrc || {}, hanja: hanjaSnapshot(db.hanja),
+    textbookSrc: db.textbookSrc || {}, hanja: hanjaSnapshot(db.hanja), naesinTg: naesinTgSnapshot(db.naesinTg),
     haru: { packIds: haru.packIds || Object.keys(haru.packs || {}), paperkeys: haru.paperkeys || {}, plans: haru.plans || {},
       states: haru.states || {}, mocks: haru.mocks || {}, paper: haru.paper || {}, atoms: haru.atoms || null },
     chunk: { states: chunk.states || {}, summaries: chunk.summaries || {}, assigns: chunk.assigns || {}, customs: chunk.customs || null },
