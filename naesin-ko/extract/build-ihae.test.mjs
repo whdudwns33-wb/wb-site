@@ -161,4 +161,40 @@ t('머리말에서 교과서 좌표를 읽어 둔다 — 여러 자료를 합칠
   assert.strictEqual(out.meta.workTitle, '모래시계');
 });
 
+t('7.8pt 축소 시행과 같은 행의 파란 풀이를 각각 보존한다', () => {
+  const small = structuredClone(doc);
+  const row = small.pages[1].lines.find((l) => l.y === 314);
+  row.spans.forEach((s) => { s.size = 7.8; });
+  row.spans.push(sp(250, '시간을 돌아보는 모습', { color: NOTE, size: 6.9 }));
+  const result = buildIhae(small);
+  assert.ok(result.work.text.stanzas.flatMap((s) => s.lines).includes('유리 벽에 침묵이 쌓인다'));
+  assert.ok(result.work.lineNotes.some((n) => n.anchor === '유리 벽에 침묵이 쌓인다' && n.note === '시간을 돌아보는 모습'));
+  const annotated = structuredClone(doc);
+  annotated.pages[1].lines.push(ln(335, [sp(70, '자신을 ', { size: 7.9, color: NOTE, w: 25 }),
+    sp(95, '성찰', { size: 7.9, color: WHITE, w: 16 }), sp(111, '하는 태도', { size: 7.9, color: NOTE })]));
+  annotated.pages[1].lines.sort((a, b) => a.y - b.y);
+  const separated = buildIhae(annotated).work;
+  assert.ok(!separated.text.stanzas.flatMap((s) => s.lines).includes('성찰'), '풀이의 흰 정답은 시행이 아니다');
+  assert.ok(separated.lineNotes.some((n) => n.note === '자신을 성찰하는 태도'));
+  assert.ok(separated.blanks.some((b) => b.answers.includes('성찰')), '풀이 빈칸 자체는 보존해야 한다');
+
+});
+
+t('중3 개념완성은 첫 쪽 핵심 정리와 Q 빈칸을 학생용 절에서 수거한다', () => {
+  const half = (from, color) => [pg(from + 1, [
+    ln(59, [sp(183, '3', { size: 13 }), sp(310, '1-1.새벽 정원')]),
+    ln(64, [sp(175, '중', { size: 9.1 })]),
+    ln(120, [sp(40, '주제'), sp(120, '일상의 '), sp(180, '발견', { color })]),
+    ln(140, [sp(40, '갈래'), sp(120, '자유시')])]),
+    pg(from + 2, [ln(45, [sp(400, '1-1.새벽 정원', { size: 7.9 })]),
+      ln(110, [sp(60, '이해 전략')]), ln(650, [sp(60, 'Q1 '), sp(100, '새벽', { color }), sp(140, '을 바라본다')])])];
+  const concept = { pages: half(0, WHITE).concat(half(2, BLACK)) };
+  const result = buildIhae(concept, { concept: true });
+  assert.strictEqual(result.paired, true);
+  assert.strictEqual(result.work.title, '새벽 정원');
+  assert.strictEqual(result.meta.grade, '중3');
+  assert.ok(result.work.blanks.some((b) => b.answers.includes('발견')));
+  assert.strictEqual(result.work.blanks.filter((b) => b.answers.includes('새벽')).length, 1);
+});
+
 console.log(`\nOK — ${passed}개 통과. 초안은 초안이다 — 검수 게이트(§7[3])는 건너뛰지 않는다.`);

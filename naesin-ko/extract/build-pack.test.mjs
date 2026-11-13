@@ -7,7 +7,13 @@
  *   ③ 팩 전역 유일 id
  * 실제 지면은 저장소에 못 들어오므로(CLAUDE.md 절대 규칙 1) 자체 창작 값으로 만든다. */
 import assert from 'node:assert';
-import { mergeBlanks, reanchor, workIdFor, resolveSets } from './build-pack.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { basicFixture, puriFixture } from './practice-fixtures.mjs';
+import PC from '../pack-check.js';
+import { mergeBlanks, reanchor, reanchorSetMark, workIdFor, resolveSets, buildPack, writePack } from './build-pack.mjs';
 
 let passed = 0;
 const t = (name, fn) => { fn(); passed += 1; console.log('  ✓ ' + name); };
@@ -191,6 +197,185 @@ t('본문이 없는 발췌는 못 살린다 — 지문 없는 지문 세트를 �
   const r = resolveSets(results, works);
   assert.deepStrictEqual(results[0].out.sets, []);
   assert.ok(r.stillPending.some((p) => p.setId === 's-01'));
+});
+
+t('제목 생략 본문은 다른 파일의 본문과 유일하게 일치할 때만 잇는다', () => {
+  const lines = ['창문을 열자 파란 종이배가 하늘로 날아갔다', '나는 그 배에 오늘의 약속을 하나씩 적었다'];
+  const results = [{ series: 'danwon', out: { sets: [], review: {
+    pending: [pendSet('s-01', [{ label: '(가)', title: '' }])],
+    candidates: [{ kind: 'setText', setId: 's-01', label: '(가)', lines }] } } },
+    { series: 'seosul', out: { review: { candidates: [{ kind: 'setText', title: '(가) 종이배 약속', body: lines }] } } }];
+  const works = [];
+  const r = resolveSets(results, works);
+  assert.strictEqual(r.inferred[0].title, '종이배 약속');
+  assert.strictEqual(results[0].out.sets[0].works[0].kind, 'excerpt');
+  assert.deepStrictEqual(results[0].out.sets[0].works[0].text.stanzas[0].lines, lines);
+  const ambiguous = structuredClone(results);
+  ambiguous[0].out.sets = [];
+  ambiguous[0].out.review.pending = [pendSet('s-01', [{ label: '(가)', title: '' }])];
+  ambiguous[1].out.review.candidates.push({ kind: 'setText', title: '다른 제목', body: lines });
+  assert.strictEqual(resolveSets(ambiguous, []).inferred.length, 0, '같은 본문에 제목이 둘이면 추측하면 안 된다');
+});
+
+t('시의 제목을 모른다고 유일한 소설에 붙이지 않는다', () => {
+  const results = res('danwon', { sets: [], review: {
+    pending: [pendSet('s-01', [{ title: '창작 소설', kind: 'excerpt', text: { paragraphs: ['소설 본문'] } }]),
+      pendSet('s-02', [{ title: '', kind: 'full' }])],
+    candidates: [{ kind: 'setText', setId: 's-02', lines: ['짧은 시의 행'] }] } });
+  const r = resolveSets(results, []);
+  assert.ok(r.stillPending.some((p) => p.setId === 's-02'));
+});
+
+t('여러 객관식 상품과 서술형 회차의 id를 가르고 미지원·손상 파일은 경고로 넘긴다', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ko-multi-'));
+  const sp = (x, text, size = 9.1, color = '#000000') => ({ x, text, size, color, w: Math.min(text.length * 8, 200) });
+  const ln = (y, ...spans) => ({ y, spans });
+  const pg = (no, lines) => ({ no, width: 595, height: 842, lines });
+  const fixture = (series, essay) => ({ pages: [pg(1, [ln(45, sp(60, '[' + series + ']')),
+    ln(100, sp(60, '※ 다음 글을 읽고 물음에 답하시오.', 7.9)),
+    ln(125, sp(150, '별의 약속')), ln(145, sp(253, '윤여름')),
+    ln(170, sp(70, '저녁 창가에서 별에게 편지를 쓴다')),
+    ln(300, sp(60, '1.', 13.7, '#191919')), ln(306, sp(86, '이 글의 마음을 고르시오.')),
+    ...(essay ? [] : ['① 빛', '② 창', '③ 별', '④ 길', '⑤ 밤'].map((text, n) => ln(340 + n * 20, sp(70, text))))]),
+    pg(2, essay ? [ln(100, sp(66, '1)', 7.9)), ln(120, sp(66, '모범 답안', 7, '#3e88ab')),
+      ln(140, sp(66, '별을 기다리는 마음이다.', 7.9))] : [ln(100, sp(66, '1) [정답] ③', 7.9)),
+      ln(120, sp(66, '[해설] 창작 근거이다.', 7.9))])] });
+  try {
+    fs.writeFileSync(path.join(dir, '_meta.txt'), 'revision: 2022\nscope: unit7\n');
+    const docs = [fixture('단원집중'), fixture('단원집중'), fixture('최다빈출 공략'), fixture('서술형 공략', true), fixture('서술형 공략', true)];
+    docs.forEach((doc, i) => fs.writeFileSync(path.join(dir, 'file' + i + '.json'), JSON.stringify(doc)));
+    const concept = { pages: [pg(1, [ln(45, sp(60, '중3 국어 1-1.별의 약속')),
+      ln(90, sp(60, '이해 전략 핵심 내용을 파악하자!!')),
+      ln(120, sp(40, '주제'), sp(120, '기다림', 9.1, '#ffffff'))])] };
+    fs.writeFileSync(path.join(dir, 'concept.json'), JSON.stringify(concept));
+    fs.writeFileSync(path.join(dir, 'unsupported.json'), JSON.stringify({ pages: [pg(1, [ln(45, sp(60, '[새로운워크북]'))])] }));
+    fs.writeFileSync(path.join(dir, 'broken.json'), '{');
+    fs.writeFileSync(path.join(dir, 'not-spans.json'), 'null');
+    const result = buildPack(dir);
+    assert.deepStrictEqual(result.errors, []);
+    assert.strictEqual(result.review.skipped.length, 3);
+    assert.ok(result.warns.some((w) => w.includes('앱에 아직 안 들어가는 자료 3개')));
+    assert.strictEqual(result.pack.items.length, 3);
+    const canon = result.pack.works.find((w) => w.title === '별의 약속');
+    assert.strictEqual(canon.hasCanon, true);
+    assert.ok(canon.blanks.length);
+    assert.ok(canon.text.stanzas[0].lines.length, '전문이 없는 개념 자료의 읽기 화면을 비워 두면 안 된다');
+    assert.strictEqual(canon.textSource.kind, 'excerpt');
+    assert.strictEqual(result.review.reconstructedTexts.length, 1);
+
+    assert.ok(result.pack.items.some((i) => i.source.series === '최다빈출 공략'));
+    const draftItems = result.review.pending.filter((p) => p.kind === 'item').map((p) => p.item);
+    assert.strictEqual(draftItems.length, 2);
+    const ids = result.pack.items.concat(draftItems).map((i) => i.id);
+    assert.strictEqual(new Set(ids).size, 5);
+    assert.ok(ids.every((id) => id.includes('-unit7-f')));
+    assert.strictEqual(new Set(result.pack.sets.map((set) => set.setId)).size, result.pack.sets.length);
+    assert.ok(result.pack.items.every((i) => result.pack.sets.some((set) => set.setId === i.setId)));
+    assert.ok(!('pending' in result.pack) && !('skipped' in result.pack));
+    const conceptCli = spawnSync(process.execPath, ['naesin-ko/extract/build-ihae.mjs', path.join(dir, 'concept.json')], { encoding: 'utf8' });
+    assert.strictEqual(conceptCli.status, 0, conceptCli.stderr);
+    assert.strictEqual(JSON.parse(conceptCli.stdout).work.title, '별의 약속');
+    const mcCli = spawnSync(process.execPath, ['naesin-ko/extract/build-danwon.mjs', path.join(dir, 'file2.json')], { encoding: 'utf8' });
+    assert.strictEqual(mcCli.status, 0, mcCli.stderr);
+    assert.strictEqual(JSON.parse(mcCli.stdout).items[0].source.series, '최다빈출 공략');
+
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+t('재실행에서 빠진 JSON은 팩에서 빼되 검수 쪽에 보존한다', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ko-rerun-'));
+  try {
+    writePack(dir, { meta: { packId: 'fixture' }, works: [{ workId: 'w-old', _workKey: '임시', title: '옛 작품' }],
+      sets: [{ setId: 's-old' }], items: [{ id: 'q-old' }] }, {});
+    writePack(dir, { meta: { packId: 'fixture' }, works: [{ workId: 'w-new', _workKey: '임시', title: '새 작품' }], sets: [], items: [] }, {});
+    assert.deepStrictEqual(fs.readdirSync(path.join(dir, 'pack/works')), ['w-new.json']);
+    assert.ok(!fs.existsSync(path.join(dir, 'pack/items.json')));
+    assert.ok(!fs.existsSync(path.join(dir, 'pack/sets.json')));
+    assert.ok(!('_workKey' in JSON.parse(fs.readFileSync(path.join(dir, 'pack/works/w-new.json'))).work));
+    const review = JSON.parse(fs.readFileSync(path.join(dir, 'review/review.json')));
+    assert.strictEqual(review.previousFiles.length, 3);
+    review.previousFiles.forEach((f) => assert.ok(fs.existsSync(path.join(dir, 'review', f))));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+t('세트 기호는 실제 발췌에 유일하게 있는 구절의 작품에 연결한다', () => {
+  const byId = { a: { text: { paragraphs: ['공통 구절과 정본 A'] } }, b: { text: { paragraphs: ['다른 정본 B'] } } };
+  const set = { works: [{ workId: 'a', kind: 'full' },
+    { workId: 'b', kind: 'excerpt', text: { paragraphs: ['새로운 발췌 구절과 공통 구절'] } }] };
+  const fixed = reanchorSetMark(set, byId, { symbol: '㉠', workId: '', anchorText: '새로운발췌 구절' });
+  assert.strictEqual(fixed.workId, 'b');
+  assert.strictEqual(fixed.anchorText, '새로운 발췌 구절');
+  assert.strictEqual(reanchorSetMark(set, byId, { symbol: '㉠', anchorText: '공통 구절' }), null);
+  assert.strictEqual(reanchorSetMark(set, byId, { symbol: '㉠', workId: 'a', anchorText: '새로운 발췌 구절' }), null);
+});
+
+t('새 네 상품을 폴더에서 자동 판별하고 기존 mc5·ox 계약으로 합친다', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ko-practice-'));
+  try {
+    const docs = [basicFixture('실력완성'), basicFixture('대표유형'), puriFixture('solution'), puriFixture('concept2')];
+    docs.forEach((doc, i) => fs.writeFileSync(path.join(dir, 'fixture' + i + '.json'), JSON.stringify(doc)));
+    fs.writeFileSync(path.join(dir, '_meta.txt'), 'revision: 2022\n');
+    const result = buildPack(dir);
+    assert.deepStrictEqual(result.errors, []);
+    assert.deepStrictEqual(result.review.skipped, []);
+    assert.deepStrictEqual(result.review.dropped, []);
+    assert.strictEqual(result.pack.items.length, 16);
+    assert.strictEqual(result.review.pending.filter((p) => p.kind === 'item').length, 2);
+    assert.strictEqual(new Set(result.pack.items.map((i) => i.id)).size, result.pack.items.length);
+    assert.strictEqual(new Set(result.pack.sets.map((s) => s.setId)).size, result.pack.sets.length);
+    assert.deepStrictEqual(new Set(result.pack.items.map((i) => i.source.series)),
+      new Set(['실력완성', '대표유형', '풀이완성', '개념완성 step2.풀이전략']));
+    assert.deepStrictEqual(PC.checkPack({ ...result.pack.meta, works: result.pack.works, sets: result.pack.sets, items: result.pack.items }).errors, []);
+    assert.ok(!('files' in result.pack) && !('candidates' in result.pack));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
+t('보조 상품 파일 하나의 경계 실패는 경고로 내리고 문항 전용 팩(정본 0)도 통과시킨다', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ko-qonly-'));
+  const sp = (x, text, size = 9.1, color = '#000000') => ({ x, text, size, color, w: Math.min(text.length * 8, 200) });
+  const ln = (y, ...spans) => ({ y, spans });
+  const pg = (no, lines) => ({ no, width: 595, height: 842, lines });
+  try {
+    fs.writeFileSync(path.join(dir, '_meta.txt'), 'revision: 2015\n');
+    /* 정본(이해완성) 없이 단독 문항과 무제 지문 세트가 있는 단원집중 자료 */
+    const danwon = { pages: [
+      pg(1, [
+        ln(45, sp(60, '[단원집중]')),
+        ln(65, sp(60, '중3 | 국어', 11, '#ffffff'), sp(290, '2-1.음운의 체계와 특성(1회)', 10.5)),
+        ln(100, sp(60, '1.', 13.7, '#191919')),
+        ln(106, sp(86, '음운에 대한 설명으로 가장 적절한 것은?')),
+        ...['① 뜻 구별', '② 문장 성분', '③ 문단 중심', '④ 담화 맥락', '⑤ 매체 자료'].map((c, n) => ln(130 + n * 18, sp(70, c))),
+        ln(240, sp(60, '※ 다음을 읽고 물음에 답하시오.', 7.9)),
+        ln(265, sp(70, '국어의 자음은 소리 나는 위치와 방법에 따라 나뉜다.')),
+        ln(310, sp(60, '2.', 13.7, '#191919')),
+        ln(316, sp(86, '윗글의 내용과 일치하는 것은?')),
+        ...['① 모음 설명', '② 자음 분류', '③ 문장 짜임', '④ 높임 표현', '⑤ 시간 표현'].map((c, n) => ln(340 + n * 18, sp(70, c))),
+      ]),
+      pg(2, [
+        ln(100, sp(66, '1) [정답] ①', 7.9)),
+        ln(120, sp(66, '[해설] 음운은 뜻을 구별해 주는 소리의 가장 작은 단위이다.', 7.9)),
+        ln(160, sp(66, '2) [정답] ②', 7.9)),
+        ln(180, sp(66, '[해설] 자음의 분류 기준을 설명하고 있다.', 7.9)),
+      ]),
+    ] };
+    /* 학생/교사 경계를 확정할 수 없는 깨진 보조 상품(실력완성) 1개 */
+    const brokenSkill = basicFixture('실력완성');
+    brokenSkill.pages = brokenSkill.pages.slice(0, 1);
+    brokenSkill.pages[0].lines = brokenSkill.pages[0].lines.filter((l) => !l.spans.some((s) => s.text === '1.'));
+    fs.writeFileSync(path.join(dir, 'danwon.json'), JSON.stringify(danwon));
+    fs.writeFileSync(path.join(dir, 'broken-skill.json'), JSON.stringify(brokenSkill));
+
+    const result = buildPack(dir);
+    assert.deepStrictEqual(result.errors, []);
+    assert.strictEqual(result.pack.items.length, 2);
+    assert.strictEqual(result.pack.sets.length, 1);
+    assert.ok(result.pack.works.every((w) => !w.hasCanon));
+    assert.ok(result.review.skipped.some((s) => s.file === 'broken-skill.json'));
+    assert.ok(result.warns.some((w) => w.includes('broken-skill.json') && w.includes('추출 중 오류(건너뜀)')));
+    assert.ok(result.warns.some((w) => w.includes('문항 전용 팩')));
+    const checked = PC.checkPack({ ...result.pack.meta, works: result.pack.works, sets: result.pack.sets, items: result.pack.items });
+    assert.deepStrictEqual(checked.errors, []);
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 console.log(`\nOK — ${passed}개 통과. 병합기는 자료 하나만 봐서는 못 하는 것을 한다.`);

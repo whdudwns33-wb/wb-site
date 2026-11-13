@@ -290,4 +290,74 @@ t('검수 부속물은 팩에 낼 것과 섞이지 않는다 — 섞이면 학�
   assert.ok(out.review.candidates.length > 0 && out.review.todo.length > 0);
 });
 
+t('한 span으로 합쳐진 정답 번호도 문항에 정확히 연결한다', () => {
+  const merged = structuredClone(doc);
+  const row = merged.pages[2].lines.find((l) => l.y === 194.3);
+  row.spans = [sp(66.7, '1) [정답] ④', { size: 7.9 })];
+  assert.strictEqual(buildDanwon(merged, { workIds: WORKS }).items[0].answer, 4);
+});
+
+t('단·쪽을 넘는 선지와 한 줄에 두 개인 선지를 빠짐없이 읽는다', () => {
+  const continued = structuredClone(doc);
+  const p = continued.pages[0];
+  const carry = p.lines.filter((l) => [477.7, 491.1, 504.8, 521.1].includes(l.y));
+  p.lines = p.lines.filter((l) => !carry.includes(l));
+  const shifted = carry.map((l, i) => ({ y: 55 + i * 2, spans: l.spans.map((s) => ({ ...s, x: s.x - 255.1 })) }));
+  continued.pages[1].lines.push(...shifted);
+  continued.pages[1].lines.sort((a, b) => a.y - b.y);
+  const first = buildDanwon(continued, { workIds: WORKS }).items[0];
+  assert.strictEqual(first.choices.length, 5);
+  assert.ok(first.choices[3].text.endsWith('다.'));
+  const inline = structuredClone(doc);
+  const secondPage = inline.pages[1];
+  secondPage.lines = secondPage.lines.filter((l) => ![204.6, 218.2, 231.7, 248, 261.4].includes(l.y));
+  secondPage.lines.push(ln(204.6, [sp(66.7, '① 마당 ② 침묵')]),
+    ln(230, [sp(66.7, '③ 눈 ④ 겨울')]), ln(260, [sp(66.7, '⑤ 문장')]));
+  secondPage.lines.sort((a, b) => a.y - b.y);
+  assert.deepStrictEqual(buildDanwon(inline, { workIds: WORKS }).items[1].choices.map((c) => c.text), ['마당', '침묵', '눈', '겨울', '문장']);
+});
+
+t('라벨과 본문이 같은 span이면 본문을 버리지 않고 상품 출처도 보존한다', () => {
+  const labeled = structuredClone(doc);
+  labeled.pages[0].lines.find((l) => l.y === 130.2).spans[0].text = '(가) 창작 도입 문장';
+  const result = buildDanwon(labeled, { workIds: WORKS, sourceSeries: '최다빈출 공략' });
+  assert.ok(result.review.candidates.find((c) => c.kind === 'setText').lines.includes('창작 도입 문장'));
+  assert.ok(result.items.every((i) => i.source.series === '최다빈출 공략'));
+});
+
+t('정답·선지가 불완전한 객관식은 검수로 내리고 이유와 초안을 남긴다', () => {
+  const incomplete = structuredClone(doc);
+  incomplete.pages[0].lines.find((l) => l.y === 521.1).spans[0].text = '끝 번호를 읽지 못한 선지';
+  const result = buildDanwon(incomplete, { workIds: WORKS });
+  assert.ok(!result.items.some((i) => i.source.no === 1));
+  const held = result.review.pending.find((p) => p.reason === 'incomplete-mc5');
+  assert.strictEqual(held.item.source.no, 1);
+  assert.strictEqual(held.item.answer, 4);
+});
+
+t('캡슐형 정답과 Tip·오답 point 라벨도 기존 해설 계약으로 읽는다', () => {
+  for (const label of ['오답 point', '1등급 공략 Tip']) {
+    const capsule = structuredClone(doc);
+    const row = capsule.pages[2].lines.find((l) => l.y === 194.3);
+    row.spans = [sp(66.7, '1)', { size: 7.9 }), sp(84, '정답', { size: 7, color: WHITE }), sp(110, '④', { size: 7.9 })];
+    capsule.pages[2].lines.find((l) => l.y === 206.3).spans = [sp(70, label, { size: 7, color: '#5e6fb5' })];
+    capsule.pages[2].lines.splice(capsule.pages[2].lines.findIndex((l) => l.y === 206.3) + 1, 0,
+      ln(210, [sp(66.7, '기다림을 나타낸다. ', { size: 7.9 })]));
+    capsule.pages[0].lines.push(ln(40, [sp(60, '[최다오답 공략]')]));
+    assert.strictEqual(U.detectSeries(capsule).extractor, 'danwon');
+    const result = buildDanwon(capsule, { workIds: WORKS });
+    assert.strictEqual(result.items[0].answer, 4);
+    assert.ok(result.items[0].explanation.main.includes('기다림을 나타낸다.'));
+  }
+});
+
+t('복수 정답은 하나로 줄여 채점하지 않고 검수로 남긴다', () => {
+  const multi = structuredClone(doc);
+  multi.pages[2].lines.find((l) => l.y === 194.3).spans[1].text = '[정답] ①, ④';
+  const result = buildDanwon(multi, { workIds: WORKS });
+  const held = result.review.pending.find((p) => p.reason === 'multi-answer');
+  assert.strictEqual(held.rawAnswer, '①, ④');
+  assert.ok(!result.items.some((i) => i.source.no === 1));
+});
+
 console.log(`\nOK — ${passed}개 통과. 초안은 초안이다 — 검수 게이트(§7[3])는 건너뛰지 않는다.`);
