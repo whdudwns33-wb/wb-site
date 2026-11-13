@@ -209,6 +209,19 @@ await t('반별 현황 — 반 전원이 분모, 번호별 오답률은 처음 �
   assert.ok(!JSON.stringify(c).includes('전류가 흐르기'), '반 현황에 답안 원문이 실린다');
 });
 
+await t('문항 영역(crops) — 저장·학생에게 전달, 정답 쪽·쪽 밖은 거절', async () => {
+  const R = (p, y) => [{ p, x: 0.05, y, w: 0.45, h: 0.2 }];
+  const crops = { 1: R(1, 0.1), 2: R(1, 0.4), 3: R(2, 0.1), 4: R(2, 0.4) };
+  const base = (await call(ADMIN, 'GET', '/sheet?id=sc-1')).body.sheet;
+  assert.match((await call(ADMIN, 'POST', '/admin/sheet', { id: 'sc-1', sheet: { ...base, crops: { ...crops, 4: R(3, 0.1) } } })).body.error, /문제 쪽을 벗어나/, '정답·해설 쪽(3쪽)을 가리키면 거절');
+  assert.match((await call(ADMIN, 'POST', '/admin/sheet', { id: 'sc-1', sheet: { ...base, crops: { 1: [{ p: 1, x: 0.8, y: 0, w: 0.5, h: 0.1 }] } } })).body.error, /좌표가 쪽을 벗어나/);
+  assert.strictEqual((await call(ADMIN, 'POST', '/admin/sheet', { id: 'sc-1', sheet: { ...base, crops: { ...crops, 99: R(1, 0.1) } } })).status, 200);
+  const got = (await call(S1, 'GET', '/sheet?id=sc-1')).body;
+  assert.deepStrictEqual(Object.keys(got.sheet.crops), ['1', '2', '3', '4'], '없는 문항(99번)의 영역은 버린다');
+  const fresh = (await call(S2, 'GET', '/sheet?id=sc-1')).body;
+  assert.ok(fresh.sheet.crops[1] && !('answers' in fresh) && fresh.sheet.questions.every((x) => !('answer' in x)), '영역은 나가도 정답은 제출 전에 안 나간다');
+});
+
 await t('닫으면 학생에게서 사라지고, 지우면 쪽 그림도 지워진다', async () => {
   await call(ADMIN, 'POST', '/admin/sheet', { id: 'sc-1', sheet: { ...SHEET, open: false } });
   assert.deepStrictEqual((await call(S2, 'GET', '/sheets')).body.sheets, []);

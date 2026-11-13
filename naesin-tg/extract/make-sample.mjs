@@ -5,12 +5,16 @@ import fs from 'node:fs';
 
 const W = 794, H = 1123;   // A4 96dpi
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const spans = [];   // 쪽마다 문항 덩어리의 세로 범위 — 문항 영역(한 문제씩 보기)을 만든다
 const page = (head, blocks) => {
-  let y = 110; let body = '';
+  let y = 110; let body = ''; const sp = [];
   for (const b of blocks) {
+    sp.push({ y0: y - 26 });
     for (const line of b) { body += `<text x="${line.startsWith(' ') ? 78 : 60}" y="${y}" font-size="${line.startsWith(' ') ? 17 : 19}"${line.startsWith(' ') ? '' : ' font-weight="700"'}>${esc(line.trim())}</text>`; y += 32; }
+    sp[sp.length - 1].y1 = y - 14;
     y += 34;
   }
+  spans.push(sp);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="'Noto Sans KR','Apple SD Gothic Neo',sans-serif" fill="#222A24">`
     + `<rect width="${W}" height="${H}" fill="#fff"/><text x="60" y="56" font-size="15" fill="#5F665C">${esc(head)}</text><line x1="60" y1="70" x2="${W - 60}" y2="70" stroke="#3E6B4A" stroke-width="2"/>${body}</svg>`;
   return 'data:image/svg+xml;base64,' + Buffer.from(svg).toString('base64');
@@ -38,6 +42,13 @@ const pages = [
   ]),
 ];
 
+/* 문항 i 의 영역 = 그 쪽 i 번째 덩어리(정답 쪽은 빼고). 비율로 적는다 — 서버·화면이 쪽 크기를 몰라도 된다. */
+const QPAGES = [1, 1, 1, 2, 2, 2];
+const crops = {};
+QPAGES.forEach((p, i) => {
+  const k = QPAGES.slice(0, i).filter((x) => x === p).length, b = spans[p - 1][k];
+  crops[i + 1] = [{ p, x: +(40 / W).toFixed(4), y: +(b.y0 / H).toFixed(4), w: +((W - 80) / W).toFixed(4), h: +((b.y1 - b.y0) / H).toFixed(4) }];
+});
 const out = {
   id: 'sample-sc-m2-elec-1',
   sheet: { title: '[체험] 전기 1회', subject: 'science', grade: '중2', unit: '체험', step: 3, kind: 'test', pages: 3, answerFrom: 3,
@@ -45,7 +56,7 @@ const out = {
       { no: 1, type: 'choice', page: 1, answer: '2' }, { no: 2, type: 'choice', page: 1, answer: '2' },
       { no: 3, type: 'short', page: 1, answer: '암페어|A' }, { no: 4, type: 'choice', page: 2, answer: '4' },
       { no: 5, type: 'choice', page: 2, answer: '1,3' }, { no: 6, type: 'essay', page: 2, answer: '' },
-    ] },
+    ], crops },
   pages,
 };
 fs.writeFileSync(new URL('../sheet-sample.json', import.meta.url), JSON.stringify(out));
