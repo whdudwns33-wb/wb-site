@@ -347,11 +347,13 @@ async function exchangeInvite(env, body, origin, json, request) {
       'task', studentId, access.updatedAt, guardian.identityHash),
     env.DB.prepare(
       'INSERT INTO guardian_portal_sessions(app,token_hash,student_id,guardian_identity_hash,access_updated_at,' +
-      'created_at,expires_at,last_seen_at,revoked) SELECT ?,?,?,?,?,?,?,?,0 ' +
+      'created_at,expires_at,last_seen_at,revoked) SELECT ?,?,?,?,?,' +
+      // 같은 밀리초 교환도 생성 순서가 남도록 직전 세션보다 1 크게 — 아래 「최근 N개만 남기기」가 이 순서를 쓴다
+      'max(?,COALESCE((SELECT MAX(created_at) FROM guardian_portal_sessions WHERE app=? AND student_id=?),0)+1),?,?,0 ' +
       'WHERE EXISTS (SELECT 1 FROM guardian_portal_codes WHERE app=? AND code_hash=? AND claim_id=? ' +
       'AND consumed_at IS NULL AND revoked=0)'
     ).bind('task', tokenHash, studentId, guardian.identityHash, access.updatedAt,
-      now, now + SESSION_TTL_MS, now, 'task', codeHash, claimId),
+      now, 'task', studentId, now + SESSION_TTL_MS, now, 'task', codeHash, claimId),
     env.DB.prepare(
       'UPDATE guardian_portal_sessions SET revoked=1 WHERE app=? AND student_id=? AND revoked=0 AND token_hash<>? ' +
       'AND token_hash NOT IN (SELECT token_hash FROM guardian_portal_sessions WHERE app=? AND student_id=? ' +
