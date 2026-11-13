@@ -3,6 +3,8 @@
 import assert from 'node:assert';
 import { extract, splitSource, parseJsonBlock, makeQuota, CHUNK_CHARS, KINDS, readExtractLimit, EXTRACT_QUOTA_DEFAULT } from './naesin-extract.mjs';
 import { dayKey } from './ai-quota.mjs';
+import CHECK from '../naesin/pack-check.js';
+import fs from 'node:fs';
 
 let n = 0;
 const t = async (name, fn) => { await fn(); n += 1; console.log('  ✓ ' + name); };
@@ -68,6 +70,26 @@ await t('model 인자로 모델을 바꿀 수 있다', async () => {
   const f = fakeFetch([{ text: wordsJson(['w-001']) }]);
   await extract({ kind: 'words', text: 'x', apiKey: 'k', model: 'claude-sonnet-5', fetchImpl: f });
   assert.strictEqual(f.calls[0].body.model, 'claude-sonnet-5');
+});
+
+await t('문법 예문 추출 양식은 학생 팩 관문과 같은 객체 형태다', async () => {
+  const f = fakeFetch([{ text: '{"patterns":[]}' }]);
+  await extract({ kind: 'patterns', text: '자체 작성 양식 검증', apiKey: 'test-fixture-key', fetchImpl: f });
+  const line = f.calls[0].body.messages[0].content.split('\n').find(s => s.startsWith('스키마: '));
+  const shape = JSON.parse(line.slice('스키마: '.length));
+  const sample = JSON.parse(fs.readFileSync(new URL('../naesin/pack-sample.json', import.meta.url), 'utf8'));
+  assert.deepStrictEqual(Object.keys(shape.patterns[0].textbookExamples[0]), ['en', 'ko', 'origin']);
+  assert.deepStrictEqual(CHECK.checkPack({ ...sample, patterns: shape.patterns }).errors, []);
+});
+
+await t('대화문 추출 양식에는 학생이 풀 핵심표현 빈칸 정답이 있다', async () => {
+  const f = fakeFetch([{ text: '{"dialogues":[]}' }]);
+  await extract({ kind: 'dialogues', text: '자체 작성 양식 검증', apiKey: 'test-fixture-key', fetchImpl: f });
+  const line = f.calls[0].body.messages[0].content.split('\n').find(s => s.startsWith('스키마: '));
+  const shape = JSON.parse(line.slice('스키마: '.length));
+  const sample = JSON.parse(fs.readFileSync(new URL('../naesin/pack-sample.json', import.meta.url), 'utf8'));
+  assert.equal(shape.keyExpressions[0].blankAnswer, '...');
+  assert.deepStrictEqual(CHECK.checkPack({ ...sample, ...shape }).errors, []);
 });
 
 await t('코드펜스·앞말이 붙어도 JSON만 떼어 파싱한다', async () => {

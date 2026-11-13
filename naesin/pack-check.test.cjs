@@ -12,6 +12,23 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const has = (list, frag) => list.some((x) => (x.where + ': ' + x.message).indexOf(frag) >= 0);
 
 console.log('pack-check — 팩 검사 규칙');
+t('원문 이미지는 해시만 받고 정답이 드러나는 본문 빈칸 원본은 거절한다',()=>{
+  const pack=clone(SAMPLE),row=pack.items[0];row.sourceImages=['a'.repeat(64)];row.sourceImageRequired=true;
+  assert.deepStrictEqual(CHECK.checkPack(pack).errors,[]);
+  for(const value of [[],['../db.json'],Array(4).fill('a'.repeat(64))]){row.sourceImages=value;assert.ok(CHECK.checkPack(pack).errors.length);}
+  row.sourceImages=['a'.repeat(64)];row.source='00';assert.ok(CHECK.checkPack(pack).errors.length);
+  delete row.sourceImages;assert.ok(CHECK.checkPack(pack).errors.length);
+});
+t('명시한 문제 전용 팩만 빈 단어·본문을 허용하고 빈 문항·잘못된 정답은 거절한다',()=>{
+  const pack={...clone(SAMPLE),contentMode:'questions',words:[],sentences:[]};
+  for(const key of CHECK.PACK_ARRAYS)if(!['items','words','sentences'].includes(key))delete pack[key];
+  delete pack.counts;
+  assert.deepStrictEqual(CHECK.checkPack(pack).errors,[]);
+  assert.ok(CHECK.checkPack({...pack,items:[]}).errors.length);
+  assert.ok(CHECK.checkPack({...pack,contentMode:'other'}).errors.length);
+  assert.ok(CHECK.checkPack({...pack,words:undefined}).errors.length);
+  const bad=clone(pack);bad.items[0].answer=[];assert.ok(CHECK.checkPack(bad).errors.length);
+});
 
 /* ── 기준선 ── */
 t('자체 창작 샘플 팩은 오류 0', () => {
@@ -25,7 +42,8 @@ t('빈 팩은 "검사할 내용 없음" + 필수 배열 둘', () => {
   assert.ok(has(r.errors, '검사할 팩 내용이 하나도 없음'));
   assert.ok(has(r.errors, 'words 가 비었음'));
   assert.ok(has(r.errors, 'sentences 가 비었음'));
-  assert.strictEqual(r.errors.length, 3);
+  assert.equal(r.errors.filter((e) => e.message.includes('권리 확인')).length, 1);
+  assert.equal(r.errors.filter((e) => /words 가 비었음|sentences 가 비었음|검사할 팩 내용/.test(e.message)).length, 3);
 });
 
 /* ── 필수 배열 (2026-09-03 결함) ──
@@ -35,7 +53,7 @@ t('빈 팩은 "검사할 내용 없음" + 필수 배열 둘', () => {
    오류 메시지도 없이 '교재를 불러오는 중…' 에 멈춘다.
    전에는 이런 팩이 오류 0·경고 0 으로 배포 관문을 통과했다. */
 t('문장만 있는 팩은 배포를 막는다 — words 없이는 학생 앱이 안 뜬다', () => {
-  const p = { packId: SAMPLE.packId, sentences: clone(SAMPLE.sentences) };
+  const p = { packId: SAMPLE.packId, rights: clone(SAMPLE.rights), sentences: clone(SAMPLE.sentences) };
   const r = CHECK.checkPack(p);
   assert.ok(has(r.errors, 'words 가 비었음'), '막지 못했다: ' + JSON.stringify(r.errors));
   assert.ok(has(r.errors, 'WORD TEST'), '어느 자료가 필요한지 알려 줘야 한다');
@@ -43,7 +61,7 @@ t('문장만 있는 팩은 배포를 막는다 — words 없이는 학생 앱이
 });
 
 t('단어만 있는 팩도 막는다 — sentences 없이는 본문·홈·성취도가 죽는다', () => {
-  const p = { packId: SAMPLE.packId, words: clone(SAMPLE.words) };
+  const p = { packId: SAMPLE.packId, rights: clone(SAMPLE.rights), words: clone(SAMPLE.words) };
   const r = CHECK.checkPack(p);
   assert.ok(has(r.errors, 'sentences 가 비었음'), '막지 못했다: ' + JSON.stringify(r.errors));
   assert.ok(has(r.errors, '본문 워크북'));
@@ -57,9 +75,9 @@ t('배열이 있어도 비면 막는다 — 검수에서 전 행을 버린 경�
 });
 
 t('둘 다 있으면 통과 — 나머지 종류는 없어도 된다', () => {
-  const p = { packId: SAMPLE.packId, words: clone(SAMPLE.words), sentences: clone(SAMPLE.sentences) };
+  const p = { packId: SAMPLE.packId, rights: clone(SAMPLE.rights), words: clone(SAMPLE.words), sentences: clone(SAMPLE.sentences) };
   const r = CHECK.checkPack(p);
-  assert.deepStrictEqual(r.errors, [], '대화문·패턴·문항이 없다고 막으면 안 된다: ' + JSON.stringify(r.errors));
+  assert.deepStrictEqual(r.errors, [], '자체 제작 권리를 명시한 팩은 통과해야 한다: ' + JSON.stringify(r.errors));
 });
 
 t('팩이 객체가 아니면 오류', () => {
@@ -289,9 +307,81 @@ t('저장 문항 — 정답이 보기 label에 없으면 오류', () => {
 
 t('저장 문항 — 보기 없는 낱말 정답은 단어 마스터와 대조(경고)', () => {
   const p = clone(SAMPLE);
-  p.items = [{ no: 1, formatType: 'short', answer: ['zzzznotaword'] }];
+  p.items = [{ no: 1, formatType: 'short', instructionKo: 'Write the answer.', answer: ['zzzznotaword'] }];
   const r = CHECK.checkPack(p);
+  assert.deepStrictEqual(r.errors, []);
   assert.ok(has(r.warns, '단어 마스터에 없음'));
+});
+
+t('저장 문항 — 고유 id와 기존 자료별 복합키를 구분한다', () => {
+  const p = clone(SAMPLE), item = clone(p.items[0]);
+  delete item.id;
+  p.items = [{ ...item, source: '04', section: 'own' }, { ...item, source: '05', section: 'own' }];
+  assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '다른 자료의 같은 번호는 허용한다');
+  p.items[1].source = '04';
+  assert.ok(has(CHECK.checkPack(p).errors, '복합키 중복'));
+  p.items = [{ ...item, id: 'ic-04-00-001' }, { ...item, id: 'ic-05-00-001' }];
+  assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '새 id가 원행을 구분한다');
+  p.items[1].id = p.items[0].id;
+  assert.ok(has(CHECK.checkPack(p).errors, 'id 중복'));
+  for (const id of ['', null, '../private', 'x'.repeat(61), '한글']) {
+    p.items = [{ ...item, id }];
+    assert.ok(has(CHECK.checkPack(p).errors, 'id 형식'), String(id));
+  }
+});
+
+t('저장 문항 — 번호가 겹친 기존 문항의 위치 키가 학생 러너의 길이·인코딩 제한을 지킨다', () => {
+  const p = clone(SAMPLE), item = clone(p.items[0]); delete item.id; delete item.footnoteNo; item.no = 7;
+  const pair = section => [{ ...item, source: '04', section }, { ...item, source: '05', section }];
+  p.items = pair('한글 원문'); assert.deepStrictEqual(CHECK.checkPack(p).errors, []);
+  p.items = pair('x'.repeat(2036)); assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '2048자 키는 허용한다');
+  for (const section of ['x'.repeat(2037), '한'.repeat(230)]) {
+    p.items = pair(section); assert.ok(has(CHECK.checkPack(p).errors, '2048자'), '긴 중복 번호 위치는 게시하지 않는다');
+  }
+  p.items = pair('\ud800'); assert.ok(has(CHECK.checkPack(p).errors, '인코딩할 수 없음'));
+  p.items = [{ ...item, source: '04', section: '한'.repeat(230) }]; assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '고유 번호의 i-7 기존 키는 바꾸지 않는다');
+  p.items = pair('한'.repeat(230)).map((row, i) => ({ ...row, id: 'own-' + i })); assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '새 id 문항은 위치 키를 쓰지 않는다');
+});
+
+t('저장 문항 — 번호·출처·유형·문항문 없는 문항은 게시하지 않는다', () => {
+  for (const mutate of [
+    row => { row.no = 0; }, row => { row.no = '1'; }, row => { row.footnoteNo = -1; },
+    row => { row.source = ''; }, row => { row.section = ' '; }, row => { row.formatType = 'unknown'; },
+    row => { row.instructionKo = ''; row.stimulus = { type: 'text', parts: [] }; },
+  ]) {
+    const p = clone(SAMPLE); p.items = [clone(p.items[0])]; mutate(p.items[0]);
+    assert.ok(CHECK.checkPack(p).errors.length > 0, JSON.stringify(p.items[0]));
+  }
+  const p = clone(SAMPLE); p.items = [{ ...p.items[0], instructionKo: '', stimulus: { type: 'text', parts: [{ text: 'Own context.' }] }, footnoteNo: null }];
+  assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '지문만 있는 기존 문항과 null 각주는 유지한다');
+});
+
+t('저장 문항 — 객관식 보기·정답·선택 개수는 실제 채점 가능해야 한다', () => {
+  for (const mutate of [
+    row => { row.choices = []; }, row => { row.choices[0].text = ''; },
+    row => { row.choices[0].label = true; }, row => { row.choices[1].label = row.choices[0].label; },
+    row => { row.answer = ['']; }, row => { row.answer = [true]; },
+    row => { row.answer = [row.answer[0], row.answer[0]]; row.answerCount = 2; },
+    row => { row.answerCount = 2; }, row => { row.answerCount = 0; },
+  ]) {
+    const p = clone(SAMPLE); p.items = [clone(p.items[0])]; mutate(p.items[0]);
+    assert.ok(CHECK.checkPack(p).errors.length > 0, JSON.stringify(p.items[0]));
+  }
+  const p = clone(SAMPLE), row = clone(p.items[0]);
+  row.choices[0] = { label: 1, tuple: ['Own', 'tuple'] }; row.answer = [1]; row.promptKo = row.instructionKo; delete row.instructionKo;
+  p.items = [row]; assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '숫자 라벨·tuple·기존 문항문 별칭을 유지한다');
+});
+
+t('저장 문항 — 주관식 허용 답안은 선택 개수와 별개이며 빈 답·보기를 막는다', () => {
+  const own = { no: 1, formatType: 'short', stem: 'Write the answer.', answer: ['Own first answer', 'Own second answer'], answerCount: 1 };
+  for (const choices of [undefined, null, []]) {
+    const p = clone(SAMPLE); p.items = [{ ...own, choices }];
+    assert.deepStrictEqual(CHECK.checkPack(p).errors, []);
+  }
+  for (const patch of [{ answer: [''] }, { answer: [true] }, { answer: ['Own answer', '  OWN   ANSWER '] }, { choices: [{ label: '1', text: 'Own choice' }] }, { answerCount: -1 }]) {
+    const p = clone(SAMPLE); p.items = [{ ...own, ...patch }];
+    assert.ok(CHECK.checkPack(p).errors.length > 0, JSON.stringify(patch));
+  }
 });
 
 t('itemsLabel 로 문항 섹션 이름을 바꿀 수 있다', () => {
@@ -312,12 +402,32 @@ t('섹션 함수를 따로 부를 수 있다', () => {
    (필수 배열 관문은 별개로 걸리므로, 그 한 줄만 남는 것이 정상) */
 t('없는 섹션의 내용은 검사하지 않는다', () => {
   const r = CHECK.checkPack({ words: [{ id: 'w1', headword: 'sea', meaningKo: ['바다'], sections: ['reading'] }] });
-  assert.strictEqual(r.errors.length, 1, JSON.stringify(r.errors));
+  assert.equal(r.errors.filter((e) => e.where === 'rights').length, 1, JSON.stringify(r.errors));
+  assert.ok(r.errors.some((e) => e.message.includes('sentences 가 비었음')), JSON.stringify(r.errors));
   assert.ok(has(r.errors, 'sentences 가 비었음'), JSON.stringify(r.errors));
   assert.strictEqual(r.summary.length, 1);
 });
 
 /* ── 본문 단어 · 난이도 (§4.4 v1.3) ── */
+
+t('구조화된 다의어는 순번·정확한 필드·영한 예문·뜻 배열이 모두 맞아야 통과한다', () => {
+  const valid = { id: 'w-sense', headword: 'gate', meaningKo: ['탑승구', '문'], sections: ['reading'], senses: [
+    { senseNo: 1, pos: 'n.', meaningKo: '탑승구', example: { en: 'Our plane will leave from Gate 18.', ko: '우리 비행기는 18번 탑승구에서 출발한다.' } },
+    { senseNo: 2, pos: 'n.', meaningKo: '문', example: { en: 'The farmer closed the gate.', ko: '농부는 문을 닫았다.' } },
+  ] };
+  const validCollector = CHECK.collector({}); CHECK.checkWords({ words: [valid] }, validCollector);
+  assert.deepStrictEqual(validCollector.errors, []); assert.ok(validCollector.summary[0].includes('다의어 1'), validCollector.summary[0]);
+  const mutations = [
+    (w) => { w.senses[0].senseNo = 2; },
+    (w) => { w.senses[0].pos = 7; },
+    (w) => { w.senses[0].extra = 'forbidden'; },
+    (w) => { w.senses[0].example.extra = 'forbidden'; },
+    (w) => { w.senses[0].example.en = ''; },
+    (w) => { w.senses[0].meaningKo = ''; },
+    (w) => { w.senses.push({ senseNo: 3, pos: 'n.', meaningKo: '더', example: { en: 'More.', ko: '더.' } }, { senseNo: 4, pos: 'n.', meaningKo: '더', example: { en: 'More.', ko: '더.' } }); },
+  ];
+  for (const mutate of mutations) { const row = clone(valid); mutate(row); const c = CHECK.collector({}); CHECK.checkWords({ words: [row] }, c); assert.ok(c.errors.length, JSON.stringify(row)); }
+});
 
 t('단어 난이도 — 1·2·3만 통과, 그 밖의 값은 오류', () => {
   const mk = (level) => ({ words: [{ id: 'w1', headword: 'sea', meaningKo: ['바다'], sections: ['reading'], level: level }] });
@@ -366,6 +476,67 @@ t('문장만 따로 검사할 때는 wordIds 를 대조하지 않는다(단어 �
   const c = CHECK.collector({});
   CHECK.checkSentences({ sentences: [{ seq: 1, dayGroup: '8/1', en: 'A', ko: '가', wordIds: ['아무거나'] }] }, c);
   assert.ok(!has(c.errors, 'words 에 없는 id'), JSON.stringify(c.errors));
+});
+
+t('학생 팩은 최상위·행·중첩 행의 검수 원천을 거부한다', () => {
+  const mutations = [
+    (p) => { p.reviewed = false; }, (p) => { p.publishable = false; },
+    (p) => { p.raw = '합성 원천'; }, (p) => { p.wordCandidates = [{}]; },
+    (p) => { p.words[0].reviewed = false; }, (p) => { p.words[0].source = { path: '합성' }; },
+    (p) => { p.words[0]._pdfReview = { flags: [], locations: [] }; },
+    (p) => { p.words[0].example.raw = '합성'; },
+    (p) => { p.sentences[0].chunks[0].evidence = '합성'; },
+    (p) => { p.items[0].stimulus.parts[0].flags = []; },
+    (p) => { p.words[0].meaningKo = [{ raw: '합성' }]; },
+  ];
+  mutations.forEach((mutate) => {
+    const p = clone(SAMPLE); mutate(p);
+    const r = CHECK.checkPack(p);
+    assert.ok(r.errors.length, '부속물이 통과하면 안 된다');
+  });
+});
+
+t('기존 메타·선택 배열·중첩 학습 필드는 보존한다', () => {
+  const p = clone(SAMPLE);
+  p.source = '자체 창작'; p.notes = ['검수 완료'];
+  p.school = '합성학교'; p.gradeSem = '2-1'; p.exam = '연습';
+  p.keyExpressions = [{ en: 'Good morning.', ko: '좋은 아침.', blankAnswer: 'morning' }];
+  p.functions = [{ name: '인사', pattern: 'Good morning.', explainKo: '아침 인사' }];
+  p.vocabSidebar = [{ en: 'sun', ko: '해' }]; p.readingQA = [{ q: 'When?', a: 'Morning.' }];
+  p.words[0].senses = null; p.words[0].irregularForms = null;
+  p.items[0].source = '자체 창작'; p.items[0].section = '연습';
+  assert.deepStrictEqual(CHECK.checkPack(p).errors, []);
+});
+
+t('학생 생성기를 깨뜨리는 truthy 배열·중첩 형태는 throw 없이 오류로 막는다', () => {
+  const mutations = [
+    (p) => { p.words[0].synonyms = {}; }, (p) => { p.words[0].senses = {}; },
+    (p) => { p.words[0].antonyms = 'wrong'; }, (p) => { p.sentences[0].chunks = {}; },
+    (p) => { p.sentences[0].keywords = {}; }, (p) => { p.sentences.find((s) => s.grammarChoices && s.grammarChoices.length).grammarChoices[0].options = {}; },
+    (p) => { p.patterns[0].grammarPoint = [{}]; }, (p) => { p.dialogues[0].lines = {}; },
+    (p) => { p.source = { raw: '합성' }; },
+  ];
+  mutations.forEach((mutate) => {
+    const p = clone(SAMPLE); mutate(p);
+    let r; assert.doesNotThrow(() => { r = CHECK.checkPack(p); });
+    assert.ok(r.errors.length);
+  });
+});
+
+t('대화문 lines와 핵심표현 en/정답 누락은 학생 화면이 멈추기 전에 차단한다', () => {
+  const mutations = [
+    (p) => { delete p.dialogues[0].lines; }, (p) => { p.dialogues[0].lines = null; },
+    (p) => { p.dialogues[0].lines = []; },
+    (p) => { p.keyExpressions = [{ ko: '합성', blankAnswer: 'morning' }]; },
+    (p) => { p.keyExpressions = [{ en: null, ko: '합성', blankAnswer: 'morning' }]; },
+    (p) => { p.keyExpressions = [{ en: 'Good morning.', ko: '좋은 아침.' }]; },
+    (p) => { p.keyExpressions = [{ en: 'Good morning.', ko: '좋은 아침.', blankAnswer: 'night' }]; },
+  ];
+  mutations.forEach((mutate) => {
+    const p = clone(SAMPLE); mutate(p);
+    let r; assert.doesNotThrow(() => { r = CHECK.checkPack(p); });
+    assert.ok(r.errors.length);
+  });
 });
 
 console.log('\n통과 ' + n + '개 — 팩 검사 규칙 검증 완료');
