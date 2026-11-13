@@ -447,7 +447,14 @@ async function fullDump(env) {
   const letter = await dumpLetter(letterStore(env));
   /* 어휘브레인 — 목록(메타)·학생 기록·배정. 단어장 본문은 내신 팩과 같은 이유로 id 만 */
   const hanja = await dumpHanja(hanjaStore(env));
-  return { service: 'wb-reading', savedAt: nowIso(), students, portalFamilies, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk, letter, hanja };
+  /* 탐구브레인 — 학생 기록·시험 배정·과제와 문제지 목록(메타). 문제지 본문·쪽 그림은 구매 자료라 팩과 같은 이유로 뺀다.
+     로컬 store.naesinTgSnapshot 과 같은 모양. */
+  const naesinTg = { sheetIds: (await env.DB.get('naesintg:sheets', 'json')) || [], states: {}, exams: {},
+    tasks: (await env.DB.get('naesintg:tasks', 'json')) || [] };
+  for (const [pre, tgt] of [['naesintg:state:', naesinTg.states], ['naesintg:exam:', naesinTg.exams]]) {
+    for (const k of await kvListAll(env, pre)) tgt[k.slice(pre.length)] = await env.DB.get(k, 'json');
+  }
+  return { service: 'wb-reading', savedAt: nowIso(), students, portalFamilies, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk, letter, hanja, naesinTg };
 }
 
 async function snapshotBackup(env) {
