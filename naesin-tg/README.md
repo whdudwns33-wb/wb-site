@@ -12,10 +12,12 @@
 ```
 naesin-tg/
   index.html          학생 앱 (탭: 오늘·개념·문제·오답·성취도 + 풀이 화면: 왼쪽 지면, 오른쪽 답안 칸)
+  manifest.webmanifest · sw.js   홈 화면 설치(PWA). SW 는 셸만 캐시하고 /api/(문제지·쪽 그림·정답)는 건드리지 않는다
   sheet-sample.json   자체 창작 체험 문제지(전기 6문항, SVG 3쪽) — 저장소에 있는 유일한 문제지
   extract/
     build-sheet.mjs   PDF → 올릴 문제지 파일(쪽마다 JPEG). 오프라인 도구, poppler 필요
     make-sample.mjs   sheet-sample.json 을 다시 만든다
+    upload-sheets.mjs 문제지 파일 여러 개를 운영에 닫힌 채로 올린다(관리 웹 대신 터미널, enroll.mjs 와 같은 관리 로그인)
 reading-server/
   naesin-tg-api.mjs            /api/naesin-tg/* (worker.mjs·server.mjs 양쪽에 등록)
   public/naesin-tg-admin.html  관리 웹 — 올리기·정답 입력·열기/닫기·시험 배정·과제·반별/학생별 현황·서술형 확정
@@ -25,7 +27,10 @@ reading-server/
 
 1. 저장소 **밖** 작업 폴더에서 `node naesin-tg/extract/build-sheet.mjs <PDF> --id sc-m2-7-1-top-1` → `<id>.sheet.json`.
    PDF 도, 이 파일도 커밋하지 않는다(절대 규칙 1). 외부 AI 로 보내지 않는다.
-2. 관리 웹에서 그 파일을 고른다. 과목·학년·단원·단계, **정답·해설이 시작하는 쪽**, 문항 수를 확인한다.
+2. 관리 웹에서 그 파일을 고른다. **여러 개면 한꺼번에 고른다**(⌘A, 국어 관리 웹과 같다) — 모두 닫힌 채로 올라가고 이미 있는 문제지는 건너뛴다. 터미널에서 올릴 수도 있다:
+   `ADMIN_PIN=… node naesin-tg/extract/upload-sheets.mjs <폴더> [--first id,id] [--dry]` — 모두 **닫힌 채로**,
+   서버에 이미 있는 id 는 건너뛴다(정답·「열기」를 지우지 않게. 덮어쓰려면 `--force`). 그다음 관리 웹에서 하나씩 연다.
+   (관리 웹에서 하나씩 올릴 때는) 과목·학년·단원·단계, **정답·해설이 시작하는 쪽**, 문항 수를 확인한다.
 3. 번호별로 유형(객관식·단답·서술형), 있는 쪽, 정답을 넣는다. 객관식은 `3`, 복수 정답은 `1,3`, 단답은 `도체|전도체`.
    정답 자동 읽기는 없다 — 족보닷컴 지면은 정답의 동그라미 숫자가 글자층에 없다(2026-11-12 실측).
 4. 「정답을 확인했고 학생에게 엽니다」를 켜고 저장. 정답이 비었거나 쪽 그림이 빠지면 서버가 열기를 거절한다.

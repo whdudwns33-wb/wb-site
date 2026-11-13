@@ -159,7 +159,7 @@ jobs:
       - name: 국어브레인 서버 라우트 테스트
         run: node reading-server/naesin-ko-api.test.mjs
       - name: 탐구브레인 서버 라우트·변환 도구 테스트
-        run: node reading-server/naesin-tg-api.test.mjs && node naesin-tg/extract/build-sheet.test.mjs
+        run: node reading-server/naesin-tg-api.test.mjs && node naesin-tg/extract/build-sheet.test.mjs && node naesin-tg/extract/upload-sheets.test.mjs
       - name: 어휘브레인 순수 로직 테스트 (단어장 검사·SRS·문항·따라쓰기 판정)
         run: for f in hanja/*.test.cjs; do node "$f" || exit 1; done
       - name: 어휘브레인 체험 단어장 검증 (book-validate)
