@@ -130,6 +130,8 @@ jobs:
         run: node scripts/docs-sync.test.mjs
       - name: 내신브레인 AI 추출 테스트
         run: node reading-server/naesin-extract.test.mjs
+      - name: 내신브레인 로컬 PDF 초안 추출 규칙 검증
+        run: node naesin/extract/draft.test.mjs
       - name: 내신브레인 수업 라이브 세션 테스트
         run: node reading-server/naesin-live.test.mjs
       - name: 내신브레인 시험 결과 분석·예측 테스트
