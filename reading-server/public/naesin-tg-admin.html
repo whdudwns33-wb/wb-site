@@ -71,7 +71,7 @@ async function refresh() {
 }
 
 function upForm() {
-  if (!UP) return '<p class="muted">PDF 를 <code>build-sheet.mjs</code> 로 바꾼 JSON 파일을 고르세요. 이미 올린 문제지를 고치려면 아래 목록에서 [고치기]를 누르세요.</p><input type="file" id="file" accept=".json,application/json">';
+  if (!UP) return '<p class="muted">PDF 를 <code>build-sheet.mjs</code> 로 바꾼 <code>.sheet.json</code> 파일을 고르세요. <b>여러 개를 한꺼번에 고르면</b>(⌘A) 모두 닫힌 채로 올라가고, 이미 있는 문제지는 건너뜁니다. 이미 올린 문제지를 고치려면 아래 목록에서 [고치기]를 누르세요.</p><input type="file" id="file" multiple accept=".json,application/json">';
   const s = UP.sheet;
   const opt = (v, cur, label) => '<option value="' + v + '"' + (String(cur) === String(v) ? ' selected' : '') + '>' + label + '</option>';
   return '<div class="grid">'
@@ -171,7 +171,29 @@ async function save() {
   refresh();
 }
 
+/* 여러 개 한꺼번에 — 국어 관리 웹처럼 파일을 전부 골라 올린다. 모두 닫힌 채(정답·열기는 하나씩 [고치기]에서),
+   이미 있는 id 는 건너뛴다(강사가 넣은 정답과 「열기」를 덮어쓰지 않게). 정보 → 쪽 그림 순서라 끊겨도 학생에게 안 보인다. */
+async function bulkUpload(files) {
+  const have = new Set(SHEETS.map((x) => x.id));
+  const list = files.filter((f) => f.name.endsWith('.sheet.json'));
+  let ok = 0, skip = 0; const bad = [];
+  for (let k = 0; k < list.length; k += 1) {
+    try {
+      const j = JSON.parse(await list[k].text());
+      if (!j.id || !j.sheet || !Array.isArray(j.pages)) throw new Error('문제지 파일이 아니에요');
+      if (have.has(j.id)) { skip += 1; continue; }
+      MSG = '올리는 중 ' + (k + 1) + ' / ' + list.length + ' — ' + (j.sheet.title || j.id); render();
+      await post('/admin/sheet', { id: j.id, sheet: { ...j.sheet, pages: j.pages.length, open: false } });
+      for (let i = 0; i < j.pages.length; i += 1) await post('/admin/page', { id: j.id, n: i + 1, data: j.pages[i] });
+      ok += 1;
+    } catch (err) { if (err.message === 'auth') return; bad.push(list[k].name + ': ' + err.message); }
+  }
+  MSG = (bad.length ? '!' : '') + '올림 ' + ok + ' · 건너뜀(이미 있음) ' + skip + ' · 실패 ' + bad.length + (bad.length ? ' — ' + bad.slice(0, 5).join(' / ') : '') + '. 모두 닫힌 채입니다.';
+  refresh();
+}
+
 document.addEventListener('change', (e) => {
+  if (e.target.id === 'file' && e.target.files.length > 1) return bulkUpload([...e.target.files]);
   if (e.target.id === 'file' && e.target.files[0]) {
     e.target.files[0].text().then((t) => {
       const j = JSON.parse(t);
