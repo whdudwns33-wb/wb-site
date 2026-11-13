@@ -323,7 +323,12 @@
 'use strict';
 /* ───────────────────────── 상수 ───────────────────────── */
 const KEY='wbr.v1';
-const NAESIN_LINK=(()=>{try{return new URLSearchParams(location.search).get('app')==='naesin';}catch(e){return false;}})();
+/* ?app=<앱> — 진로독서를 띄우지 않고 학생 연동만 한 뒤 그 앱으로 돌려보낸다(내신브레인·탐구브레인이 로그인 화면으로 쓴다).
+   probe 는 연동이 살아 있는지 그 앱 API 로 확인하는 경로다. */
+const LINK_APPS={naesin:{path:'/naesin/',name:'내신브레인',probe:'/naesin/exam'},'naesin-tg':{path:'/naesin-tg/',name:'탐구브레인',probe:'/naesin-tg/sheets'}};
+const LINK_KEY=(()=>{try{const a=new URLSearchParams(location.search).get('app');return Object.prototype.hasOwnProperty.call(LINK_APPS,a)?a:null;}catch(e){return null;}})();
+const LINK_APP=LINK_KEY?LINK_APPS[LINK_KEY]:null;
+const NAESIN_LINK=!!LINK_APP;
 const GRADES=[['k7','7세'],['e1','초1'],['e2','초2'],['e3','초3'],['e4','초4'],['e5','초5'],['e6','초6'],['m1','중1'],['m2','중2'],['m3','중3'],['h1','고1'],['h2','고2'],['h3','고3']];
 const LEVEL_OF={k7:'L1',e1:'L1',e2:'L1',e3:'L2',e4:'L2',e5:'L2',e6:'L2',m1:'L3',m2:'L3',m3:'L3',h1:'L4',h2:'L4',h3:'L4'};
 const LEVELS=['L1','L2','L3','L4'];
@@ -690,7 +695,7 @@ function syncRequest(code){
 function finishSync(j){
   SYNC.auth={code:j.student.code,name:j.student.name,token:j.token,lastSync:null};
   syncSaveAuth();sess.pend=null;sess.syncErr=null;sess.syncCode=null;pendStop();
-  if(NAESIN_LINK){location.replace('/naesin/');return Promise.resolve();}
+  if(NAESIN_LINK){location.replace(LINK_APP.path);return Promise.resolve();}
   return syncPull(true).then(()=>syncPush()).then(()=>{
     /* 연동 순간 서버에 있던 기록을 받아 온다. 전에 쓰던 학생이면 프로필까지
        돌아오므로 학년을 다시 물을 이유가 없다 — 곧장 하던 자리로 보낸다. */
@@ -729,22 +734,22 @@ function syncPoll(loud){
 function consumeCodeLink(){
   let c=null;
   try{c=new URLSearchParams(location.search).get('c');}catch(e){}
-  if(c)try{history.replaceState(null,'',location.pathname+(NAESIN_LINK?'?app=naesin':''));}catch(e){}   // 주소창에 코드를 남기지 않는다
+  if(c)try{history.replaceState(null,'',location.pathname+(NAESIN_LINK?'?app='+LINK_KEY:''));}catch(e){}   // 주소창에 코드를 남기지 않는다
   return c;
 }
 async function startNaesinLink(code){
   const request=++SYNC_REQUEST;pendStop();sess.pend=null;sess.ob={step:'link'};view={name:'onboard'};
   const initialAuth=SYNC.auth;
   if(code)sess.syncCode=code;
-  document.title='WB 내신브레인 · 학생 연동';
-  const brand=$('.brand'),swap=$('.swap');if(brand)brand.textContent='WB 내신브레인 · 학생 연동';if(swap)swap.remove();
+  document.title='WB '+LINK_APP.name+' · 학생 연동';
+  const brand=$('.brand'),swap=$('.swap');if(brand)brand.textContent='WB '+LINK_APP.name+' · 학생 연동';if(swap)swap.remove();
   await syncHealth();if(request!==SYNC_REQUEST||!syncAuthCurrent(initialAuth))return;
   if(SYNC.auth&&code&&String(SYNC.auth.code)!==String(code).trim()){SYNC.auth=null;syncSaveAuth();}
   if(SYNC.avail&&SYNC.auth){
     const auth=SYNC.auth;
     try{
-      await syncApi('/naesin/exam');if(request!==SYNC_REQUEST||SYNC.auth!==auth)return;
-      location.replace('/naesin/');return;
+      await syncApi(LINK_APP.probe);if(request!==SYNC_REQUEST||SYNC.auth!==auth)return;
+      location.replace(LINK_APP.path);return;
     }catch(e){if(request!==SYNC_REQUEST)return;sess.syncErr=e.message;}
   }
   navSet(view,true);render();
@@ -762,13 +767,13 @@ function vOnboard(){
   if(NAESIN_LINK)st.step='link';
   else if(st.step==='link'&&!SYNC.avail)st.step='grade';
   if(st.step==='link'){
-    if(NAESIN_LINK&&!SYNC.avail)return'<div class="card"><h1>내신브레인 학생 연동</h1><p class="sub">학원 서버에 연결하지 못했어요. 학원 내 학습 주소와 네트워크를 확인하세요.</p><button class="btn" data-act="naesin-link-retry">연결 다시 확인</button></div>';
-    return `<div class="card hero"><p class="eyebrow">시작하기</p><h1>${NAESIN_LINK?'내신브레인 학생 연동':'학생 코드가 있나요?'}</h1>
+    if(NAESIN_LINK&&!SYNC.avail)return'<div class="card"><h1>'+LINK_APP.name+' 학생 연동</h1><p class="sub">학원 서버에 연결하지 못했어요. 학원 내 학습 주소와 네트워크를 확인하세요.</p><button class="btn" data-act="naesin-link-retry">연결 다시 확인</button></div>';
+    return `<div class="card hero"><p class="eyebrow">시작하기</p><h1>${NAESIN_LINK?LINK_APP.name+' 학생 연동':'학생 코드가 있나요?'}</h1>
       ${sess.pend?`<p class="sub" style="margin-top:9px"><b>${esc(sess.pend.name||'')}</b> — 선생님 승인을 기다리는 중이에요.</p>
         <div class="note">선생님이 관리 화면에서 <b>승인</b>을 눌러 주시면 바로 연결됩니다. 옆에 계시면 지금 말씀드리세요.</div>
         <div class="row2"><button class="btn sm ghost" data-act="sync-cancel">취소</button>
         <button class="btn sm" data-act="sync-check">지금 확인</button></div>`
-      :`<p class="sub">${NAESIN_LINK?'선생님께 받은 학생 코드를 입력하세요. 선생님이 승인하면 내신브레인으로 바로 이동하고, 학원 안에서 학습한 기록이 이 PC 서버에 저장됩니다.':'선생님께 받은 코드를 넣으면 <b>기록이 학원 서버에도 저장돼요.</b> 휴대폰을 바꾸거나 앱을 지웠다가 다시 깔아도 읽은 글과 심은 낱말이 그대로 이어집니다. 전에 쓰던 코드라면 하던 데서 바로 이어서 해요.'}</p>
+      :`<p class="sub">${NAESIN_LINK?'선생님께 받은 학생 코드를 입력하세요. 선생님이 승인하면 '+LINK_APP.name+'으로 바로 이동'+(LINK_KEY==='naesin'?'하고, 학원 안에서 학습한 기록이 이 PC 서버에 저장됩니다.':'해요.'):'선생님께 받은 코드를 넣으면 <b>기록이 학원 서버에도 저장돼요.</b> 휴대폰을 바꾸거나 앱을 지웠다가 다시 깔아도 읽은 글과 심은 낱말이 그대로 이어집니다. 전에 쓰던 코드라면 하던 데서 바로 이어서 해요.'}</p>
         <input type="text" id="obCode" placeholder="학생 코드 (예: wb-a2b3c4)" value="${esc(sess.syncCode||'')}" autocomplete="off" autocapitalize="off" spellcheck="false">
         <button class="btn" data-act="ob-link">연동하고 시작하기</button>
         ${NAESIN_LINK?'':'<button class="btn ghost sm" data-act="ob-skip-link">코드 없이 둘러보기</button><p class="note">코드 없이 시작하면 이 기기 브라우저에만 저장돼요. 나중에 설정에서 연동할 수 있지만, 그 전에 브라우저 기록을 지우면 되살릴 수 없어요.</p>'}`}
