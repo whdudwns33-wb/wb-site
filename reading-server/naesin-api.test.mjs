@@ -267,6 +267,10 @@ await t('팩 목록 — 비어 있으면 빈 배열, 같은 id 재업로드는 �
   await up('dummy-e2-mid1');   // 검수 후 재업로드 — 목록에는 한 번만
   const list = await call(store, { path: '/api/naesin/admin/packs', who: ADMIN });
   assert.deepStrictEqual(list.body.packs, ['dummy-e2-mid1', 'dummy-e2-fin1'], '재업로드는 중복으로 안 쌓인다');
+  // 관리 화면의 한글 팩 이름 — 학년·교과서·문항 수가 팩마다 따라온다
+  assert.deepStrictEqual(Object.keys(list.body.meta), ['dummy-e2-mid1', 'dummy-e2-fin1']);
+  assert.strictEqual(list.body.meta['dummy-e2-mid1'].textbook, PACK.textbook || null);
+  assert.strictEqual(list.body.meta['dummy-e2-mid1'].items, (PACK.items || []).length);
 });
 
 await t('[B7] 팩 삭제 — 배정 중이면 409(참조 scope 목록), 아니면 삭제 + 목록에서 제거, 없어도 ok', async () => {
