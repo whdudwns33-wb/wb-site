@@ -64,6 +64,94 @@ export function joinSpans(spans) {
   return out;
 }
 
+
+/* 문제지·풀이 전략이 같은 선지 분할 규칙을 쓴다. */
+const CHOICE_SYMBOLS = ['①', '②', '③', '④', '⑤'];
+export function parseChoiceRows(input) {
+  /* 두 선지가 한 줄에 실리기도 한다. 다음 번호가 줄 첫머리 또는 공백 뒤에 있을 때만
+     나누고, 단·쪽을 넘는 이어지는 줄도 같은 문항 스트림에서 읽는다. */
+  const rows = [];
+  let next = 0;
+  input.filter((r) => r.text).forEach((r) => {
+    let text = r.text, start = 0;
+    while (next < 5) {
+      const at = text.indexOf(CHOICE_SYMBOLS[next], start);
+      if (at < 0 || (at > 0 && !/\s/.test(text[at - 1]))) break;
+      if (next === 0 && text.slice(0, at).trim()) break;
+      if (at > start) rows.push({ text: text.slice(start, at) });
+      start = at; next += 1;
+    }
+    rows.push({ text: text.slice(start) });
+  });
+  let bogiAt = -1, firstChoice = -1, want = 0;
+  const chIdx = [];
+  rows.forEach((r, i) => {
+    const t = r.text.trim();
+    if (bogiAt < 0 && t === '<보기>') bogiAt = i;
+    /* 선지는 **다음 번호가 맞을 때만** 새 선지로 본다. 그냥 '원문자로 시작하면 새 선지'로
+       잡으면 <보기> 본문이나 이어지는 줄의 첫 글자에 걸린다. */
+    if (want < 5 && t.indexOf(CHOICE_SYMBOLS[want]) === 0) {
+      if (firstChoice < 0) firstChoice = i;
+      chIdx.push(i); want += 1;
+    }
+  });
+  const stemEnd = bogiAt >= 0 ? bogiAt : (firstChoice >= 0 ? firstChoice : rows.length);
+  const stem = joinChoiceRows(rows.slice(0, stemEnd));
+  const bogi = bogiAt >= 0
+    ? joinChoiceRows(rows.slice(bogiAt + 1, firstChoice >= 0 ? firstChoice : rows.length)) : '';
+  const choices = chIdx.map((at, k) => ({
+    no: k + 1,
+    text: joinChoiceRows(rows.slice(at, chIdx[k + 1] == null ? rows.length : chIdx[k + 1]))
+      .replace(new RegExp('^' + CHOICE_SYMBOLS[k] + '\\s*'), ''),
+  }));
+  return { stem, bogi, choices };
+}
+function joinChoiceRows(rows) { return stripChrome(rows.map((r) => r.text).join('')); }
+
+export function columnRows(pages) {
+  return (pages || []).flatMap((p) => splitColumns(p).flatMap((lines, ci) =>
+    lines.slice().sort((a, b) => a.y - b.y).map((l) => ({ ...l, page: p.no, col: ci ? 'R' : 'L' }))));
+}
+
+/* 예제 번호가 그림인 신형과 Q1/Q2 텍스트인 구형을 함께 읽는다. 신형 발문은
+   9.5pt이고 첫 줄만 기둥 안쪽으로 들어간다. 9.8pt 주제 제목과 구분한다. */
+export function exampleStarts(lines) {
+  const left = colLeft(lines);
+  return lines.filter((l) => {
+    const body = l.spans.filter((s) => s.color === '#000000');
+    return body.some((s) => /^Q\d+\./.test(s.text.trim()) && s.size >= 9.4) ||
+      body.some((s) => [9.4, 9.5].includes(s.size) && s.x - left >= 20) &&
+      !body.some((s) => [9.4, 9.5].includes(s.size) && s.x - left < 20);
+  }).map((l) => ({ y: l.y, no: Number((joinSpans(l.spans).match(/^Q(\d+)\./) || [])[1]) || null }));
+}
+
+/* 기본 문제지는 해설을 끼워 넣어 교사용 쪽 수가 더 길다. 단순 절반 대신 문항
+   1번의 재등장과 그 앞의 반복 표지로 가른다. 풀이 자료는 반복 마스트헤드를 쓴다. */
+export function practiceHalves(doc) {
+  const pages = doc.pages || [];
+  const ones = columnRows(pages).filter((r) => itemMarkers([r]).some((m) => m.no === 1));
+  let cut = ones.length > 1 ? pages.findIndex((p) => p.no === ones[1].page) : -1;
+  const head = (p) => p.lines.filter((l) => l.y < MAST_BAND).map((l) => joinSpans(l.spans)).join('').replace(/\s/g, '');
+  const repeats = pages.map((p, i) => i > 0 && head(p) && head(p) === head(pages[0]) ? i : -1).filter((i) => i > 0);
+  const repeated = repeats.length === 1 ? repeats[0] : -1;
+  if (repeated > 0 && (cut < 0 || repeated <= cut)) cut = repeated;
+  if (cut < 0) {
+    const starts = sectionStarts(doc);
+    if (starts.length === 2) cut = pages.findIndex((p) => p.no === starts[1]);
+  }
+  if (cut <= 0) throw new Error('학생용/선생님용 경계를 확정하지 못했습니다 — 반복 표지·1번 문항을 확인하세요');
+  return { student: pages.slice(0, cut), teacher: pages.slice(cut) };
+}
+
+export function paragraphsFromRows(rows) {
+  const paragraphs = [], edge = Math.max(0, ...rows.map((r) => r.width));
+  rows.forEach((r, i) => {
+    if (!i || rows[i - 1].width < edge - 12) paragraphs.push([]);
+    paragraphs[paragraphs.length - 1].push(r);
+  });
+  return paragraphs.map(joinChoiceRows);
+}
+
 /* ── 시리즈 판별 ──
    파일명은 못 믿는다 — 구글 드라이브에서 내려받으면 한글이 깨진다(실제로 그랬다).
    지면 내용만으로 가른다. 1차는 머리말 대괄호 태그, 2차는 색·마커 지문(fingerprint). */
@@ -122,10 +210,13 @@ export function restoreChoiceImages(doc) {
         color: '#000000', imageDigest: im.digest });
       row.spans.sort((a, b) => a.x - b.x);
     }
-    for (const col of splitColumns(p)) for (const row of col.sort((a, b) => a.y - b.y)) {
-      if (itemMarkers([row]).length) { group = []; groups.push(group); }
+    for (const col of splitColumns(p)) {
+      const examples = new Set(exampleStarts(col).map((e) => e.y));
+      for (const row of col.sort((a, b) => a.y - b.y)) {
+      if (itemMarkers([row]).length || examples.has(row.y)) { group = []; groups.push(group); }
       if (passageStarts([row]).length || solutionEntries([row]).length) group = null;
       if (group) group.push(...row.spans.filter((s) => s.imageDigest));
+      }
     }
   }
   const sequences = new Map();
@@ -149,10 +240,10 @@ export function restoreChoiceImages(doc) {
 
 export function detectSeries(doc) {
   const text = plainText(doc).replace(/[\x00-\x1f]/g, ' ');
-  if (/\[활용\s*가이드\]/.test(text) && /이해완성\s*Review/.test(text)) return { series: 'skill', extractor: null, by: 'guide', confident: true };
-  if (/\[이해완성\]에서/.test(text) && !/\[이해완성\]을\s*학습하기/.test(text)) return { series: 'solution', extractor: null, by: 'guide', confident: true };
+  if (/\[활용\s*가이드\]/.test(text) && /이해완성\s*Review/.test(text)) return { series: 'skill', extractor: 'basic', by: 'guide', confident: true };
+  if (/\[이해완성\]에서/.test(text) && !/\[이해완성\]을\s*학습하기/.test(text)) return { series: 'solution', extractor: 'puri', by: 'guide', confident: true };
   /* 중3 개념완성은 머리말 상품 태그가 없고 배너로 두 단계를 가른다. */
-  if (/풀이\s*전략\s*문제를\s*푸는/.test(text)) return { series: 'concept2', extractor: null, by: 'banner', confident: true };
+  if (/풀이\s*전략\s*문제를\s*푸는/.test(text)) return { series: 'concept2', extractor: 'puri', by: 'banner', confident: true };
   if (/이해\s*전략\s*핵심\s*내용/.test(text)) return { series: 'concept1', extractor: 'ihae', by: 'banner', confident: true };
   if (!/\[이해완성\]/.test(text) && mastGrade((doc.pages || [])[0] || { lines: [] }) === '중3' &&
       /이해\s*전략/.test(text) && pairHalves(doc) &&
@@ -166,7 +257,8 @@ export function detectSeries(doc) {
   if (hits.length === 1) {
     const series = hits[0];
     if (['ihae', 'yoyak', 'danwon', 'seosul'].includes(series)) return { series, extractor: series, by: 'tag', confident: true };
-    if (['solution', 'skill', 'typical', 'concept'].includes(series)) return { series, extractor: null, by: 'tag', confident: true };
+    if (['solution', 'skill', 'typical', 'concept'].includes(series)) return { series,
+      extractor: { solution: 'puri', skill: 'basic', typical: 'basic' }[series] || null, by: 'tag', confident: true };
     /* 새 상품은 이름만 보고 객관식으로 단정하지 않는다. 같은 지면의 문항번호·선지와
        정답/해설 항목을 모두 읽을 수 있을 때만 기존 문제지 추출기를 재사용한다. */
     const capsule = /정답/.test(text) && /오답\s*point|1등급\s*공략\s*Tip/.test(text);
@@ -177,7 +269,7 @@ export function detectSeries(doc) {
   }
   const tally = colorTally(doc);
   if (!hits.length && (doc.pages || []).flatMap((p) => itemMarkers(p.lines)).filter((m) => m.no === 1).length > 1) {
-    return { series: 'typical', extractor: null, by: 'inline-solutions', confident: true };
+    return { series: 'typical', extractor: 'basic', by: 'inline-solutions', confident: true };
   }
   const fb = Object.keys(FALLBACK).filter((k) => FALLBACK[k](text, tally));
   if (fb.length === 1) return { series: fb[0], extractor: fb[0], by: 'fallback', confident: false, candidates: hits };
@@ -496,7 +588,7 @@ export function blankId(workId, series, n) {
   return workId + ':' + tag + '-' + String(n).padStart(3, '0');
 }
 export function itemId(series, scope, no) {
-  const tag = { danwon: 'dj', seosul: 'ss', ihae: 'ih', yoyak: 'yo' }[series] || 'it';
+  const tag = { danwon: 'dj', seosul: 'ss', ihae: 'ih', yoyak: 'yo', puri: 'ps' }[series] || 'it';
   return tag + '-' + scope + '-' + String(no).padStart(3, '0');
 }
 /* 내용에서 나오는 안정 키 — 쪽이 밀려도 안 바뀐다. 재추출 후 학생 진도를 잇는 데 쓴다. */

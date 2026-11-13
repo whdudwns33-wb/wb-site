@@ -98,8 +98,8 @@ export function buildDanwon(doc, opts) {
      '마지막으로 문항 번호가 찍힌 쪽 다음부터 해설'. 쪽 수가 달라져도 산다(실측 문제 7 · 해설 3). */
   let lastProblem = -1;
   pages.forEach((p, i) => { if (U.itemMarkers(p.lines).length) lastProblem = i; });
-  const problemPages = pages.slice(0, lastProblem + 1);
-  const solutionPages = pages.slice(lastProblem + 1);
+  const problemPages = opts.solutions ? pages : pages.slice(0, lastProblem + 1);
+  const solutionPages = opts.solutions ? [] : pages.slice(lastProblem + 1);
 
   /* ── 문항쪽 스트림에 표지 달기 ── */
   const ps = readStream(problemPages, sizes);
@@ -166,14 +166,8 @@ export function buildDanwon(doc, opts) {
       const bodyRows = b.rows.filter((x, i) => !x.isAuthor && i !== ai - 1 && x.text);
       const lines = bodyRows.map((x) => U.stripChrome(x.text));
       const prose = b.rows.length > 0 && b.rows.filter((x) => x.width > (pages[0].width || 595) * 0.3).length / b.rows.length >= 0.35;
-      const paragraphs = [], edge = Math.max(0, ...bodyRows.map((x) => x.width));
-      bodyRows.forEach((r, i) => {
-        /* 짧게 끝난 줄은 문단 끝이다. 넘쳐 흐른 줄은 원래 끝공백을 살려 붙인다. */
-        if (!i || bodyRows[i - 1].width < edge - 12) paragraphs.push([]);
-        paragraphs[paragraphs.length - 1].push(r);
-      });
       return { label: b.label, title, author, lines, prose,
-        paragraphs: paragraphs.map(joinRows), page: b.page };
+        paragraphs: U.paragraphsFromRows(bodyRows), page: b.page };
     });
   }
 
@@ -197,45 +191,7 @@ export function buildDanwon(doc, opts) {
     blocks.push({ no: row.itemNo, set: curSet, page: row.page, col: row.col, rows: ps.slice(i, end) });
   });
 
-  function parseItem(b) {
-    /* 두 선지가 한 줄에 실리기도 한다. 다음 번호가 줄 첫머리 또는 공백 뒤에 있을 때만
-       나누고, 단·쪽을 넘는 이어지는 줄도 같은 문항 스트림에서 읽는다. */
-    const rows = [];
-    let next = 0;
-    b.rows.filter((r) => r.text).forEach((r) => {
-      let text = r.text, start = 0;
-      while (next < 5) {
-        const at = text.indexOf(CIRCLED[next], start);
-        if (at < 0 || (at > 0 && !/\s/.test(text[at - 1]))) break;
-        if (next === 0 && text.slice(0, at).trim()) break;
-        if (at > start) rows.push({ text: text.slice(start, at) });
-        start = at; next += 1;
-      }
-      rows.push({ text: text.slice(start) });
-    });
-    let bogiAt = -1, firstChoice = -1, want = 0;
-    const chIdx = [];
-    rows.forEach((r, i) => {
-      const t = r.text.trim();
-      if (bogiAt < 0 && t === '<보기>') bogiAt = i;
-      /* 선지는 **다음 번호가 맞을 때만** 새 선지로 본다. 그냥 '원문자로 시작하면 새 선지'로
-         잡으면 <보기> 본문이나 이어지는 줄의 첫 글자에 걸린다. */
-      if (want < 5 && t.indexOf(CIRCLED[want]) === 0) {
-        if (firstChoice < 0) firstChoice = i;
-        chIdx.push(i); want += 1;
-      }
-    });
-    const stemEnd = bogiAt >= 0 ? bogiAt : (firstChoice >= 0 ? firstChoice : rows.length);
-    const stem = joinRows(rows.slice(0, stemEnd));
-    const bogi = bogiAt >= 0
-      ? joinRows(rows.slice(bogiAt + 1, firstChoice >= 0 ? firstChoice : rows.length)) : '';
-    const choices = chIdx.map((at, k) => ({
-      no: k + 1,
-      text: joinRows(rows.slice(at, chIdx[k + 1] == null ? rows.length : chIdx[k + 1]))
-        .replace(new RegExp('^' + CIRCLED[k] + '\\s*'), ''),
-    }));
-    return { stem, bogi, choices };
-  }
+  const parseItem = (b) => U.parseChoiceRows(b.rows);
 
   /* ── 정답·해설 ──
      해설은 단과 쪽을 넘어 흐른다(p8 좌단 맨 아래 → p8 우단 맨 위 → p9 좌단 맨 위).
@@ -252,8 +208,8 @@ export function buildDanwon(doc, opts) {
       U.solutionEntries(lines).forEach((e) => { entryAt[page.no + (ci ? 'R' : 'L') + ':' + e.y] = e.no; });
     });
   });
-  const solutions = {};
-  const solOrder = [];
+  const solutions = { ...(opts.solutions || {}) };
+  const solOrder = Object.keys(solutions);
   ss.forEach((row, i) => {
     const no = entryAt[row.page + row.col + ':' + row.y];
     if (no == null) return;
@@ -412,7 +368,8 @@ export function buildDanwon(doc, opts) {
     if (sol) {
       const ansNo = CIRCLED.indexOf((sol.answer || '').trim()) + 1;
       if (ansNo) it.answer = ansNo;
-      const sp = splitPerChoice(sol.body || '');
+      const sp = sol.perChoice ? { main: sol.body || '', per: { ...sol.perChoice }, count: Object.keys(sol.perChoice).length }
+        : splitPerChoice(sol.body || '');
       perCount += sp.count;
       /* 정답 선지에는 마커가 안 붙는다 — 앞 산문이 그 역할을 한다. main 과 perChoice[정답]
          양쪽에 넣어야 '선지별 해설 누락' 경고가 안 뜨고 학생 오답 피드백도 맞는다. */

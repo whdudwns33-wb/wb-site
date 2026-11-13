@@ -23,6 +23,8 @@ import { buildIhae } from './build-ihae.mjs';
 import { buildYoyak } from './build-yoyak.mjs';
 import { buildDanwon } from './build-danwon.mjs';
 import { buildSeosul } from './build-seosul.mjs';
+import { buildBasic } from './build-basic.mjs';
+import { buildPuri } from './build-puri.mjs';
 
 const PACK_ID_RE = /^[A-Za-z0-9-]{3,60}$/;   // 서버(naesin-ko-api.mjs)와 같은 규칙
 const HERE = path.dirname(new URL(import.meta.url).pathname);
@@ -435,6 +437,8 @@ export function buildPack(dir, opts) {
     try {
       if (f.series === 'yoyak') results.push({ ...f, out: buildYoyak(f.doc, o) });
       else if (f.extractor === 'danwon') results.push({ ...f, out: buildDanwon(f.doc, o) });
+      else if (f.extractor === 'basic') results.push({ ...f, out: buildBasic(f.doc, o) });
+      else if (f.extractor === 'puri') results.push({ ...f, out: buildPuri(f.doc, o) });
       else if (f.series === 'seosul') results.push({ ...f, out: buildSeosul(f.doc, o) });
     } catch (e) {
       errors.push(`${base}(${U.SERIES_LABEL[f.series]}) 추출 중 오류: ${String(e.message).slice(0, 200)}`);
@@ -675,6 +679,9 @@ export function buildPack(dir, opts) {
 
   const review = {
     packId, pending, skipped, unanchored, reanchored, dropped, mergeLog, reconstructedTexts,
+    files: results.map((r) => ({ file: path.basename(r.file), series: U.SERIES_LABEL[r.series], extractor: r.extractor,
+      items: (r.out.items || []).length, pendingItems: ((r.out.review || {}).pending || []).filter((p) => p.kind === 'item').length,
+      ...((r.out.review || {}).extraction || {}) })),
     stubWorks: solved.added, inferred: solved.inferred,
     candidates: results.flatMap((r) => ((r.out.review && r.out.review.candidates) || r.out.candidates || [])
       .map((c) => ({ series: r.series, ...c }))),

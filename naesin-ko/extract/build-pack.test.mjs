@@ -11,6 +11,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { basicFixture, puriFixture } from './practice-fixtures.mjs';
+import PC from '../pack-check.js';
 import { mergeBlanks, reanchor, reanchorSetMark, workIdFor, resolveSets, buildPack, writePack } from './build-pack.mjs';
 
 let passed = 0;
@@ -246,7 +248,7 @@ t('여러 객관식 상품과 서술형 회차의 id를 가르고 미지원·손
       ln(90, sp(60, '이해 전략 핵심 내용을 파악하자!!')),
       ln(120, sp(40, '주제'), sp(120, '기다림', 9.1, '#ffffff'))])] };
     fs.writeFileSync(path.join(dir, 'concept.json'), JSON.stringify(concept));
-    fs.writeFileSync(path.join(dir, 'unsupported.json'), JSON.stringify(fixture('실력완성', true)));
+    fs.writeFileSync(path.join(dir, 'unsupported.json'), JSON.stringify({ pages: [pg(1, [ln(45, sp(60, '[새로운워크북]'))])] }));
     fs.writeFileSync(path.join(dir, 'broken.json'), '{');
     fs.writeFileSync(path.join(dir, 'not-spans.json'), 'null');
     const result = buildPack(dir);
@@ -305,6 +307,27 @@ t('세트 기호는 실제 발췌에 유일하게 있는 구절의 작품에 연
   assert.strictEqual(fixed.anchorText, '새로운 발췌 구절');
   assert.strictEqual(reanchorSetMark(set, byId, { symbol: '㉠', anchorText: '공통 구절' }), null);
   assert.strictEqual(reanchorSetMark(set, byId, { symbol: '㉠', workId: 'a', anchorText: '새로운 발췌 구절' }), null);
+});
+
+t('새 네 상품을 폴더에서 자동 판별하고 기존 mc5·ox 계약으로 합친다', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ko-practice-'));
+  try {
+    const docs = [basicFixture('실력완성'), basicFixture('대표유형'), puriFixture('solution'), puriFixture('concept2')];
+    docs.forEach((doc, i) => fs.writeFileSync(path.join(dir, 'fixture' + i + '.json'), JSON.stringify(doc)));
+    fs.writeFileSync(path.join(dir, '_meta.txt'), 'revision: 2022\n');
+    const result = buildPack(dir);
+    assert.deepStrictEqual(result.errors, []);
+    assert.deepStrictEqual(result.review.skipped, []);
+    assert.deepStrictEqual(result.review.dropped, []);
+    assert.strictEqual(result.pack.items.length, 16);
+    assert.strictEqual(result.review.pending.filter((p) => p.kind === 'item').length, 2);
+    assert.strictEqual(new Set(result.pack.items.map((i) => i.id)).size, result.pack.items.length);
+    assert.strictEqual(new Set(result.pack.sets.map((s) => s.setId)).size, result.pack.sets.length);
+    assert.deepStrictEqual(new Set(result.pack.items.map((i) => i.source.series)),
+      new Set(['실력완성', '대표유형', '풀이완성', '개념완성 step2.풀이전략']));
+    assert.deepStrictEqual(PC.checkPack({ ...result.pack.meta, works: result.pack.works, sets: result.pack.sets, items: result.pack.items }).errors, []);
+    assert.ok(!('files' in result.pack) && !('candidates' in result.pack));
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 });
 
 console.log(`\nOK — ${passed}개 통과. 병합기는 자료 하나만 봐서는 못 하는 것을 한다.`);
