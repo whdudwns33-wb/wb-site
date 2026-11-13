@@ -313,6 +313,30 @@ function baseView(row) {
     lesson: { title: String(lesson.title || ''), subject: String(lesson.subject || '') }
   };
 }
+// 인계가 검증된 원 수업과 서버가 연결한 이전 메모만 읽기 전용으로 전달한다.
+async function previousHandoffMemos(env, app, task, beforeDate) {
+  const result = await env.DB.prepare("SELECT data FROM checks WHERE app=? AND json_extract(data,'$.taskId')=? AND json_extract(data,'$.date')<?")
+    .bind(app, task.id, beforeDate).all();
+  const archive = task.inheritedLessonMemos;
+  const archived = archive && archive.studentId === task.studentId && archive.sourceTaskId === task.predecessorTaskId && Array.isArray(archive.records)
+    ? archive.records.filter(item => item && item.date < task.start && (item.taskId === archive.sourceTaskId ||
+      (Array.isArray(archive.sourceTaskIds) && archive.sourceTaskIds.includes(item.taskId)))) : [];
+  const seen = new Set();
+  return (result.results || []).map(row => parseJson(row.data)).concat(archived).filter(Boolean).map(item => {
+    let note = String(item.note || '').trim();
+    const memo = item.lessonMemo || {};
+    if (!note) note = [['contentProgress','수업내용 · 진도'],['homework','과제'],['guardianNotice','안내사항'],['otherNotes','기타 · 특이사항']]
+      .filter(([key]) => String(memo[key] || '').trim()).map(([key,label]) => '[' + label + ']\n' + String(memo[key]).trim()).join('\n\n');
+    const comment = String(memo.comment || '').trim();
+    if (comment && !note.includes(comment)) note += (note ? '\n\n' : '') + '[코멘트]\n' + comment;
+    return { taskId: String(item.taskId || ''), date: String(item.date || ''), note, sourceStaffName: String(item.sourceStaffName || '') };
+  }).filter(item => {
+    const key = item.taskId + '|' + item.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(item.date) || item.date >= beforeDate || !item.note || seen.has(key)) return false;
+    seen.add(key); return true;
+  }).sort((a,b) => b.date.localeCompare(a.date)).slice(0,3);
+}
+
 async function view(env, app, row, auth) {
   const result = baseView(row), current = kst(), inWindow = !writeWindow(row.record_date);
   const context = await verifiedContext(env, app, rowInput(row));
@@ -324,6 +348,8 @@ async function view(env, app, row, auth) {
     (checkRow && String(checkRow.owner || '') === String(row.source_staff_id) ? parseJson(checkRow.data) : null);
   result.attendance = { att: check && check.taskId === row.lesson_task_id && check.date === row.record_date &&
     ['P', 'L', 'A', 'E'].includes(check.att) ? check.att : '' };
+  result.previousMemos = loaded && loaded.task && row.status !== 'cancelled'
+    ? await previousHandoffMemos(env, app, loaded.task, String(row.record_date)) : [];
   result.visit = null;
   if (loaded && row.visit_id) {
     const physical = await env.DB.prepare('SELECT * FROM weekend_actual_visits WHERE app=? AND visit_id=? LIMIT 1')

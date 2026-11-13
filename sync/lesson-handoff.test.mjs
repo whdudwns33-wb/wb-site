@@ -634,3 +634,32 @@ test('save CAS rechecks source semantics and keeps the previous receiver memo on
   assert.equal(result.status, 409); assert.deepEqual(JSON.parse(db.handoff().memo_json), blankMemo());
   assert.equal(db.handoff().revision, 2); assert.equal(db.count('lesson_handoff_events'), 2);
 });
+
+test('handoff history exposes only three prior source memos including comment-only records to participants', async t => {
+  const db = fixture(t);
+  db.check({ note: '', lessonMemo: { comment: '코멘트만 기록' } }, '2026-08-29');
+  db.check({ note: '이전 진도', lessonMemo: {} }, '2026-08-28');
+  db.check({ note: '셋째', lessonMemo: {} }, '2026-08-27');
+  db.check({ note: '넷째', lessonMemo: {} }, '2026-08-26');
+  db.check({ taskId: 'other-lesson', note: '다른 학생 비밀' }, '2026-08-29');
+  await createOk(db);
+  const listed = await call(db, { action: 'list', date, dataGeneration: 0 }, recipient);
+  const memos = listed.body.handoffs[0].previousMemos;
+  assert.deepEqual(memos.map(m => m.date), ['2026-08-29','2026-08-28','2026-08-27']);
+  assert.equal(memos[0].note, '[코멘트]\n코멘트만 기록');
+  assert.doesNotMatch(JSON.stringify(memos), /private-marker|다른 학생 비밀|원 교사 진도/);
+  assert.deepEqual((await call(db, { action: 'list', date, dataGeneration: 0 }, stranger)).body.handoffs, []);
+});
+
+test('handoff history accepts validated archive but rejects a different student archive', async t => {
+  const db = fixture(t);
+  const archive = { studentId: 'student-a', sourceTaskId: 'old', sourceTaskIds: ['old'], records: [
+    { taskId: 'old', date: '2026-07-28', note: '이전 담당 메모' },
+    { taskId: 'unrelated', date: '2026-07-29', note: '잘못된 연결' }
+  ] };
+  db.task({ predecessorTaskId: 'old', inheritedLessonMemos: archive });
+  await createOk(db);
+  assert.equal((await call(db, { action: 'list', date, dataGeneration: 0 }, recipient)).body.handoffs[0].previousMemos[0].note, '이전 담당 메모');
+  db.task({ predecessorTaskId: 'old', inheritedLessonMemos: { ...archive, studentId: 'other' } });
+  assert.deepEqual((await call(db, { action: 'list', date, dataGeneration: 0 }, recipient)).body.handoffs[0].previousMemos, []);
+});

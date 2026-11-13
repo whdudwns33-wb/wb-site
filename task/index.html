@@ -5827,6 +5827,14 @@ function lessonHandoffCardHtml(row, mode) {
     '</b>' + (row.simple ? '' : ' (읽기 전용)') + ' · 출결·회차는 원 수업 1건을 그대로 사용합니다.<br>담당 교체만으로 하원·재등원하지 않습니다. 정규 담당과 시간표는 유지됩니다.</div>' +
     lessonHandoffReadOnlyMemo(row.sourceMemo, sourceName + '의 인계 당시 원 수업 메모' + (row.simple ? '' : ' · ' + row.completedHours)) +
     '<div class="guide lesson-handoff-note"><b>' + esc(sourceName) + '의 전달 메모</b><br>' + esc(row.note || '전달 메모 없음') + '</div>';
+  if (!popup) {
+    const previous = (Array.isArray(row.previousMemos) ? row.previousMemos : []).slice(0, 3);
+    body += '<details class="lesson-progress-section previous-memos"><summary>이전 수업 메모</summary><div class="previous-memos-body">' +
+      '<div class="card-sub">' + esc(row.recordDate) + ' 이전 기록 · 최신순 3개 · 읽기 전용</div>' +
+      (previous.length ? previous.map(item => '<div class="guide mb8"><b>' + esc(item.date) + '</b>' +
+        (item.sourceStaffName ? ' · ' + esc(item.sourceStaffName) + ' 선생님' : '') + '<br>' + esc(item.note) + '</div>').join('') :
+        '<div class="empty">이전에 작성한 수업 메모가 없습니다.</div>') + '</div></details>';
+  }
   if (!popup && lessonHandoffCanAct(row, 'attendance')) body += '<div class="lesson-handoff-actions">' +
     [['P', '출석'], ['L', '지각'], ['A', '결석'], ['E', '조퇴'], ['', '미완료']].map(item => '<button class="btn ' + (att === item[0] ? 'btn-primary' : 'btn-ghost') +
       '" data-act="lessonHandoffAttendance" data-att="' + item[0] + '"' + attrs + '>' + item[1] + '</button>').join('') + '</div>';
@@ -6573,7 +6581,15 @@ function previousTaskMemos(taskId, beforeDate) {
     inherited.sourceTaskId === task.predecessorTaskId && Array.isArray(inherited.records)
     ? inherited.records.filter(row => row && (row.taskId === inherited.sourceTaskId ||
         (Array.isArray(inherited.sourceTaskIds) && inherited.sourceTaskIds.includes(row.taskId))) && row.date < task.start) : [];
-  const rows = Object.values(state.checks || {}).filter(row => row && row.taskId === taskId).concat(archived);
+  const rows = Object.values(state.checks || {}).filter(row => row && row.taskId === taskId).concat(archived).map(row => {
+    let note = String(row.note || '').trim();
+    const memo = row.lessonMemo || {};
+    if (!note) note = [['contentProgress','수업내용 · 진도'],['homework','과제'],['guardianNotice','안내사항'],['otherNotes','기타 · 특이사항']]
+      .filter(([key]) => String(memo[key] || '').trim()).map(([key,label]) => '[' + label + ']\n' + String(memo[key]).trim()).join('\n\n');
+    const comment = String(memo.comment || '').trim();
+    if (comment && !note.includes(comment)) note += (note ? '\n\n' : '') + '[코멘트]\n' + comment;
+    return Object.assign({}, row, { note });
+  });
   const seen = new Set();
   return rows.filter(row => {
     const key = row.taskId + '|' + row.date;
