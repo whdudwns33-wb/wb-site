@@ -30,25 +30,29 @@ reading-server/
    정답 자동 읽기는 없다 — 족보닷컴 지면은 정답의 동그라미 숫자가 글자층에 없다(2026-11-12 실측).
 4. 「정답을 확인했고 학생에게 엽니다」를 켜고 저장. 정답이 비었거나 쪽 그림이 빠지면 서버가 열기를 거절한다.
 5. 자료를 고르고 시험일을 넣어 배정한다(대상을 비우면 반 공통).
+6. 숙제는 「과제 내기」 — 문제지(읽기 자료 제외) 1~10개 + 제목 + 마감일 + 대상(전체 / 반 / 학생 코드 여럿).
+   시험 범위 밖 문제지도 과제로 주면 그 학생에게 열린다. 과제는 여러 건 동시에 걸 수 있고, 지워도 풀이 기록은 남는다.
 
 ## 학생 앱이 하는 일
 
-- 배정되고 열린 자료만 보인다. 읽기 자료(요점정리·노트)는 「개념」, 문제지는 「문제」에 단계별로.
+- 시험 범위나 과제로 받고 열린 자료만 보인다. 읽기 자료(요점정리·노트)는 「개념」, 문제지는 「문제」에 단계별로.
 - 풀이 화면: 지면은 전체 / 왼쪽 단 / 오른쪽 단으로 본다(2단 조판 — 그림은 그대로, 보이는 범위만 바꾼다).
   답은 1.2초 뒤 서버에 임시 저장돼 기기를 바꿔도 이어 푼다.
+- 「오늘」 맨 위는 과제(마감 이른 순, 마감 지나면 빨강, 다 내면 ✓, 마감 7일 뒤 숨김), 그 아래 시험 범위.
 - 제출은 한 번. 제출하면 ○✕·정답·해설 쪽이 열린다. 서술형은 모범답안을 보고 스스로 표시하고 강사가 확정한다.
 - 틀린 문제는 **틀린 날과 다른 날** 다시 맞혀야 오답에서 지워진다.
 
 ## 서버 API
 
-학생: `GET /sheets` → `{sheets, exam, scope, progress, today}` · `GET /sheet?id=` → `{sheet, my, answers?}`(answers 는 제출 뒤에만)
+학생: `GET /sheets` → `{sheets, exam, scope, progress, today, tasks, examIds}` · `GET /sheet?id=` → `{sheet, my, answers?}`(answers 는 제출 뒤에만)
 · `GET /page?id=&n=` → `{page:{n,data}}` · `PUT /draft` · `POST /submit` → `{result}` · `POST /retry` → `{retry}` · `POST /essay`
 
 관리: `GET /admin/sheets` · `POST /admin/sheet {id, sheet}` · `POST /admin/page {id, n, data}`(1.4MB) · `POST /admin/sheet-delete`
-· `GET/POST /admin/exam` · `GET /admin/overview` · `GET /admin/student?code=&id=` · `POST /admin/essay`
+· `GET/POST /admin/exam` · `GET /admin/tasks` → `{tasks}`(과제마다 `status: {targets, submitted, missing}`) · `POST /admin/task {id?, title, due, sheetIds, target}` · `POST /admin/task-delete {id}` · `GET /admin/overview` · `GET /admin/student?code=&id=` · `POST /admin/essay`
 
 ## 현재 상태 (v0, 2026-11-12)
 
 있는 것: 위 전부, 서버 테스트(`node reading-server/naesin-tg-api.test.mjs`).
-아직 없는 것: 실제 족보닷컴 문제지로 한 시험(계정에 내려받기 권한이 없었다) · 과제 배정(시험 범위와 따로 주는 숙제) ·
+과제 배정(2026-11-12): 과제 목록은 `naesintg:tasks` 한 키. 「전체」 대상의 제출 현황은 탐구브레인을 한 번이라도 연 학생만 센다(등록 학생 전원을 세면 다른 앱만 쓰는 학생이 "안 냄"으로 잡힌다).
+아직 없는 것: 실제 족보닷컴 문제지로 한 시험(계정에 내려받기 권한이 없었다) · 과제 고치기 화면(서버는 `id` 로 고치기를 받는다) · 알림·반복 과제 ·
 반별 현황 묶음 · 인쇄 · 이용권이 끝났을 때 자료를 지우는 절차 · 야간 백업에 풀이 기록 싣기(`worker.mjs` 의 dump).

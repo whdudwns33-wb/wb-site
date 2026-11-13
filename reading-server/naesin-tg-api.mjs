@@ -90,6 +90,20 @@ const examOf = async (store, code) => {
   const def = await store.getExam('default');
   return { exam: def || null, scope: def ? 'default' : null };
 };
+/* 과제 — 시험 범위와 따로 주는 숙제. 대상은 전체 / 반(학생 기록의 cls) / 학생 코드 여럿.
+   과제 목록은 한 키에 통째로 둔다(학원 규모에서 수십 건이라 KV 값 하나로 충분). */
+const TASKS_MAX = 100;
+const TASK_SHEETS_MAX = 10;
+const TASK_HIDE_DAYS = 7;   // 마감 7일 뒤부터 학생 화면에서 숨긴다(지우는 것은 강사만)
+const taskFor = (t, code, cls) => (t.target.kind === 'all' ? true
+  : t.target.kind === 'cls' ? !!cls && t.target.cls === cls : t.target.codes.includes(code));
+const myTasks = async (store, code) => {
+  const all = (await store.getTasks()) || [];
+  if (!all.length) return [];
+  const stu = await store.getStudent(code);
+  return all.filter((t) => taskFor(t, code, stu && stu.cls));
+};
+const addDays = (date, n) => new Date(Date.parse(date + 'T00:00:00Z') + n * 86400_000).toISOString().slice(0, 10);
 const stateOf = async (store, code) => {
   const rec = await store.getState(code);
   const st = (rec && rec.state) || {};
@@ -124,14 +138,17 @@ export async function handleNaesinTg(ctx) {
   const body = async () => {
     try { return await ctx.getBody(); } catch (e) { if (e && e.status === 413) throw e; return null; }
   };
-  /* 학생이 열 수 있는 문제지인가 — 배정됐고(내 시험 → 반 공통) 강사가 열어 둔 것만. 관리자는 통과. */
+  /* 학생이 열 수 있는 문제지인가 — 시험 범위(내 시험 → 반 공통)나 내 과제에 들었고 강사가 열어 둔 것만. 관리자는 통과.
+     과제는 학생 화면에서 숨긴 뒤에도 지우기 전까지는 열린다 — 오답 다시 풀기가 그 문제지를 다시 연다. */
   const loadFor = async (id) => {
     if (!SHEET_ID_RE.test(id)) return { err: j(400, { error: '문제지 id가 필요해요.' }) };
     const rec = await store.getSheet(id);
     if (!rec) return { err: j(404, { error: '문제지를 찾을 수 없어요.' }) };
     if (!who.admin) {
       const { exam } = await examOf(store, who.code);
-      if (!exam || !(exam.sheetIds || []).includes(id) || !rec.sheet.open) return { err: j(403, { error: '배정되지 않은 문제지예요.' }) };
+      const inExam = !!exam && (exam.sheetIds || []).includes(id);
+      const inTask = !inExam && (await myTasks(store, who.code)).some((t) => t.sheetIds.includes(id));
+      if (!(inExam || inTask) || !rec.sheet.open) return { err: j(403, { error: '배정되지 않은 문제지예요.' }) };
     }
     return { sheet: rec.sheet, updatedAt: rec.updatedAt };
   };
@@ -142,11 +159,19 @@ export async function handleNaesinTg(ctx) {
     const { exam, scope } = await examOf(store, who.code);
     const st = await stateOf(store, who.code);
     const index = (await store.getSheetIds()) || [];
-    const ids = (exam && exam.sheetIds) || [];
+    const tasks = (await myTasks(store, who.code))
+      .filter((t) => addDays(t.due, TASK_HIDE_DAYS) >= today)
+      .map((t) => ({ id: t.id, title: t.title, due: t.due, sheetIds: t.sheetIds }))
+      .sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : 0));
+    const ids = [...new Set(((exam && exam.sheetIds) || []).concat(...tasks.map((t) => t.sheetIds)))];
     const sheets = ids.map((id) => index.find((e) => e.id === id)).filter((e) => e && e.open);
     const progress = {};
     for (const e of sheets) progress[e.id] = progressOf(st.sheets[e.id]);
-    return j(200, { sheets, exam: exam ? { examDate: exam.examDate, title: exam.title || '' } : null, scope, progress, today });
+    /* 학생 화면이 시험 범위 목록과 과제 목록을 나눠 그리도록 시험 범위 id 를 따로 싣는다 */
+    const examIds = ((exam && exam.sheetIds) || []).filter((id) => sheets.some((e) => e.id === id));
+    return j(200, { sheets, exam: exam ? { examDate: exam.examDate, title: exam.title || '' } : null, scope, progress, today,
+      tasks: tasks.map((t) => ({ ...t, sheetIds: t.sheetIds.filter((id) => sheets.some((e) => e.id === id)) })).filter((t) => t.sheetIds.length),
+      examIds });
   }
 
   if (p === '/api/naesin-tg/sheet' && method === 'GET') {
@@ -321,6 +346,84 @@ export async function handleNaesinTg(ctx) {
     const rec = { examDate, title: String(b.title || '').trim().slice(0, 60), sheetIds, updatedAt: nowIso() };
     await store.putExam(scope, rec);
     return j(200, { ok: true, scope, exam: rec });
+  }
+
+  /* 과제 목록 + 과제마다 대상·제출 수·안 낸 학생. 제출 = 과제의 문제지를 모두 낸 것.
+     대상 명단: 학생 코드는 그대로, 반은 등록 학생 가운데 그 반, 전체는 탐구브레인을 한 번이라도 연 학생
+     (전체를 등록 학생 전원으로 세면 다른 앱만 쓰는 학생까지 "안 냄"으로 잡힌다). */
+  if (p === '/api/naesin-tg/admin/tasks' && method === 'GET') {
+    const tasks = (await store.getTasks()) || [];
+    const opened = await store.listStateCodes();
+    let roster = null;   // 반 대상이 있을 때만 등록 학생을 훑는다
+    const out = [];
+    for (const t of tasks) {
+      let codes;
+      if (t.target.kind === 'codes') codes = t.target.codes;
+      else if (t.target.kind === 'all') codes = opened;
+      else {
+        if (!roster) { roster = []; for (const c of await store.listStudentCodes()) roster.push(await store.getStudent(c)); }
+        codes = roster.filter((s) => s && s.cls === t.target.cls).map((s) => s.code);
+      }
+      const done = []; const missing = [];
+      for (const code of codes) {
+        const st = await stateOf(store, code);
+        const stu = await store.getStudent(code);
+        (t.sheetIds.every((id) => st.sheets[id] && st.sheets[id].done) ? done : missing).push({ code, name: (stu && stu.name) || '' });
+      }
+      out.push({ ...t, status: { targets: codes.length, submitted: done.length, missing } });
+    }
+    return j(200, { tasks: out });
+  }
+
+  if (p === '/api/naesin-tg/admin/task' && method === 'POST') {
+    const b = await body();
+    if (!b) return j(400, { error: '올바른 JSON이 아니에요.' });
+    const title = String(b.title || '').trim().slice(0, 60);
+    if (!title) return j(400, { error: '과제 제목이 필요해요.' });
+    const due = String(b.due || '').trim();
+    if (!DATE_RE.test(due)) return j(400, { error: '마감일은 YYYY-MM-DD' });
+    const index = (await store.getSheetIds()) || [];
+    const sheetIds = [...new Set((Array.isArray(b.sheetIds) ? b.sheetIds : []).map((x) => String(x || '').trim()))];
+    if (!sheetIds.length || sheetIds.length > TASK_SHEETS_MAX) return j(400, { error: '문제지를 1~' + TASK_SHEETS_MAX + '개 골라 주세요.' });
+    for (const id of sheetIds) {
+      const e = index.find((x) => x.id === id);
+      if (!e) return j(400, { error: '없는 문제지예요: ' + id });
+      if (e.kind !== 'test') return j(400, { error: '과제에는 문제지만 넣어요(읽기 자료 제외): ' + id });
+    }
+    const tg = b.target || {};
+    let target;
+    if (tg.kind === 'all') target = { kind: 'all' };
+    else if (tg.kind === 'cls') {
+      const cls = String(tg.cls || '').trim().slice(0, 30);
+      if (!cls) return j(400, { error: '반 이름이 필요해요.' });
+      target = { kind: 'cls', cls };
+    } else if (tg.kind === 'codes') {
+      const codes = [...new Set((Array.isArray(tg.codes) ? tg.codes : []).map((x) => String(x || '').trim()).filter(Boolean))];
+      if (!codes.length || codes.length > 100) return j(400, { error: '학생 코드를 1~100명 넣어 주세요.' });
+      for (const c of codes) {
+        if (!CODE_RE.test(c) || !(await store.getStudent(c))) return j(404, { error: '등록되지 않은 학생 코드예요: ' + c });
+      }
+      target = { kind: 'codes', codes };
+    } else return j(400, { error: "대상은 'all' · 'cls' · 'codes' 가운데 하나" });
+    const tasks = (await store.getTasks()) || [];
+    const id = String(b.id || '').trim();
+    const old = id ? tasks.find((x) => x.id === id) : null;
+    if (id && !old) return j(404, { error: '과제를 찾을 수 없어요.' });
+    if (!old && tasks.length >= TASKS_MAX) return j(400, { error: '과제가 ' + TASKS_MAX + '건을 넘어요. 끝난 과제를 지워 주세요.' });
+    const rec = { id: old ? old.id : 't-' + crypto.randomUUID().slice(0, 8), title, due, sheetIds, target,
+      createdAt: old ? old.createdAt : nowIso(), updatedAt: nowIso() };
+    await store.putTasks(old ? tasks.map((x) => (x.id === rec.id ? rec : x)) : tasks.concat(rec));
+    return j(200, { ok: true, task: rec });
+  }
+
+  /* 과제를 지워도 학생의 풀이 기록은 문제지 단위라 그대로 남는다 */
+  if (p === '/api/naesin-tg/admin/task-delete' && method === 'POST') {
+    const b = await body();
+    const id = String((b && b.id) || '').trim();
+    const tasks = (await store.getTasks()) || [];
+    if (!tasks.some((x) => x.id === id)) return j(404, { error: '과제를 찾을 수 없어요.' });
+    await store.putTasks(tasks.filter((x) => x.id !== id));
+    return j(200, { ok: true });
   }
 
   /* 반 현황 — 학생마다 문제지별 점수·남은 오답·확정 안 된 서술형 수. 답안 원문은 싣지 않는다. */

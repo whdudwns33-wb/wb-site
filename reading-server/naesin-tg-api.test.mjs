@@ -11,14 +11,17 @@ const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + 
 function memStore() {
   const sheets = {}, pages = {}, states = {}, exams = {};
   let ids = null;
-  const students = { 'st-1': { code: 'st-1', name: '김지우', cls: '중2 A반' }, 'st-2': { code: 'st-2', name: '박서준', cls: '중2 A반' } };
+  let tasks = null;
+  const students = { 'st-1': { code: 'st-1', name: '김지우', cls: '중2 A반' }, 'st-2': { code: 'st-2', name: '박서준', cls: '중2 A반' },
+    'st-3': { code: 'st-3', name: '이하은', cls: '중2 B반' } };
   return {
     getSheet: (id) => sheets[id] || null, putSheet: (id, rec) => { sheets[id] = rec; }, delSheet: (id) => { delete sheets[id]; },
     getSheetIds: () => ids, putSheetIds: (v) => { ids = v; },
     getPage: (id, n) => pages[id + ':' + n] || null, putPage: (id, n, d) => { pages[id + ':' + n] = d; }, delPage: (id, n) => { delete pages[id + ':' + n]; },
     getState: (c) => states[c] || null, putState: (c, rec) => { states[c] = JSON.parse(JSON.stringify(rec)); }, listStateCodes: () => Object.keys(states),
     getExam: (s) => exams[s] || null, putExam: (s, rec) => { exams[s] = rec; },
-    getStudent: (c) => students[c] || null,
+    getTasks: () => tasks, putTasks: (v) => { tasks = JSON.parse(JSON.stringify(v)); },
+    getStudent: (c) => students[c] || null, listStudentCodes: () => Object.keys(students),
     _raw: { sheets, pages, states, exams },
   };
 }
@@ -30,7 +33,7 @@ const call = (who, method, path, bodyOrQuery) => {
   return handleNaesinTg({ path: '/api/naesin-tg' + p, method, who, store, now: () => clock,
     query: new URLSearchParams(qs || ''), getBody: async () => bodyOrQuery });
 };
-const ADMIN = { admin: true }, S1 = { code: 'st-1' }, S2 = { code: 'st-2' };
+const ADMIN = { admin: true }, S1 = { code: 'st-1' }, S2 = { code: 'st-2' }, S3 = { code: 'st-3' };
 const PNG = 'data:image/png;base64,iVBORw0KGgo=';
 const SHEET = { title: '7-1 전기 1회', subject: 'science', grade: '중2', unit: '7-1', step: 3, kind: 'test', pages: 3, answerFrom: 3,
   questions: [
@@ -137,6 +140,60 @@ await t('서술형 — 학생이 스스로 표시, 강사가 확정', async () =
   assert.strictEqual((await call(ADMIN, 'GET', '/admin/student?code=st-1&id=sc-1')).body.student.essays[4].self, 'ok');
   assert.strictEqual((await call(ADMIN, 'POST', '/admin/essay', { code: 'st-1', id: 'sc-1', no: 4, verdict: 'pass' })).status, 200);
   assert.strictEqual((await call(ADMIN, 'GET', '/admin/overview')).body.students[0].sheets['sc-1'].essayHold, 0);
+});
+
+await t('과제 — 시험 범위 밖 문제지도 대상 학생에게만 열리고, 현황에 안 낸 학생이 보인다', async () => {
+  const saved = clock;
+  await call(ADMIN, 'POST', '/admin/sheet', { id: 'sc-2', sheet: { ...SHEET, title: '7-2 숙제', pages: 2, answerFrom: 0 } });
+  for (const n of [1, 2]) await call(ADMIN, 'POST', '/admin/page', { id: 'sc-2', n, data: PNG });
+  assert.strictEqual((await call(ADMIN, 'POST', '/admin/sheet', { id: 'sc-2', sheet: { ...SHEET, title: '7-2 숙제', pages: 2, answerFrom: 0, open: true } })).status, 200);
+  const A = { title: '7-2 숙제', due: '2026-11-20', sheetIds: ['sc-2'], target: { kind: 'cls', cls: '중2 A반' } };
+  assert.strictEqual((await call(S1, 'POST', '/admin/task', A)).status, 403);
+  assert.strictEqual((await call(ADMIN, 'POST', '/admin/task', { ...A, title: '' })).status, 400);
+  assert.strictEqual((await call(ADMIN, 'POST', '/admin/task', { ...A, due: '11/20' })).status, 400);
+  assert.strictEqual((await call(ADMIN, 'POST', '/admin/task', { ...A, sheetIds: ['nope'] })).status, 400);
+  assert.strictEqual((await call(ADMIN, 'POST', '/admin/task', { ...A, target: { kind: 'codes', codes: ['ghost'] } })).status, 404);
+  assert.strictEqual((await call(ADMIN, 'POST', '/admin/task', { ...A, target: { kind: 'x' } })).status, 400);
+  const id = (await call(ADMIN, 'POST', '/admin/task', A)).body.task.id;
+
+  const h = (await call(S2, 'GET', '/sheets')).body;
+  assert.deepStrictEqual(h.tasks.map((x) => x.id), [id]);
+  assert.deepStrictEqual(h.examIds, ['sc-1']);
+  assert.ok(h.sheets.some((e) => e.id === 'sc-2'));
+  assert.strictEqual((await call(S2, 'GET', '/sheet?id=sc-2')).status, 200);
+  assert.deepStrictEqual((await call(S3, 'GET', '/sheets')).body.tasks, [], '다른 반에는 안 보인다');
+  assert.strictEqual((await call(S3, 'GET', '/sheet?id=sc-2')).status, 403);
+
+  let st = (await call(ADMIN, 'GET', '/admin/tasks')).body.tasks[0].status;
+  assert.deepStrictEqual([st.targets, st.submitted, st.missing.length], [2, 0, 2]);
+  assert.strictEqual((await call(S2, 'POST', '/submit', { id: 'sc-2', answers: { 1: '3' } })).status, 200);
+  st = (await call(ADMIN, 'GET', '/admin/tasks')).body.tasks[0].status;
+  assert.deepStrictEqual([st.submitted, st.missing.map((m) => m.name)], [1, ['김지우']]);
+
+  /* 학생 코드 대상 · 고치기 */
+  assert.strictEqual((await call(ADMIN, 'POST', '/admin/task', { ...A, id, target: { kind: 'codes', codes: ['st-3'] } })).status, 200);
+  assert.strictEqual((await call(S3, 'GET', '/sheets')).body.tasks.length, 1);
+  assert.strictEqual((await call(S2, 'GET', '/sheets')).body.tasks.length, 0);
+  assert.strictEqual((await call(ADMIN, 'POST', '/admin/task', { ...A, id: 't-none' })).status, 404);
+
+  /* 전체 대상은 탐구브레인을 연 학생만 센다(st-3 은 아직 기록이 없다) */
+  await call(ADMIN, 'POST', '/admin/task', { ...A, id, target: { kind: 'all' } });
+  assert.strictEqual((await call(ADMIN, 'GET', '/admin/tasks')).body.tasks[0].status.targets, 2);
+
+  /* 마감 7일 뒤에는 화면에서 숨지만, 지우기 전까지 문제지는 열린다 */
+  clock = Date.parse('2026-11-27T03:00:00Z');
+  assert.strictEqual((await call(S2, 'GET', '/sheets')).body.tasks.length, 1);
+  clock = Date.parse('2026-11-28T03:00:00Z');
+  assert.strictEqual((await call(S2, 'GET', '/sheets')).body.tasks.length, 0);
+  assert.strictEqual((await call(S2, 'GET', '/sheet?id=sc-2')).status, 200);
+
+  /* 지우면 닫히지만 풀이 기록은 남는다 */
+  assert.strictEqual((await call(ADMIN, 'POST', '/admin/task-delete', { id })).status, 200);
+  assert.strictEqual((await call(ADMIN, 'POST', '/admin/task-delete', { id })).status, 404);
+  assert.strictEqual((await call(S2, 'GET', '/sheet?id=sc-2')).status, 403);
+  assert.ok(store._raw.states['st-2'].state.sheets['sc-2'].done);
+  await call(ADMIN, 'POST', '/admin/sheet-delete', { id: 'sc-2' });
+  clock = saved;
 });
 
 await t('닫으면 학생에게서 사라지고, 지우면 쪽 그림도 지워진다', async () => {

@@ -165,13 +165,26 @@
     $('hstat').innerHTML = (H.exam ? '<span class="chip' + (d != null && d <= 7 ? ' warn' : '') + '">' + esc(H.exam.title || '시험') + ' ' + (d > 0 ? 'D-' + d : d === 0 ? 'D-day' : '끝') + '</span>' : '<span class="chip mut">시험 미등록</span>');
     var html = '';
     if (!H.sheets.length) {
-      html = '<div class="card"><h3>아직 받은 자료가 없어요</h3><p class="muted">선생님이 시험 범위를 정하면 여기에 문제지가 보여요.</p></div>';
+      html = '<div class="card"><h3>아직 받은 자료가 없어요</h3><p class="muted">선생님이 시험 범위나 과제를 정하면 여기에 문제지가 보여요.</p></div>';
     } else if (S.tab === 'today') {
-      var todo = tests.filter(function (e) { return !H.progress[e.id].submitted; }).sort(function (a, b) { return a.step - b.step; });
+      /* 과제가 맨 위(마감 이른 순 — 서버가 정렬), 그 아래 시험 범위 문제지. examIds 가 없으면(이전 서버) 전부 시험 범위로 본다. */
+      var byId = {}; H.sheets.forEach(function (e) { byId[e.id] = e; });
+      var tasks = H.tasks || [], examIds = H.examIds || H.sheets.map(function (e) { return e.id; });
+      tasks.forEach(function (t) {
+        var ss = t.sheetIds.map(function (id) { return byId[id]; }).filter(Boolean);
+        var left = ss.filter(function (e) { return !H.progress[e.id].submitted; });
+        var dd = Math.round((Date.parse(t.due) - Date.parse(H.today)) / 86400000);
+        var chip = !left.length ? '<span class="chip">다 냈어요 ✓</span>'
+          : dd < 0 ? '<span class="chip bad">마감 지남 · ' + esc(t.due.slice(5).replace('-', '/')) + '</span>'
+          : '<span class="chip' + (dd <= 1 ? ' warn' : '') + '">' + (dd === 0 ? '오늘 마감' : '마감 D-' + dd) + '</span>';
+        html += '<div class="card"><h3 style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span>과제 · ' + esc(t.title) + '</span>' + chip + '</h3>'
+          + (left.length ? '<div class="list">' + left.map(sheetBtn).join('') + '</div>' : '') + '</div>';
+      });
+      var todo = tests.filter(function (e) { return examIds.indexOf(e.id) >= 0 && !H.progress[e.id].submitted; }).sort(function (a, b) { return a.step - b.step; });
       var wr = tests.reduce(function (n, e) { return n + (H.progress[e.id].wrongOpen || 0); }, 0);
       var eh = tests.reduce(function (n, e) { return n + (H.progress[e.id].essayHold || 0); }, 0);
-      html = '<div class="card"><h3>오늘 할 일</h3>' + (todo.length ? '<p class="muted small">단계 순서대로 위에서부터 풀어요.</p><div class="list">' + todo.slice(0, 3).map(sheetBtn).join('') + '</div>'
-        : '<p>받은 문제지를 모두 풀었어요.</p>') + '</div>'
+      html += (examIds.length ? '<div class="card"><h3>' + (tasks.length ? '시험 범위' : '오늘 할 일') + '</h3>' + (todo.length ? '<p class="muted small">단계 순서대로 위에서부터 풀어요.</p><div class="list">' + todo.slice(0, 3).map(sheetBtn).join('') + '</div>'
+        : '<p>시험 범위 문제지를 모두 풀었어요.</p>') + '</div>' : '')
         + (wr ? '<div class="card"><h3>다시 풀 오답 ' + wr + '문제</h3><p class="muted small">틀린 날과 다른 날 다시 맞히면 지워져요.</p><button class="btn ghost" data-go="wrong">오답 보러 가기</button></div>' : '')
         + (eh ? '<div class="card"><h3>서술형 ' + eh + '문제</h3><p class="muted small">모범답안과 견주어 스스로 표시했는지 확인해요. 확정은 선생님이 해요.</p></div>' : '');
     } else if (S.tab === 'note' || S.tab === 'test') {
