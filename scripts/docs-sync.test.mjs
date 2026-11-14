@@ -60,4 +60,18 @@ t('최상위 작업 폴더가 루트 지도에서 빠지지 않는다', () => {
   assert.deepEqual(missing, [], '최상위 작업 폴더를 CLAUDE.md 지도에 추가하고 AGENTS.md 와 맞추세요');
 });
 
+t('AGENTS.override.md 가 어디에도 없다 — 있으면 코덱스가 그 폴더의 AGENTS.md 대신 읽는다', () => {
+  /* 코덱스는 폴더마다 AGENTS.override.md 를 AGENTS.md 보다 먼저 고른다. 어느 PC 에 남은 낡은 override 가 저장소 규칙을
+     조용히 대체해도 아무도 모른다 — 그래서 무시 목록에 넣지 않고(git status 에서 숨겨진다) 여기서 빨갛게 한다. */
+  const found = [];
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) { if (e.name !== '.git' && e.name !== 'node_modules') walk(path.join(dir, e.name)); }
+      else if (e.name === 'AGENTS.override.md') found.push(path.relative(ROOT, path.join(dir, e.name)));
+    }
+  };
+  walk(ROOT);
+  assert.deepEqual(found, [], 'AGENTS.override.md 를 지우세요(필요한 규칙은 CLAUDE.md 에 넣고 cp CLAUDE.md AGENTS.md)');
+});
+
 console.log(`docs-sync: ${passed} passed`);
