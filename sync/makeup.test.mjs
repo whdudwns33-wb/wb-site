@@ -409,7 +409,7 @@ test('pending session4 start suppresses only the scoped subject automatic makeup
   }
 });
 
-test('session4 automatic makeup keeps the prior policy for absences before the configured cycle start', async () => {
+test('session4 automatic makeup is excluded even before the configured cycle start', async () => {
   const db = new TestD1(); seed(db);
   const document = roster();
   document.roster.students[0].billingMode = 'session4';
@@ -420,8 +420,33 @@ test('session4 automatic makeup keeps the prior policy for absences before the c
     action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10',
     creationMode: 'automatic'
   });
-  assert.equal(prior.status, 200, JSON.stringify(prior.body));
-  assert.equal(prior.body.case.history[0].creationMode, 'automatic');
+  assert.equal(prior.status, 409);
+  assert.equal(prior.body.code, 'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
+});
+
+test('clinic automatic creation is blocked and pending list hides newly excluded cases but keeps scheduled ones', async () => {
+  for (const mode of ['clinic', 'session4']) {
+    const db = new TestD1(); seed(db);
+    const made = await call(db, own('teacher-a'), { action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10' });
+    assert.equal(made.status, 200);
+    if (mode === 'clinic') {
+      const t = JSON.parse(db.database.prepare("SELECT data FROM tasks WHERE id='lesson-a'").get().data);
+      t.lessonRole = '클리닉';
+      db.prepare("UPDATE tasks SET data=? WHERE id='lesson-a'").bind(JSON.stringify(t)).run();
+    } else {
+      const r = roster(); r.roster.students[0].billingMode = 'session4';
+      db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(r)).run();
+    }
+    const blocked = await call(db, own('teacher-a'), {action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+    assert.equal(blocked.status,409);
+    assert.equal(blocked.body.code,mode==='clinic'?'CLINIC_AUTOMATIC_MAKEUP_DISABLED':'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
+    const list = await call(db, manager('director'), {action:'list'});
+    assert(!list.body.cases.some(c=>c.caseId===made.body.case.caseId));
+    const scheduled = await call(db, manager('director'), {action:'schedule',caseId:made.body.case.caseId,revision:made.body.case.revision,date:'2026-08-12',startTime:'19:00',endTime:'19:50'});
+    assert.equal(scheduled.status,200,JSON.stringify(scheduled.body));
+    const after = await call(db, manager('director'), {action:'list'});
+    assert(after.body.cases.some(c=>c.caseId===made.body.case.caseId&&c.status==='confirmed'));
+  }
 });
 
 test('D1 trigger-inclusive commit reports success and a repeated manual creation does not duplicate the lesson', async () => {
@@ -2864,4 +2889,89 @@ test('reset reconciliation cannot cancel makeup if attendance becomes absent con
   const result=await call(db,own('teacher-a'),{action:'reconcile_attendance',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
   assert.equal(result.status,409);assert.equal(result.body.code,'ATTENDANCE_CORRECTION_REQUIRED');
   assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?').get(created.body.case.caseId).status,'review_pending');
+});
+
+test('simple completion records actual date and preserves scheduled memo and attendance', async () => {
+ const db=new TestD1();seed(db);
+ const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ const id=scheduled.body.lessonTask.id;
+ db.prepare('INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)').bind('task',id+'|2026-08-12','teacher-a',JSON.stringify({taskId:id,date:'2026-08-12',note:'보존할 수업 메모',att:'',steps:{first:true}}),2,2).run();
+ const done=await callAt(db,own('teacher-a'),{action:'complete',caseId:created.body.case.caseId,revision:scheduled.body.case.revision,date:'2026-08-13',startTime:'19:00',endTime:'20:00',attendanceStatus:'P'},'2026-08-14T12:00:00+09:00');
+ assert.equal(done.status,200,JSON.stringify(done.body));assert.equal(done.body.case.completedDate,'2026-08-13');
+ const record=JSON.parse(db.database.prepare('SELECT data FROM checks WHERE k=?').get(id+'|2026-08-12').data);
+ assert.equal(record.note,'보존할 수업 메모');assert.equal(record.steps.first,true);assert.equal(record.att,'P');
+ assert.equal(JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE id=?').get(id).data).start,'2026-08-12');
+});
+test('simple completion restores missing generated lesson and forbids absent or unrelated teacher completion',async()=>{
+ for(const scenario of ['missing','absent','other']) {
+ const db=new TestD1();seed(db);const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ if(scenario==='missing'){db.database.exec('DROP TRIGGER trg_tasks_capture_revocation_delete');db.database.prepare('DELETE FROM tasks WHERE id=?').run(scheduled.body.lessonTask.id);}
+ if(scenario==='absent')makeupAttendance(db,created.body.case.caseId,'teacher-a','2026-08-12','A');
+ const result=await callAt(db,own(scenario==='other'?'teacher-b':'teacher-a'),{action:'complete',caseId:created.body.case.caseId,revision:scheduled.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00',attendanceStatus:'P'},'2026-08-14T12:00:00+09:00');
+ assert.equal(result.status,scenario==='missing'?200:scenario==='other'?403:409,JSON.stringify(result.body));
+ }
+});
+
+test('explicit completion does not overwrite a concurrent absence',async()=>{
+ const db=new TestD1();seed(db);const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ const id=scheduled.body.lessonTask.id;makeupAttendance(db,created.body.case.caseId,'teacher-a','2026-08-12','P');
+ db.beforeBatch=()=>db.database.prepare("UPDATE checks SET data=json_set(data,'$.att','A'),updated_at=updated_at+1 WHERE k=?").run(id+'|2026-08-12');
+ const result=await callAt(db,all,{action:'complete',caseId:created.body.case.caseId,revision:scheduled.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00',attendanceStatus:'P'},'2026-08-14T12:00:00+09:00');
+ assert.equal(result.status,409);assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?').get(created.body.case.caseId).status,'confirmed');
+ assert.equal(JSON.parse(db.database.prepare('SELECT data FROM checks WHERE k=?').get(id+'|2026-08-12').data).att,'A');
+});
+test('assigned teacher can change record-free makeup time but cannot reassign it',async()=>{
+ const db=new TestD1();seed(db);const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ const request={action:'reschedule',caseId:created.body.case.caseId,revision:scheduled.body.case.revision,date:'2026-08-13',startTime:'19:00',endTime:'20:00',staffId:'teacher-a'};
+ assert.equal((await call(db,own('teacher-b'),request)).status,403);
+ assert.equal((await call(db,own('teacher-a'),{...request,staffId:'teacher-b'})).status,403);
+ assert.equal((await call(db,own('teacher-a'),request)).status,200);
+});
+
+ test('archive cutoff skips old automatic requests but retains explicit creation and later absences', async()=>{
+ const db=new TestD1();seed(db);
+ const env={DB:db,WB_MAKEUP_ARCHIVE_THROUGH:'2026-11-11'};
+ const old=await handleMakeup(env,'task',{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'},'*',own('teacher-a'),responseJson);
+ assert.equal((await old.json()).code,'MAKEUP_LEGACY_ARCHIVED');
+ assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n,0);
+ const manual=await handleMakeup(env,'task',{action:'create_from_absence',creationMode:'manual',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'},'*',own('teacher-a'),responseJson);
+ assert.equal(manual.status,200);assert.ok((await manual.json()).case);
+ const later=await handleMakeup(env,'task',{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-11-12'},'*',own('teacher-a'),responseJson);
+ assert.notEqual((await later.json()).code,'MAKEUP_LEGACY_ARCHIVED');
+ });
+
+test('admin completes an absent scheduled makeup on its actual date without erasing absence', async()=>{
+ const db=new TestD1();seed(db);
+ const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ const id=scheduled.body.lessonTask.id;makeupAttendance(db,created.body.case.caseId,'teacher-a','2026-08-12','A');
+ const payload={action:'complete',caseId:created.body.case.caseId,revision:scheduled.body.case.revision,date:'2026-08-13',startTime:'19:00',endTime:'20:00',attendanceStatus:'P'};
+ assert.equal((await callAt(db,all,{...payload,date:'2026-08-12'},'2026-08-14T12:00:00+09:00')).status,409);
+ assert.equal((await callAt(db,own('teacher-a'),payload,'2026-08-14T12:00:00+09:00')).status,409);
+ const done=await callAt(db,all,payload,'2026-08-14T12:00:00+09:00');
+ assert.equal(done.status,200,JSON.stringify(done.body));assert.equal(done.body.case.completedDate,'2026-08-13');
+ assert.equal(done.body.case.status,'completed');
+ const read=date=>JSON.parse(db.database.prepare('SELECT data FROM checks WHERE k=?').get(id+'|'+date).data);
+ assert.equal(read('2026-08-12').att,'A');assert.equal(read('2026-08-13').att,'P');
+ assert.equal(JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE id=?').get(id).data).start,'2026-08-13');
+ assert.equal((await callAt(db,all,payload,'2026-08-14T12:00:00+09:00')).status,409);
+});
+
+test('makeup list exposes only the scheduled lesson attendance for its confirmed date',async()=>{
+ const db=new TestD1();seed(db);
+ const created=await call(db,own('teacher-a'),{action:'create_from_absence',sourceTaskId:'lesson-a',sourceDate:'2026-08-10'});
+ const scheduled=await call(db,all,{action:'schedule',caseId:created.body.case.caseId,revision:created.body.case.revision,date:'2026-08-12',startTime:'20:00',endTime:'21:00'});
+ makeupAttendance(db,created.body.case.caseId,'teacher-a','2026-08-12','L');
+ const result=await call(db,all,{action:'list',caseId:created.body.case.caseId});
+ assert.equal(result.status,200);assert.equal(result.body.cases[0].scheduledAttendance.value,'L');
+ assert.equal(result.body.cases[0].scheduledAttendance.date,'2026-08-12');
+ makeupAttendance(db,created.body.case.caseId,'teacher-a','2026-08-13','A');
+ const again=await call(db,all,{action:'list',caseId:created.body.case.caseId});
+ assert.equal(again.body.cases[0].scheduledAttendance.value,'L');
+ const forbidden=await call(db,own('teacher-b'),{action:'list',caseId:created.body.case.caseId});
+ assert.equal(forbidden.body.cases.length,0);
 });

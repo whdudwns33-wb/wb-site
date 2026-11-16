@@ -113,7 +113,8 @@ t('고등 조합은 먼저 만들 목록에 섞지 않는다 — 채울 수 있�
 
 t('퇴원 학생은 교과서 지정표에서도 빠진다 — 유령 학생이 수집 순서를 흔든다', () => {
   /* 지정표는 맵 한 레코드라 학생별 키를 지우는 기존 방식으로 닿지 않는다. 양쪽 호스트 모두 */
-  assert.ok(/drop\(naesinRoot\(\)\.books \|\| \{\}, c\)/.test(server), 'server.mjs 퇴원 처리가 naesin:books 를 안 지운다');
+  const localStore = fs.readFileSync(path.join(__dirname, '../reading-server/store.mjs'), 'utf8');
+  assert.ok(/await deleteStudent\(c\)/.test(server) && /\[db\.naesin, \['states', 'exams', 'results', 'books'\]\]/.test(localStore), '로컬 삭제 저장 경로가 교과서 지정표를 안 지운다');
   assert.ok(/const books = await env\.DB\.get\('naesin:books', 'json'\)/.test(worker), 'worker.mjs 퇴원 처리가 naesin:books 를 안 지운다');
   assert.ok(/delete books\[c\]/.test(worker) && /env\.DB\.put\('naesin:books'/.test(worker), 'worker 가 지운 뒤 다시 쓰지 않는다');
 });

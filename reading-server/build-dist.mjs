@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { stampServiceWorker } from './sw-version.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.join(ROOT, '..', 'reading');
@@ -29,6 +30,7 @@ fs.copyFileSync(path.join(ROOT, 'public', 'naesin-studio.html'), path.join(DIST,
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-live.html'), path.join(DIST, 'admin', 'naesin-live.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'haru-admin.html'), path.join(DIST, 'admin', 'haru-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-ko-admin.html'), path.join(DIST, 'admin', 'naesin-ko-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'naesin-tg-admin.html'), path.join(DIST, 'admin', 'naesin-tg-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'hanja-admin.html'), path.join(DIST, 'admin', 'hanja-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'hanja-print.html'), path.join(DIST, 'admin', 'hanja-print.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'chunk-admin.html'), path.join(DIST, 'admin', 'chunk-admin.html'));
@@ -56,6 +58,8 @@ fs.copyFileSync(SHARED, path.join(DIST, 'vocab', 'voice.js'));
 fs.copyFileSync(path.join(ROOT, '..', 'shared', 'qr.js'), path.join(DIST, 'admin', 'qr.js'));
 /* 팩 커버리지 순수 로직 — 관리 웹 전용이라 학생 앱 dist 에는 싣지 않는다(학생이 명부를 볼 일이 없다) */
 fs.copyFileSync(path.join(ROOT, '..', 'naesin', 'coverage.js'), path.join(DIST, 'admin', 'coverage.js'));
+fs.copyFileSync(path.join(ROOT, '..', 'naesin', 'readiness.js'), path.join(DIST, 'admin', 'readiness.js'));
+fs.copyFileSync(path.join(ROOT, '..', 'naesin', 'pack-check.js'), path.join(DIST, 'admin', 'pack-check.js'));
 
 /* 내신브레인 (naesin/) — 같은 오리진 /naesin/ 에서 서빙해야 학생 코드·API가 공유된다.
    팩 콘텐츠(구매 자료)는 dist에 싣지 않는다 — KV에만 산다(기획서 §9.3).
@@ -75,6 +79,10 @@ const NAESINKO_FILES = ['index.html', 'engine.js', 'grade.js', 'gen.js', 'pack-c
   'readiness.js', 'render.js', 'concepts.json', 'pack-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of NAESINKO_FILES) fs.copyFileSync(path.join(NAESINKO, f), path.join(DIST, 'naesin-ko', f));
 fs.copyFileSync(SHARED, path.join(DIST, 'naesin-ko', 'voice.js'));
+/* 탐구브레인 (naesin-tg/) — 화면 껍데기뿐이다. 문제지·쪽 그림·정답은 KV 에만 있고 서버가 채점한다.
+   서비스 워커는 앱 설치용으로 셸만 캐시하고 /api/ 는 건드리지 않는다 — 지면을 기기에 쌓지 않는다. */
+fs.mkdirSync(path.join(DIST, 'naesin-tg'), { recursive: true });
+for (const f of ['index.html', 'sw.js', 'manifest.webmanifest', 'icon.svg']) fs.copyFileSync(path.join(ROOT, '..', 'naesin-tg', f), path.join(DIST, 'naesin-tg', f));
 /* 하루브레인 (haru/) — 같은 오리진 /haru/ 에서 서빙해야 학생 코드·API가 공유된다.
    앱 껍데기·순수 로직·atoms.json·공개 준비 안내와 검토용 자체 샘플(preview.js)만 싣는다. 운영 팩·대응표·플랜·시험지는 dist 에 없다(설계안 §5-0). */
 const HARU = path.join(ROOT, '..', 'haru');
@@ -169,14 +177,8 @@ fs.copyFileSync(path.join(LETTER, 'drills.js'), path.join(DIST, 'admin', 'drills
    VERSION 으로 박는다. 파일이 한 글자라도 바뀌면 캐시 이름이 달라지고,
    안 바뀌면 그대로다. 잊을 수가 없다. */
 function stampSW(swPath, shellPaths, prefix) {
-  const src = fs.readFileSync(swPath, 'utf8');
-  const h = crypto.createHash('sha256');
-  for (const f of shellPaths.slice().sort()) h.update(fs.readFileSync(f));
-  h.update(src);                                   /* sw.js 자신도 포함 */
-  const tag = prefix + '-' + h.digest('hex').slice(0, 10);
-  const out = src.replace(/const VERSION = '[^']*';/, `const VERSION = '${tag}';`);
-  if (out === src) throw new Error(`${swPath}: VERSION 을 못 바꿨습니다 — sw.js 의 선언 형태가 바뀌었나 봅니다`);
-  fs.writeFileSync(swPath, out);
+  const { tag, source } = stampServiceWorker(swPath, shellPaths, prefix);
+  fs.writeFileSync(swPath, source);
   return tag;
 }
 const rTag = stampSW(path.join(DIST, 'sw.js'),
@@ -191,6 +193,9 @@ const kTag = stampSW(path.join(DIST, 'naesin-ko', 'sw.js'),
   ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-check.js', 'readiness.js', 'render.js',
     'concepts.json', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'naesin-ko', f)), 'wbk-shell');
+
+const tTag = stampSW(path.join(DIST, 'naesin-tg', 'sw.js'),
+  ['index.html', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, 'naesin-tg', f)), 'wbt-shell');
 
 const cTag = stampSW(path.join(DIST, 'chunk', 'sw.js'),
   ['index.html', 'print.html', 'voice.js', 'rules.js', 'sched.js', 'lessons.js', 'passages.js', 'manifest.webmanifest', 'icon.svg']
@@ -238,4 +243,4 @@ if (broken.length) {
 }
 
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
-console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', hTag, '·', cTag, '·', lTag, '·', jTag);
+console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', tTag, '·', hTag, '·', cTag, '·', lTag, '·', jTag);

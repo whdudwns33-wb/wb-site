@@ -14,13 +14,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { once } from 'node:events';
 import { securityHeadersFrom, parseHeadersFile } from './sec-headers.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
-const PORT = 8700 + (process.pid % 90);
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'wbr-sec-'));
 const PIN = 'test-pin-not-a-real-secret';
-const BASE = `http://127.0.0.1:${PORT}`;
+let BASE, startup = '';
 const errors = [];
 const ok = (cond, m) => { if (!cond) errors.push(m); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -35,14 +35,20 @@ ok(!('Cache-Control' in WANT), 'Cache-Control 을 보안 헤더로 가져오면 
 ok(parseHeadersFile(HEADERS_TEXT)['/*'], '_headers 에 /* 블록이 없다');
 
 const srv = spawn(process.execPath, [path.join(DIR, 'server.mjs')], {
-  env: { ...process.env, PORT: String(PORT), DATA_DIR: DATA, ADMIN_PIN: PIN },
-  stdio: 'ignore',
+  env: { ...process.env, PORT: '0', HOST: '127.0.0.1', DATA_DIR: DATA, ADMIN_PIN: PIN },
+  stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true,
 });
+const exited = once(srv, 'exit');
+srv.stdout.on('data', chunk => { startup += String(chunk); });
 
 try {
   for (let i = 0; i < 100; i++) {
-    try { await fetch(BASE + '/api/health'); break; } catch { await sleep(100); }
+    const port = startup.match(/localhost:(\d+)/)?.[1];
+    if (port) { BASE = `http://127.0.0.1:${port}`; break; }
+    if (srv.exitCode !== null) throw new Error('검사용 서버가 시작 전에 종료됨');
+    await sleep(100);
   }
+  if (!BASE) throw new Error('검사용 서버 시작 시간 초과');
 
   /* 네 갈래를 모두 본다 — 정적 루트·앱 디렉터리·API·404. 라우팅 분기마다 따로 쓰면
      한 갈래만 빠지는데, 빠진 쪽이 하필 관리 웹이면 그게 공개로 색인된다. */
@@ -74,6 +80,7 @@ try {
   errors.push('예외: ' + (e && e.message));
 } finally {
   srv.kill();
+  await exited;
   fs.rmSync(DATA, { recursive: true, force: true });
 }
 

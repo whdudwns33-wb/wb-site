@@ -26,7 +26,7 @@ import * as U from './spans-util.mjs';
 /* 연 요지 라벨: '1연' · '5연~6연' · '1~2연' 세 표기가 다 온다 */
 const RANGE = /^(\d+\s*연?\s*[~〜～]?\s*\d*\s*연)\s*(.*)$/;
 const OVERVIEW_KEYS = ['갈래', '제재', '성격', '주제', '특징'];
-const VERSE_MIN = 8.4, VERSE_MAX = 10.6;   // 시행 글꼴 크기 구간(실측)
+const VERSE_MIN = 7.8, VERSE_MAX = 10.6;   // 축소 조판(7.8pt)도 본문이다
 
 export function buildIhae(doc, opts) {
   opts = opts || {};
@@ -40,7 +40,7 @@ export function buildIhae(doc, opts) {
   const workId = opts.workId || 'w-draft';
   const work = {
     workId,
-    title: opts.title || meta.workTitle || '',
+    title: opts.title || meta.workTitle || (opts.concept ? meta.roundTitle : '') || '',
     author: opts.author || '',
     kind: opts.kind || 'poem',
     hasCanon: true,
@@ -122,14 +122,24 @@ export function buildIhae(doc, opts) {
 
     /* 왼쪽 — 개관 표를 건너뛰고 시행과 날개풀이를 가른다 */
     const verses = [], notes = [];
+    const noteSizes = new Set(left.flatMap((line) => line.spans.filter(U.isNote).map((s) => s.size)));
+    /* 풀이의 흰 정답은 파란 글씨와 같은 크기다. 작은 시행까지 받으면서 이것을
+       본문으로 오인하지 않도록 풀이 글꼴 크기를 함께 본다. */
+    const inNote = (s) => U.isNote(s) || U.isPale(s) && noteSizes.has(s.size);
     left.forEach((line) => {
       if (skipY.has(line.y)) return;
-      const r = U.readLine(line, { decoy });
-      if (!r.full || U.isChromeLine(r.full)) return;
-      const size = line.spans[0].size;
-      if (line.spans.some(U.isNote)) { notes.push({ y: line.y, r }); return; }
-      if (size < VERSE_MIN || size > VERSE_MAX) return;
-      verses.push({ y: line.y, r });
+      if (line.y < U.HEAD_BAND) return;
+      /* 축소 조판에서는 시행과 파란 풀이가 같은 행에 놓인다. 풀이가 있다는 이유로
+         시행 전체를 버리지 않고 각각 읽는다. */
+      const noteSpans = line.spans.filter(inNote);
+      if (noteSpans.length) {
+        const r = U.readLine({ ...line, spans: noteSpans }, { decoy });
+        if (r.full && !U.isChromeLine(r.full)) notes.push({ y: line.y, r });
+      }
+      const spans = line.spans.filter((s) => !inNote(s) && s.size >= VERSE_MIN && s.size <= VERSE_MAX);
+      if (!spans.length) return;
+      const r = U.readLine({ ...line, spans }, { decoy });
+      if (r.full && !U.isChromeLine(r.full)) verses.push({ y: line.y, r });
     });
 
     /* 연 나눔 — 시행 사이의 큰 간격은 대개 끼어든 날개풀이다(spans-util 주석 참조) */
@@ -145,7 +155,7 @@ export function buildIhae(doc, opts) {
     /* 날개풀이는 바로 앞 시행에 건다 */
     notes.forEach((n) => {
       let anchor = '';
-      for (const v of verses) if (v.y < n.y) anchor = v.r.full;
+      for (const v of verses) if (v.y <= n.y) anchor = v.r.full;
       work.lineNotes.push({ anchor, note: n.r.full });
       pushBlanks(n.r, 'lineNotes.' + work.lineNotes.length, '날개풀이', page);
       candidates.push({ kind: 'gloss', quote: anchor, text: n.r.full, page: page.no });
@@ -164,6 +174,11 @@ export function buildIhae(doc, opts) {
 
   usePages.forEach((page, i) => {
     const decoy = U.makeDecoy(page, 'ihae');
+    if (opts.concept) {
+      if (i === 0) parseOverview(page, decoy);
+      parseStrategy(page, decoy);
+      return;
+    }
     if (i === 0) return;                                  // 구조도 — 다이어그램이라 사람이 옮긴다
     if (i === 1) { const skip = parseOverview(page, decoy); parseBody(page, decoy, skip); return; }
     parseStrategy(page, decoy);
@@ -217,13 +232,13 @@ if (invokedDirectly) {
   }
   const doc = JSON.parse(fs.readFileSync(file, 'utf8'));
   const det = U.detectSeries(doc);
-  if (det.series && det.series !== 'ihae') {
+  if (det.series && det.extractor !== 'ihae') {
     console.error(`이 파일은 이해완성이 아니라 '${U.SERIES_LABEL[det.series]}' 입니다 — 맞는 추출기를 쓰세요.`);
     process.exit(2);
   }
   const out = buildIhae(doc, {
     workId: opt('workId'), title: opt('title'), author: opt('author'),
-    kind: opt('kind'), unitPath: opt('unitPath'),
+    kind: opt('kind'), unitPath: opt('unitPath'), concept: det.series === 'concept1',
   });
 
   /* 검수 부속물은 **정본과 다른 파일**로 나간다. 같은 파일에 넣으면 병합기가 팩 루트로

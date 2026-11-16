@@ -1381,7 +1381,8 @@ async function assignedStudentIds(env, auth, sourceDate) {
     let task;
     try { task = JSON.parse(row.data || '{}'); }
     catch (error) { continue; }
-    if (!task.deleted && (!task.start || String(task.start) <= sourceDate) &&
+    // 이미 배정된 예정 수업도 준비를 위해 출결 조회는 허용한다. 쓰기 권한은 변경하지 않는다.
+    if (!task.deleted &&
         (!task.end || String(task.end) >= sourceDate) &&
         lessonTask(task, String(row.id || ''), String(row.owner || ''))) {
       ids.add(String(task.studentId));
@@ -1464,7 +1465,7 @@ export async function handleStudentAttendance(env, app, body, origin, auth, json
   const student = rawStudents.find(item => String(item && item.id || '') === studentId);
   if (!student) return reply(json, origin, { ok: false, error: '학생을 찾을 수 없습니다' }, 404);
   if (allowedStudentIds && (!rosterStudentActiveOn(student, sourceDate) || !allowedStudentIds.has(studentId))) {
-    return reply(json, origin, { ok: false, error: '해당 학생의 담당 선생님 또는 관리자만 출결을 확인할 수 있습니다' }, 403);
+    return reply(json, origin, { ok: false, code: 'STUDENT_ATTENDANCE_FORBIDDEN', error: '해당 학생의 담당 선생님 또는 관리자만 출결을 확인할 수 있습니다' }, 403);
   }
 
   const billingMode = String(student.billingMode || 'monthly') === SESSION_MODE ? SESSION_MODE : 'monthly';
