@@ -127,7 +127,7 @@ test('수업진행은 출결을 최상단에 두고 기존 교사 기능을 모�
   }
   assert.match(panel, /makeupRequestHtml\(t, date, c\)/);
   assert.match(panel, /previousTaskMemosProgressHtml\(t\.id, date\)/);
-  assert.match(panel, /<details class="lesson-progress-section lesson-progress-details"><summary>수업 5단계 진행<\/summary>/);
+  assert.match(panel, /<details class="lesson-progress-section lesson-progress-details"[^>]*><summary>수업 5단계 진행<\/summary>/);
   assert.match(panel, /<details class="lesson-progress-section lesson-progress-details lesson-memo-details"[\s\S]{0,180} open><summary>수업 메모\(실제 진도 및 특이사항\)<\/summary>/);
   assert.match(panel, /data-persist-key="lesson-memo\|/);
   assert.match(panel, /수업 메모\(실제 진도 및 특이사항\)<\/summary>[\s\S]{0,180}taskMemoEditorHtml\(t, date, c, editable\)/);
