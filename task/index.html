@@ -4331,6 +4331,46 @@ function replaceView(root, html) {
   return true;
 }
 
+let pendingStepScrollRestore = null;
+function renderKeepingStepPosition(button) {
+  if (pendingStepScrollRestore) pendingStepScrollRestore();
+  const root = $('#view');
+  if (!root || !button) { render(); return; }
+  const key = { id: button.dataset.id, date: button.dataset.date, step: button.dataset.step };
+  const top = button.getBoundingClientRect().top;
+  const originalRoute = route;
+  const focused = document.activeElement === button;
+  const anchor = root.style.overflowAnchor;
+  // details 복원 중 브라우저의 자동 앵커 이동과 명시적 위치 복원이 겹치지 않게 한다.
+  root.style.overflowAnchor = 'none';
+  let frame = null;
+  const cleanup = () => {
+    if (frame !== null) cancelAnimationFrame(frame);
+    root.style.overflowAnchor = anchor;
+    if (pendingStepScrollRestore === cleanup) pendingStepScrollRestore = null;
+  };
+  pendingStepScrollRestore = cleanup;
+  const find = () => Array.from(root.querySelectorAll('[data-act="step"]')).find(el =>
+    el.dataset.id === key.id && el.dataset.date === key.date && el.dataset.step === key.step);
+  const restore = () => {
+    const next = find();
+    if (!next || route !== originalRoute) return;
+    const delta = next.getBoundingClientRect().top - top;
+    if (Math.abs(delta) > 0.5) window.scrollBy({ top: delta, left: 0, behavior: 'instant' });
+    if (focused) next.focus({ preventScroll: true });
+  };
+  try {
+    render();
+    restore();
+    const restoredY = window.scrollY;
+    frame = requestAnimationFrame(() => {
+      // 다음 수업 안내 등의 배치가 끝난 뒤 보정하되 사용자가 직접 스크롤하면 따라가지 않는다.
+      if (Math.abs(window.scrollY - restoredY) < 2) restore();
+      cleanup();
+    });
+  } catch (error) { cleanup(); throw error; }
+}
+
 function renderMarkupFingerprint(value) {
   // 전체 HTML을 다시 파싱하지 않고 같은 화면인지 빠르게 판별한다.
   let hash = 2166136261;
@@ -7339,7 +7379,7 @@ function taskPanel(t, date, c, editable) {
   }
 
   if (steps.length) {
-    h += (lesson ? '<details class="lesson-progress-section lesson-progress-details"><summary>수업 5단계 진행</summary><div class="lesson-progress-details-body">' : '<div style="margin-top:10px">') + steps.map((s, i) => {
+    h += (lesson ? '<details class="lesson-progress-section lesson-progress-details" data-persist-key="lesson-steps|' + esc(t.id) + '|' + esc(date) + '"><summary>수업 5단계 진행</summary><div class="lesson-progress-details-body">' : '<div style="margin-top:10px">') + steps.map((s, i) => {
       const on = !!(c && c.steps && c.steps[s.id]);
       return '<div class="step ' + (on ? 'on' : '') + '">' +
         '<button class="sbox" ' + (editable ? 'data-act="step" data-id="' + t.id + '" data-date="' + date + '" data-step="' + s.id + '"' : 'disabled') + '>✓</button>' +
@@ -24730,7 +24770,7 @@ document.addEventListener('click', async ev => {
       cur[k] = !cur[k];
       setCheck(id, date, { steps: cur, blocked: false });
       syncAuto(t, date);
-      render();
+      renderKeepingStepPosition(el);
       if (isScheduledMakeupTask(t) && isDone(id, date)) completeMakeupAfterLesson(t, date);
       break;
     }
