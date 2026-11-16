@@ -1,5 +1,5 @@
 {
-  "version": "2026-11-09.1",
+  "version": "2026-11-16.1",
   "articles": [
     {
       "id": "nuri-space",
@@ -70972,6 +70972,4219 @@
               "answer": 2,
               "explain": "지정은 1963년·1964년·1975년에, 등재는 1995년에, 선정은 2001년에 각각 따로 이루어졌다.",
               "evidencePara": 5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cheonsang-star-map",
+      "category": "history",
+      "careers": [
+        "nat",
+        "art",
+        "eng"
+      ],
+      "issue": false,
+      "publishedAt": "2026-11-16",
+      "status": "published",
+      "sources": [
+        {
+          "title": "우리역사넷 한국사 연대기 — 천상열차분야지도",
+          "url": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_r300835&code=kc_age_30"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "하늘을 돌에 새겼어요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "아주 오래전 조선에서는 ",
+              "하늘의 모습을 돌에 새겼어요. ",
+              "그 그림의 이름은 천상열차분야지도예요. ",
+              "돌에 새겼기 때문에 석각천문도라고도 불러요."
+            ],
+            [
+              "이름에 뜻이 담겨 있어요. ",
+              "‘천상’은 해와 달과 ",
+              "별의 변화예요. ",
+              "‘분야’는 하늘의 별자리를 ",
+              "땅의 지역과 짝지은 것이에요."
+            ],
+            [
+              "돌판의 위쪽에는 ",
+              "별자리 그림이 있어요. ",
+              "눈으로 볼 수 있는 ",
+              "별이 거의 다 표시되어 있어요. ",
+              "밝은 별은 크게, ",
+              "희미한 별은 작게 새겼어요."
+            ],
+            [
+              "돌판은 앞면에만 그림이 ",
+              "있는 것이 아니에요. ",
+              "뒷면에도 천문도가 있어요. ",
+              "오랜 세월이 흘러 ",
+              "마모된 곳이 많아요. ",
+              "지금은 국립고궁박물관에 있어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "천문도",
+              "easy": "하늘의 별과 별자리를 그려 놓은 그림이에요."
+            },
+            {
+              "word": "별자리",
+              "easy": "하늘의 별들을 이어서 모양으로 묶어 본 것이에요."
+            },
+            {
+              "word": "마모",
+              "easy": "오래 쓰이면서 조금씩 닳아 없어지는 것이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "바다를 건너는 배를 만든 이야기",
+                "하늘의 모습을 돌에 새긴 그림 이야기",
+                "임금이 새 글자를 만든 이야기",
+                "임금이 사는 큰 집을 지은 이야기"
+              ],
+              "answer": 1,
+              "explain": "아주 오래전 조선에서는 하늘의 모습을 돌에 새겼어요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "밝은 별은 어떻게 새겼나요?",
+              "choices": [
+                "작게 새겼어요",
+                "새기지 않았어요",
+                "크게 새겼어요",
+                "글씨로 적었어요"
+              ],
+              "answer": 2,
+              "explain": "밝은 별은 크게, 희미한 별은 작게 새겼어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「마모」는 무슨 뜻인가요?",
+              "choices": [
+                "밤에 별을 보는 것",
+                "돌을 반듯하게 자르는 것",
+                "그림을 종이에 옮겨 그리는 것",
+                "오래 쓰이면서 닳아 없어지는 것"
+              ],
+              "answer": 3,
+              "explain": "오랜 세월이 흘러 마모된 곳이 많아요.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "이 그림에서 큰 점을 찾으면 무엇을 알 수 있나요?",
+              "choices": [
+                "그 별이 밝다는 것",
+                "그 별이 멀다는 것",
+                "그 별이 작다는 것",
+                "그 별이 아주 희미하다는 것"
+              ],
+              "answer": 0,
+              "explain": "밝은 별은 크게, 희미한 별은 작게 새겼어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "우리 반 자리표를 이 그림처럼 그리려면 어떻게 할까요?",
+              "choices": [
+                "자리표를 그리지 않아요",
+                "자리마다 글씨만 적어요",
+                "중요한 자리를 더 크게 그려요",
+                "모든 자리를 똑같은 크기로 그려요"
+              ],
+              "answer": 2,
+              "explain": "밝은 별은 크게, 희미한 별은 작게 새겼어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "돌 하나로 그치지 않았다",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "하늘을 돌에 새긴 그림이 있다. ",
+              "이름은 「천상열차분야지도」다. ",
+              "이름 속에 내용이 들어 있다. ",
+              "‘천상’은 해와 달과 ",
+              "별의 변화를 나타낸다. ",
+              "‘열차’는 동양의 별자리인 12차를 ",
+              "벌여 놓았다는 뜻이다. ",
+              "‘분야’는 하늘의 별자리를 ",
+              "지상의 해당 지역과 대응시킨 것이다."
+            ],
+            [
+              "지금 남아 있는 ",
+              "석각본은 두 종류다. ",
+              "하나는 1395년 태조 때 새긴 것이고, ",
+              "또 하나는 1687년 숙종 때 ",
+              "다시 새긴 것이다. ",
+              "두 석각본은 모두 국립고궁박물관에 있다. ",
+              "돌에 새겨졌기 때문에 ",
+              "「석각천문도」라는 이름으로도 불린다."
+            ],
+            [
+              "태조 때 석각본의 상단에는 ",
+              "별자리 그림이 있다. ",
+              "중심에는 북극을 두었다. ",
+              "황도 부근의 하늘을 12등분한 후 ",
+              "1,467개의 별을 점으로 새겼다. ",
+              "밝은 별은 크게, ",
+              "희미한 별은 작게 새겼다. ",
+              "하단의 맨 위에는 ",
+              "천문도의 이름이 큰 글씨로 새겨져 있다."
+            ],
+            [
+              "천문도는 돌 하나로 그치지 않았다. ",
+              "석각본을 종이에 옮겨 그린 필사본이 ",
+              "여럿 있었을 것으로 보인다. ",
+              "영조 대에 숙종의 천문도를 모사한 목판을 만들어 ",
+              "인쇄한 것도 있다. ",
+              "프랑스 파리국립도서관에는 ",
+              "숙종 때 복각본의 초기 탁본이 ",
+              "있다고 알려져 있다."
+            ],
+            [
+              "18세기에는 또 다른 모습도 나타났다. ",
+              "서양의 천문학이 도입된 뒤였다. ",
+              "기존 「천상열차분야지도」와 서양식 천문도가 ",
+              "8폭 병풍에 나란히 ",
+              "그려진 사례도 있다."
+            ]
+          ],
+          "en": [
+            "There is a picture of the sky carved into stone. Its name is Cheonsang yeolcha bunyajido. The name tells you what is on it. Cheonsang means the changes of the sun, the moon and the stars. Yeolcha means that the twelve cha are laid out in order. The twelve cha are the star fields of the East. Bunya matches each star group in the sky with its region on the ground.",
+            "Two stone versions are left today. One was carved in 1395, under King Taejo. The other was carved again in 1687, under King Sukjong. Both are in the National Palace Museum of Korea. They were carved in stone, so they are also called Seokgak cheonmundo.",
+            "The upper part of the Taejo stone holds a star chart. The north pole is at its centre. The sky near the ecliptic was divided into twelve parts. Then 1,467 stars were carved as dots. Bright stars were carved large, and faint stars small. At the top of the lower part, the name is carved in big letters.",
+            "The star map did not stop at one stone. It seems that several hand-drawn paper copies were made from the stone. Under Yeongjo a woodblock was made that copied Sukjong’s star map. There is also a print from it. An early rubbing of the Sukjong stone is also said to exist. It is said to be in the National Library of France.",
+            "In the eighteenth century another form appeared. Western astronomy had come in by then. There is also a case like this one. The earlier Cheonsang yeolcha bunyajido and a Western star map were drawn together. They stand side by side on a folding screen of eight panels."
+          ],
+          "envocab": [
+            {
+              "word": "carved",
+              "ko": "새긴 (과거분사)",
+              "base": "carve [kɑːrv]"
+            },
+            {
+              "word": "ecliptic",
+              "ko": "황도 (명사)",
+              "base": "ecliptic [ɪˈklɪptɪk]"
+            },
+            {
+              "word": "faint",
+              "ko": "희미한 (형용사)",
+              "base": "faint [feɪnt]"
+            },
+            {
+              "word": "rubbing",
+              "ko": "탁본 (명사)",
+              "base": "rubbing [ˈrʌbɪŋ]"
+            },
+            {
+              "word": "woodblock",
+              "ko": "목판 (명사)",
+              "base": "woodblock [ˈwʊdblɑːk]"
+            },
+            {
+              "word": "screen",
+              "ko": "병풍 (명사)",
+              "base": "screen [skriːn]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "천문도",
+              "easy": "하늘의 별과 별자리의 위치를 그려 놓은 그림",
+              "hanja": "天(하늘 천)+文(글월 문)+圖(그림 도)"
+            },
+            {
+              "word": "석각",
+              "easy": "돌에 글이나 그림을 새기는 일",
+              "hanja": "石(돌 석)+刻(새길 각)"
+            },
+            {
+              "word": "탁본",
+              "easy": "새긴 면 위에 종이를 대고 떠내어 베낀 것",
+              "hanja": "拓(박을 탁)+本(근본 본)"
+            },
+            {
+              "word": "병풍",
+              "easy": "여러 폭을 이어 세워 두고 보는 그림 가리개",
+              "hanja": "屛(병풍 병)+風(바람 풍)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "서양 천문학이 조선의 별자리를 바꾸었다",
+                "돌에 새긴 천문도가 여러 방법으로 퍼졌다",
+                "조선은 천문도를 만들지 않았다",
+                "병풍이 천문도보다 먼저 만들어졌다"
+              ],
+              "answer": 1,
+              "explain": "천문도는 돌 하나로 그치지 않았고, 보전·보급에 필사·목판 인쇄·탁본 등 여러 방법이 동원되었다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "태조 때 석각본의 상단에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "별자리 그림이 있고 중심에는 북극을 두었다",
+                "서양식 천문도가 나란히 그려져 있다",
+                "8폭 병풍이 함께 세워져 있다",
+                "필사본이 붙어 있다"
+              ],
+              "answer": 0,
+              "explain": "태조 때 석각본의 상단에는 별자리 그림이 있고 중심에는 북극을 두었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「석각」은 무엇을 뜻하나요?",
+              "choices": [
+                "종이에 옮겨 그리는 일",
+                "나무에 새겨 인쇄하는 일",
+                "병풍을 여러 폭으로 잇는 일",
+                "돌에 새기는 일"
+              ],
+              "answer": 3,
+              "explain": "돌에 새겨졌기 때문에 「석각천문도」라는 이름으로도 불린다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "천문도를 퍼뜨린 방법으로 이 글에 나온 것은?",
+              "choices": [
+                "성을 쌓아 그 안에만 보관했다",
+                "석판을 깨뜨려 여러 고을에 나누어 보냈다",
+                "종이에 옮겨 그리거나 목판으로 인쇄했다",
+                "노래로 불러 입으로만 전했다"
+              ],
+              "answer": 2,
+              "explain": "석각본을 종이에 옮겨 그린 필사본이 여럿 있었을 것으로 보이고, 목판을 만들어 인쇄한 것도 있다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「천문도는 돌 하나로 그치지 않았다」가 뜻하는 것은?",
+              "choices": [
+                "돌에 새긴 천문도가 하나도 남지 않고 사라졌다는 뜻이다",
+                "천문도를 돌이 아닌 방법으로도 남겼다는 뜻이다",
+                "돌을 두 개 겹쳐 새겼다는 뜻이다",
+                "천문도를 더 만들지 않았다는 뜻이다"
+              ],
+              "answer": 1,
+              "explain": "이 문장 뒤에 필사본·목판 인쇄·탁본 등 여러 방법이 이어진다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "학급 신문을 여러 반이 함께 보게 하려면 이 글의 방법에 가장 가까운 것은?",
+              "choices": [
+                "신문을 한 장만 만들어 우리 교실 벽에만 붙인다",
+                "신문을 읽지 않고 말로만 전한다",
+                "신문을 베껴 쓰고 복사해 여러 반에 보낸다",
+                "신문을 서랍에 넣어 둔다"
+              ],
+              "answer": 2,
+              "explain": "하나로 그치지 않고 옮겨 그리고 인쇄해 퍼뜨린 방식이다.",
+              "evidencePara": 3
+            }
+          ],
+          "enseg": [
+            [
+              "There is a picture of the sky carved into stone. ",
+              "Its name is Cheonsang yeolcha bunyajido. ",
+              "The name tells you what is on it. ",
+              "Cheonsang means the changes of the sun, the moon and the stars. ",
+              "Yeolcha means that the twelve cha are laid out in order. ",
+              "The twelve cha are the star fields of the East. ",
+              "Bunya matches each star group in the sky with its region on ",
+              "the ground."
+            ],
+            [
+              "Two stone versions are left today. ",
+              "One was carved in 1395, under King Taejo. ",
+              "The other was carved again in 1687, under King Sukjong. ",
+              "Both are in the National Palace Museum of Korea. ",
+              "They were carved in stone, so they are also called Seokgak cheonmundo."
+            ],
+            [
+              "The upper part of the Taejo stone holds a star chart. ",
+              "The north pole is at its centre. ",
+              "The sky near the ecliptic was divided into twelve parts. ",
+              "Then 1,467 stars were carved as dots. ",
+              "Bright stars were carved large, and faint stars small. ",
+              "At the top of the lower part, the name is carved in big letters."
+            ],
+            [
+              "The star map did not stop at one stone. ",
+              "It seems that several hand-drawn paper copies were made from the stone. ",
+              "Under Yeongjo a woodblock was made that copied Sukjong’s star map. ",
+              "There is also a print from it. ",
+              "An early rubbing of the Sukjong stone is also said to ",
+              "exist. ",
+              "It is said to be in the National Library of France."
+            ],
+            [
+              "In the eighteenth century another form appeared. ",
+              "Western astronomy had come in by then. ",
+              "There is also a case like this one. ",
+              "The earlier Cheonsang yeolcha bunyajido and a Western star map were drawn together. ",
+              "They stand side by side on a folding screen of eight panels."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "확실한 것과 아직 논의 중인 것",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "「천상열차분야지도」는 조선 건국 직후인 ",
+              "1395년에 석판에 새긴 천문도이다. ",
+              "이름이 곧 내용이다. ",
+              "‘천상’은 천문 현상으로 해·달·별의 변화를 나타낸다. ",
+              "‘열차’는 동양의 별자리인 12차를 ",
+              "벌여 놓았다는 뜻인데, ",
+              "12차는 목성의 운행을 기준으로 설정한 ",
+              "적도 부근의 12구역을 이른다. ",
+              "‘분야’는 하늘의 별자리를 ",
+              "지상의 해당 지역과 대응시킨 것이다."
+            ],
+            [
+              "태조 때의 석각본은 ",
+              "너비 122.7cm, 높이 211cm, ",
+              "두께 11.8cm의 직육면체 석판이다. ",
+              "상단은 전체의 2/3이고, ",
+              "하단은 전체의 1/3이다."
+            ],
+            [
+              "상단에는 별자리 그림이 ",
+              "짧은 설명과 함께 그려져 있다. ",
+              "중심에 북극을 두고, ",
+              "태양이 지나는 길인 황도와 ",
+              "남북극 가운데로 적도를 그렸다. ",
+              "황도 부근의 하늘을 12등분한 후 ",
+              "1,467개의 별을 점으로 새겼다. ",
+              "밝은 별은 크게, 희미한 별은 작게 새겼다."
+            ],
+            [
+              "그런데 모본이 언제 어디의 것인지는 ",
+              "하나로 정해지지 않았다. ",
+              "석각본 하단에 새겨진 권근의 발문에는, ",
+              "이 천문도의 석본이 옛날 평양성에 있었으나 ",
+              "병란으로 강에 빠져 분실된 지 ",
+              "이미 오래되었다고 적혀 있다. ",
+              "‘평양성’이라는 지명에 주목하여 ",
+              "모본 제작 시기를 고구려 말기로 보는 데에는 ",
+              "상당수가 동의하는 것 같다. ",
+              "하지만 권근의 서술에 ",
+              "‘옛 평양성’이라고 쓰여 있을 뿐 ",
+              "‘고구려’가 등장하지 않는 점을 지적하는 연구가 있다. ",
+              "고구려가 아니라 고려의 천문도를 ",
+              "모본으로 했다는 주장도 있다."
+            ],
+            [
+              "별자리 관측 시기에 대해서도 ",
+              "각각의 주장이 다르다. ",
+              "기원전 50년부터 기원후 1세기, ",
+              "기원후 200년, 기원후 4~6세기 등이 ",
+              "나란히 제시되어 있다. ",
+              "새겨진 결과만으로 관측연대를 추정하는 것에 ",
+              "큰 의미를 부여하기 어렵다는 의견도 있다. ",
+              "석판은 앞면뿐 아니라 뒷면에도 천문도가 있는데, ",
+              "양면 중 어느 면을 ",
+              "세종 때 새겨진 것으로 볼지에 대한 ",
+              "분석도 논의가 제각각이다."
+            ],
+            [
+              "분명한 것은 세종 때에도 ",
+              "석각본 천문도가 제작되었다는 기록이 있다는 점이다. ",
+              "1687년 숙종 때에는 복각본이 제작되어 ",
+              "현재 실물로 남아 있다. ",
+              "천문도의 보전·보급에는 ",
+              "필사와 목판 인쇄와 탁본 등의 ",
+              "여러 방법이 동원되었다."
+            ]
+          ],
+          "en": [
+            "Cheonsang yeolcha bunyajido is a star map carved on a stone slab in 1395, just after the founding of Joseon. The name itself is the content. Cheonsang means astronomical phenomena: the changes of the sun, the moon and the stars. Yeolcha means that the twelve cha, the star fields of the East, are laid out in order; the twelve cha are twelve zones near the equator, set by the movement of Jupiter. Bunya matches the constellations in the sky with the corresponding regions on the ground.",
+            "The slab from Taejo’s time is a rectangular block 122.7cm wide, 211cm high and 11.8cm thick. The upper part is two thirds of the whole, and the lower part one third.",
+            "In the upper part a star chart is drawn together with short notes. The north pole is placed at the centre, with the ecliptic, the path of the sun, and the equator drawn midway between the north and south poles. The sky near the ecliptic was divided into twelve, and 1,467 stars were carved as dots. Bright stars were carved large, faint stars small.",
+            "When and where the model came from, however, has not been settled into one answer. Gwon Geun’s postscript, carved on the lower part of the slab, says that the stone original of this star map had been at the old Pyeongyang fortress, but had long since been lost in a river during a war. Because of the place name Pyeongyang, a good number of researchers seem to agree that the model was made in the late Goguryeo period. But there is research pointing out that Gwon Geun wrote only the old Pyeongyang fortress and that Goguryeo does not appear. There is also a claim that the model was a Goryeo star map, not a Goguryeo one.",
+            "On the date of the star observations, too, the claims differ. From 50 BCE to the first century CE, the year 200 CE, and the fourth to sixth centuries CE stand side by side among the dates put forward. There is also an opinion that it is hard to give much weight to estimating an observation date from the carving alone. The slab carries a star map on the back as well as the front, and the analyses of which of the two faces was carved under Sejong also go each their own way.",
+            "What is clear is that there is a record of a carved star map being made under Sejong as well. In 1687, under Sukjong, a re-carved version was made and survives today as an object. Copying by hand, woodblock printing and rubbings were among the several methods used to preserve and spread star maps."
+          ],
+          "envocab": [
+            {
+              "word": "carved",
+              "ko": "새긴 (과거분사)",
+              "base": "carve [kɑːrv]"
+            },
+            {
+              "word": "rectangular",
+              "ko": "직육면체의 (형용사)",
+              "base": "rectangular [rekˈtæŋɡjələr]"
+            },
+            {
+              "word": "equator",
+              "ko": "적도 (명사)",
+              "base": "equator [ɪˈkweɪtər]"
+            },
+            {
+              "word": "postscript",
+              "ko": "발문 (명사)",
+              "base": "postscript [ˈpoʊstskrɪpt]"
+            },
+            {
+              "word": "estimating",
+              "ko": "추정하는 것 (동명사)",
+              "base": "estimate [ˈestɪmeɪt]"
+            },
+            {
+              "word": "model",
+              "ko": "모본 (명사)",
+              "base": "model [ˈmɑːdl]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "황도",
+              "easy": "하늘에서 태양이 지나가는 길",
+              "hanja": "黃(누를 황)+道(길 도)"
+            },
+            {
+              "word": "적도",
+              "easy": "남북극의 가운데를 지나는 둘레의 선",
+              "hanja": "赤(붉을 적)+道(길 도)"
+            },
+            {
+              "word": "발문",
+              "easy": "책이나 비석 끝에 붙여 그 사정을 적은 글",
+              "hanja": "跋(밟을 발)+文(글월 문)"
+            },
+            {
+              "word": "모본",
+              "easy": "본을 떠서 옮길 때 바탕이 된 것",
+              "hanja": "模(본뜰 모)+本(근본 본)"
+            },
+            {
+              "word": "추정",
+              "easy": "확정하지 않고 미루어 짐작해 정하는 일",
+              "hanja": "推(밀 추)+定(정할 정)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 힘을 들여 말하는 것은?",
+              "choices": [
+                "천상열차분야지도의 이름과 치수를 모두 외워야 한다는 것",
+                "석각본은 돌이라 깨지지 않는다는 것",
+                "돌에 남은 것과 아직 갈리는 논의가 함께 있다는 것",
+                "세종이 천문도를 혼자 만들었다는 것"
+              ],
+              "answer": 2,
+              "explain": "치수와 새김은 그대로 남았지만, 모본 제작 시기와 관측 시기는 주장이 갈린다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "태조 때의 석각본에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "두께가 30.3cm이다",
+                "상단이 전체의 1/3이다",
+                "별을 크기에 상관없이 똑같이 새겼다",
+                "황도 부근을 12등분했다"
+              ],
+              "answer": 3,
+              "explain": "황도 부근의 하늘을 12등분한 후 1,467개의 별을 점으로 새겼다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「모본」은 이 글에서 무엇을 가리키나요?",
+              "choices": [
+                "천문도를 새기는 데 쓴 돌의 종류",
+                "옮겨 새길 때 바탕이 된 것",
+                "발문을 쓴 사람의 이름",
+                "별자리 그림의 다른 이름"
+              ],
+              "answer": 1,
+              "explain": "평양성에 있던 천문도가 이 천문도의 모본이 되었다고 적혀 있다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "별자리 관측 시기에 대한 이 글의 설명은?",
+              "choices": [
+                "기원후 200년으로 확정되었다",
+                "기원전 50년 한 가지로 좁혀졌다",
+                "각각의 주장이 다르다",
+                "아무도 분석한 적이 없다"
+              ],
+              "answer": 2,
+              "explain": "기원전 50년부터 기원후 1세기, 기원후 200년, 기원후 4~6세기 등이 나란히 제시되어 있다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「그런데 모본이 언제 어디의 것인지는 하나로 정해지지 않았다」가 이 글에서 하는 일은?",
+              "choices": [
+                "앞에서 적은 치수가 모두 틀렸다고 뒤집어 놓는다",
+                "돌에 남은 사실과 아직 갈리는 논의를 갈라 준다",
+                "천문도가 만들어지지 않았음을 알린다",
+                "세종 때의 기기 제작을 설명한다"
+              ],
+              "answer": 1,
+              "explain": "이 문장 앞은 치수와 새김이고, 뒤는 모본과 관측 시기의 여러 주장이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "오래된 그림의 제작 시기를 조사할 때 이 글의 태도에 가장 가까운 것은?",
+              "choices": [
+                "확인된 것과 갈리는 것을 나누어 적는다",
+                "가장 많이 주장되는 시기를 정답으로 적는다",
+                "주장이 갈리면 조사를 멈춘다",
+                "시기를 적지 않고 그림만 보여 준다"
+              ],
+              "answer": 0,
+              "explain": "이 글은 치수와 새김은 그대로 적고, 시기에 대해서는 여러 주장과 「의견도 있다」를 함께 적는다.",
+              "evidencePara": 4
+            }
+          ],
+          "enseg": [
+            [
+              "Cheonsang yeolcha bunyajido is a star map carved on a stone slab in 1395, ",
+              "just after the founding of Joseon. ",
+              "The name itself is the content. ",
+              "Cheonsang means astronomical phenomena: ",
+              "the changes of the sun, the moon and the stars. ",
+              "Yeolcha means that the twelve cha, ",
+              "the star fields of the East, ",
+              "are laid out in order; ",
+              "the twelve cha are twelve zones near the equator, ",
+              "set by the movement of Jupiter. ",
+              "Bunya matches the constellations in the sky with the corresponding regions on the ground."
+            ],
+            [
+              "The slab from Taejo’s time is a rectangular block 122.7cm wide, ",
+              "211cm high and 11.8cm thick. ",
+              "The upper part is two thirds of the whole, ",
+              "and the lower part one third."
+            ],
+            [
+              "In the upper part a star chart is drawn together with short notes. ",
+              "The north pole is placed at the centre, ",
+              "with the ecliptic, ",
+              "the path of the sun, ",
+              "and the equator drawn midway between the north and south poles. ",
+              "The sky near the ecliptic was divided into twelve, ",
+              "and 1,467 stars were carved as dots. ",
+              "Bright stars were carved large, faint stars small."
+            ],
+            [
+              "When and where the model came from, ",
+              "however, ",
+              "has not been settled into one answer. ",
+              "Gwon Geun’s postscript, ",
+              "carved on the lower part of the slab, ",
+              "says that the stone original of this star map had been at the old Pyeongyang fortress, ",
+              "but had long since been lost in a river during a war. ",
+              "Because of the place name Pyeongyang, ",
+              "a good number of researchers seem to agree that the model was made in the late Goguryeo period. ",
+              "But there is research pointing out that Gwon Geun wrote only the old Pyeongyang fortress and that Goguryeo does not appear. ",
+              "There is also a claim that the model was a Goryeo star map, ",
+              "not a Goguryeo one."
+            ],
+            [
+              "On the date of the star observations, too, the claims differ. ",
+              "From 50 BCE to the first century CE, ",
+              "the year 200 CE, ",
+              "and the fourth to sixth centuries CE stand side by side among the dates ",
+              "put forward. ",
+              "There is also an opinion that it is hard to give much weight to estimating an observation date from the carving alone. ",
+              "The slab carries a star map on the back as well as the front, ",
+              "and the analyses of which of the two faces was carved under Sejong also go each their own way."
+            ],
+            [
+              "What is clear is that there is a record of a carved star map being made under Sejong as well. ",
+              "In 1687, ",
+              "under Sukjong, ",
+              "a re-carved version was made and survives today as an object. ",
+              "Copying by hand, ",
+              "woodblock printing and rubbings were among the several methods used to preserve and spread ",
+              "star maps."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "하늘을 돌에 새겨 남긴다는 것",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "「천상열차분야지도」는 조선 건국 직후인 ",
+              "1395년에 석판에 새긴 천문도이다. ",
+              "‘천상’은 천문 현상으로 해·달·별의 변화를 나타낸다. ",
+              "‘열차’는 동양의 별자리인 12차를 ",
+              "벌여 놓았다는 뜻인데, ",
+              "12차는 목성의 운행을 기준으로 설정한 ",
+              "적도 부근의 12구역을 이른다. ",
+              "‘분야’는 하늘의 별자리를 ",
+              "지상의 해당 지역과 대응시킨 것이다. ",
+              "하늘 별자리와 땅의 지리를 결부시킨 ",
+              "내용을 담았다고 볼 수 있다."
+            ],
+            [
+              "현재 석각본은 두 종류가 있다. ",
+              "하나는 1395년 태조 때 석각된 것으로 ",
+              "국보 제228호이고, ",
+              "또 하나는 1687년 숙종 때 ",
+              "다시 새겨진 것으로 보물 837호이다."
+            ],
+            [
+              "태조 때의 석각본은 너비 122.7cm, ",
+              "높이 211cm, 두께 11.8cm의 직육면체 석판이다. ",
+              "전체의 2/3인 상단에는 별자리 그림이 ",
+              "짧은 설명과 함께 그려져 있다. ",
+              "중심에 북극을 두고, ",
+              "태양이 지나는 길인 황도와 ",
+              "남북극 가운데로 적도를 그렸다. ",
+              "황도 부근의 하늘을 12등분한 후 ",
+              "1,467개의 별을 점으로 새겼고, ",
+              "밝은 별은 크게, 희미한 별은 작게 새겼다."
+            ],
+            [
+              "제작 배경은 석각본 하단에 새겨진 ",
+              "권근의 발문에 서술되어 있다. ",
+              "그 앞부분 일부를 옮기면, ",
+              "이 천문도의 석본은 옛날 평양성에 있었으나 ",
+              "병란으로 강에 빠져 분실된 지 ",
+              "이미 오래되었고 ",
+              "그 인본조차 남아 있는 것이 없었다. ",
+              "태조가 즉위한 지 얼마 지나지 않아 ",
+              "인본 하나를 받치는 자가 있어, ",
+              "서운관으로 하여금 돌에 다시 새기도록 명하였다."
+            ],
+            [
+              "연구자들은 천문도 안의 도설과 ",
+              "별자리 그림인 성도 등을 통해 ",
+              "모본의 제작 시기와 ",
+              "성도의 관측 시기 등을 분석해 왔다. ",
+              "‘평양성’이라는 지명에 주목하여 ",
+              "모본 제작 시기를 고구려 말기로 보는 데에는 ",
+              "상당수가 동의하는 것 같다. ",
+              "하지만 최근에는 권근의 서술에 ",
+              "‘옛 평양성’이라고 쓰여 있을 뿐 ",
+              "‘고구려’가 등장하지 않는 점을 지적하는 연구가 있다. ",
+              "고구려가 아니라 고려의 천문도를 ",
+              "모본으로 했다는 주장도 있다. ",
+              "별자리 관측 시기에 대해서는 ",
+              "기원전 50년부터 기원후 1세기, ",
+              "기원후 200년, 기원후 4~6세기 등 ",
+              "각각의 주장이 다르고, ",
+              "새겨진 결과만으로 관측연대를 추정하는 것에 ",
+              "큰 의미를 부여하기 어렵다는 의견도 있다."
+            ],
+            [
+              "석판의 앞면뿐 아니라 뒷면에도 천문도가 있다. ",
+              "세종 때 이순지가 지은 『제가역상집』 발문에는 ",
+              "천문도 석각본을 만들었다는 서술이 보이고, ",
+              "『임하필기』와 『증보문헌비고』 등에서는 ",
+              "제작 연대인 1433년을 밝혀놓기도 했다. ",
+              "여러 기록을 토대로 ",
+              "양면 중 어느 면이 ",
+              "세종 때 제작된 것인지 ",
+              "분석이 행해졌지만, ",
+              "이 역시 논의가 제각각이다. ",
+              "아직은 더 많은 논의가 필요해 보인다."
+            ],
+            [
+              "1687년 숙종 때의 복각본은 ",
+              "내용이 태조 때와 같다. ",
+              "너비는 14.2cm, ",
+              "높이는 3cm 정도 작지만, ",
+              "두께는 18.4cm 증가한 30.3cm여서 ",
+              "훨씬 안정적으로 석재 무게를 지탱한다. ",
+              "천문도의 보전·보급에는 ",
+              "필사·목판 인쇄·탁본 등의 ",
+              "여러 방법이 동원되었고, ",
+              "18세기에는 기존 「천상열차분야지도」와 서양식 천문도가 ",
+              "8폭 병풍에 나란히 그려진 사례도 있다."
+            ]
+          ],
+          "en": [
+            "Cheonsang yeolcha bunyajido is a star map carved on a stone slab in 1395, just after the founding of Joseon. Cheonsang means astronomical phenomena: the changes of the sun, the moon and the stars. Yeolcha means that the twelve cha, the star fields of the East, are laid out in order; the twelve cha are twelve zones near the equator, set by the movement of Jupiter. Bunya matches the constellations in the sky with the corresponding regions on the ground. It can be seen as a picture of the sky that links the constellations above with the geography below.",
+            "Two carved stone versions exist today. One was carved in 1395 under Taejo and is National Treasure No. 228; the other was carved again in 1687 under Sukjong and is Treasure No. 837.",
+            "The slab from Taejo’s time is a rectangular block 122.7cm wide, 211cm high and 11.8cm thick. In the upper part, two thirds of the whole, a star chart is drawn together with short notes. The north pole is placed at the centre, with the ecliptic, the path of the sun, and the equator drawn midway between the north and south poles. The sky near the ecliptic was divided into twelve and 1,467 stars were carved as dots, bright stars large and faint stars small.",
+            "The background of its making is set out in Gwon Geun’s postscript, carved on the lower part of the slab. To quote part of its opening: the stone original of this star map had been at the old Pyeongyang fortress, but it had long since been lost in a river during a war, and not even a printed copy of it remained. Not long after Taejo took the throne someone offered a printed copy, and he ordered the Seounggwan to carve it in stone again.",
+            "Through the diagrams on the map, the star chart and the like, researchers have analysed such things as the date the model was made and the date of the star chart’s observations. Because of the place name Pyeongyang, a good number of researchers seem to agree that the model was made in the late Goguryeo period. Recently, however, there is research pointing out that Gwon Geun wrote only the old Pyeongyang fortress and that Goguryeo does not appear. There is also a claim that the model was a Goryeo star map, not a Goguryeo one. On the date of the star observations the claims differ, from 50 BCE to the first century CE, the year 200 CE, and the fourth to sixth centuries CE among others, and there is also an opinion that it is hard to give much weight to estimating an observation date from the carving alone.",
+            "The slab carries a star map on the back as well as the front. The postscript of Jega yeoksangjip, written by Yi Sun-ji under Sejong, carries a description saying that a carved stone star map was made, and works such as Imha pilgi and Jeungbo munheon bigo even give 1433 as the year of its making. On the basis of these records, analyses were made of which of the two faces was carved under Sejong, but here too the discussions go each their own way. It seems that more discussion is still needed.",
+            "The re-carved version of 1687, under Sukjong, has the same content as the one from Taejo’s time. It is 14.2cm narrower and about 3cm lower, but its thickness, increased by 18.4cm to 30.3cm, supports the weight of the stone far more stably. Copying by hand, woodblock printing and rubbings were among the several methods used to preserve and spread star maps, and in the eighteenth century there is a case of the earlier Cheonsang yeolcha bunyajido drawn side by side with a Western star map on a folding screen of eight panels."
+          ],
+          "envocab": [
+            {
+              "word": "postscript",
+              "ko": "발문 (명사)",
+              "base": "postscript [ˈpoʊstskrɪpt]"
+            },
+            {
+              "word": "diagrams",
+              "ko": "도설 (명사)",
+              "base": "diagram [ˈdaɪəɡræm]"
+            },
+            {
+              "word": "observations",
+              "ko": "관측 (명사)",
+              "base": "observation [ˌɑːbzərˈveɪʃn]"
+            },
+            {
+              "word": "supports",
+              "ko": "지탱한다 (동사)",
+              "base": "support [səˈpɔːrt]"
+            },
+            {
+              "word": "links",
+              "ko": "결부시킨다 (동사)",
+              "base": "link [lɪŋk]"
+            },
+            {
+              "word": "rubbings",
+              "ko": "탁본 (명사)",
+              "base": "rubbing [ˈrʌbɪŋ]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "결부",
+              "easy": "서로 관련지어 한데 묶어 붙이는 일",
+              "hanja": "結(맺을 결)+附(붙을 부)"
+            },
+            {
+              "word": "도설",
+              "easy": "그림에 곁들여 그 내용을 풀어 적은 설명",
+              "hanja": "圖(그림 도)+說(말씀 설)"
+            },
+            {
+              "word": "성도",
+              "easy": "별과 별자리의 위치를 그려 놓은 그림",
+              "hanja": "星(별 성)+圖(그림 도)"
+            },
+            {
+              "word": "관측",
+              "easy": "하늘의 현상을 살펴 재어 보는 일",
+              "hanja": "觀(볼 관)+測(헤아릴 측)"
+            },
+            {
+              "word": "지탱",
+              "easy": "무게나 힘을 받쳐 버티어 내는 일",
+              "hanja": "支(지탱할 지)+撐(버틸 탱)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "돌에 남은 것은 또렷하지만 모본은 갈린다",
+                "석각본이 두 종류뿐이므로 더 찾아볼 것이 없다는 것",
+                "세종 때의 기록이 가장 자세하다는 것",
+                "복각본이 태조 때의 것보다 먼저 만들어졌다는 것"
+              ],
+              "answer": 0,
+              "explain": "치수와 새김은 그대로 남았지만, 모본 제작 시기와 관측 시기와 양면의 관계는 주장이 갈린다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "두 석각본에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "태조 때의 것은 보물 837호다",
+                "숙종 때의 것이 국보 제228호로 지정되었다",
+                "숙종 때의 것은 1687년에 새겨졌다",
+                "두 석각본은 치수가 같다"
+              ],
+              "answer": 2,
+              "explain": "또 하나는 1687년 숙종 때 다시 새겨진 것이다. 국보 제228호는 태조 때의 것, 보물 837호는 숙종 때의 것이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「지탱한다」는 이 글에서 무엇을 말하나요?",
+              "choices": [
+                "무게를 재어 적는다",
+                "무게를 줄여 가볍게 한다",
+                "무게를 다른 돌에 옮긴다",
+                "무게를 받쳐 버틴다"
+              ],
+              "answer": 3,
+              "explain": "두께가 늘어 훨씬 안정적으로 석재 무게를 지탱한다고 적혀 있다.",
+              "evidencePara": 6
+            },
+            {
+              "type": "detail",
+              "q": "권근의 발문에 적힌 내용으로 알맞은 것은?",
+              "choices": [
+                "석본을 고려에서 가져왔다",
+                "석본이 평양성에 있었으나 분실되었다",
+                "인본이 여러 장 남아 있어 고르기 쉬웠다",
+                "서운관이 천문도를 숨겼다"
+              ],
+              "answer": 1,
+              "explain": "이 천문도의 석본은 옛날 평양성에 있었으나 병란으로 강에 빠져 분실된 지 이미 오래되었다고 적혀 있다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "이 자료 본문만으로는 답할 수 없는 것은?",
+              "choices": [
+                "태조 때 석각본의 두께가 몇 cm인지",
+                "상단에 새긴 별의 수",
+                "세종 때 새겨진 면이 어느 쪽인지",
+                "복각본이 만들어진 해"
+              ],
+              "answer": 2,
+              "explain": "이 자료 본문에는 양면 중 어느 면이 세종 때 제작된 것인지 분석이 행해졌지만 논의가 제각각이고, 아직은 더 많은 논의가 필요해 보인다고만 적혀 있다.",
+              "evidencePara": 5
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "복각본의 두께를 적은 서술이 이 글에서 하는 일은?",
+              "choices": [
+                "복각본이 태조 때의 것보다 가볍다는 것을 알려 준다",
+                "석재 무게를 받치는 정도가 달라졌음을 짚어 준다",
+                "별의 수가 늘어났음을 알려 준다",
+                "글자 크기가 같음을 알려 준다"
+              ],
+              "answer": 1,
+              "explain": "두께는 18.4cm 증가한 30.3cm여서 훨씬 안정적으로 석재 무게를 지탱한다고 적혀 있다.",
+              "evidencePara": 6
+            },
+            {
+              "type": "apply",
+              "q": "오래된 유물을 소개하는 글을 쓸 때 이 글의 방식에 가장 가까운 것은?",
+              "choices": [
+                "확인된 것과 갈리는 것을 나누어 적는다",
+                "가장 그럴듯한 설명 하나만 골라서 적는다",
+                "치수는 적지 않고 평가만 적는다",
+                "논의가 갈리는 대목은 빼고 적는다"
+              ],
+              "answer": 0,
+              "explain": "이 글은 치수와 새김은 그대로 적고, 모본과 양면에 대해서는 여러 주장과 「논의가 제각각이다」를 함께 적는다.",
+              "evidencePara": 5
+            }
+          ],
+          "enseg": [
+            [
+              "Cheonsang yeolcha bunyajido is a star map carved on a stone slab in 1395, ",
+              "just after the founding of Joseon. ",
+              "Cheonsang means astronomical phenomena: ",
+              "the changes of the sun, the moon and the stars. ",
+              "Yeolcha means that the twelve cha, ",
+              "the star fields of the East, ",
+              "are laid out in order; ",
+              "the twelve cha are twelve zones near the equator, ",
+              "set by the movement of Jupiter. ",
+              "Bunya matches the constellations in the sky with the corresponding regions on the ground. ",
+              "It can be seen as a picture of the sky that links the constellations above with the geography below."
+            ],
+            [
+              "Two carved stone versions exist today. ",
+              "One was carved in 1395 under Taejo and is National Treasure No. ",
+              "228; ",
+              "the other was carved again in 1687 under Sukjong and is Treasure No. ",
+              "837."
+            ],
+            [
+              "The slab from Taejo’s time is a rectangular block 122.7cm wide, ",
+              "211cm high and 11.8cm thick. ",
+              "In the upper part, ",
+              "two thirds of the whole, ",
+              "a star chart is drawn together with short notes. ",
+              "The north pole is placed at the centre, ",
+              "with the ecliptic, ",
+              "the path of the sun, ",
+              "and the equator drawn midway between the north and south poles. ",
+              "The sky near the ecliptic was divided into twelve and 1,467 stars were carved as dots, ",
+              "bright stars large and faint stars small."
+            ],
+            [
+              "The background of its making is set out in Gwon Geun’s postscript, ",
+              "carved on the lower part of the slab. ",
+              "To quote part of its opening: ",
+              "the stone original of this star map had been at the old Pyeongyang fortress, ",
+              "but it had long since been lost in a river during a war, ",
+              "and not even a printed copy of it remained. ",
+              "Not long after Taejo took the throne someone offered a printed copy, ",
+              "and he ordered the Seounggwan to carve it in stone again."
+            ],
+            [
+              "Through the diagrams on the map, the star chart and the like, researchers have ",
+              "analysed such things as the date the model was made and the date of the star chart’s ",
+              "observations. ",
+              "Because of the place name Pyeongyang, ",
+              "a good number of researchers seem to agree that the model was made in the late Goguryeo period. ",
+              "Recently, ",
+              "however, ",
+              "there is research pointing out that Gwon Geun wrote only the old Pyeongyang fortress and that Goguryeo does not appear. ",
+              "There is also a claim that the model was a Goryeo star map, ",
+              "not a Goguryeo one. ",
+              "On the date of the star observations the claims differ, ",
+              "from 50 BCE to the first century CE, ",
+              "the year 200 CE, ",
+              "and the fourth to sixth centuries CE among others, and there is also an opinion ",
+              "that it is hard to give much weight to estimating an observation date from the ",
+              "carving alone."
+            ],
+            [
+              "The slab carries a star map on the back as well as the front. ",
+              "The postscript of Jega yeoksangjip, ",
+              "written by Yi Sun-ji under Sejong, ",
+              "carries a description saying that a carved stone star map was made, ",
+              "and works such as Imha pilgi and Jeungbo munheon bigo even give 1433 as the year ",
+              "of its making. ",
+              "On the basis of these records, ",
+              "analyses were made of which of the two faces was carved under Sejong, ",
+              "but here too the discussions go each their own way. ",
+              "It seems that more discussion is still needed."
+            ],
+            [
+              "The re-carved version of 1687, ",
+              "under Sukjong, ",
+              "has the same content as the one from Taejo’s time. ",
+              "It is 14.2cm narrower and about 3cm lower, ",
+              "but its thickness, ",
+              "increased by 18.4cm to 30.3cm, ",
+              "supports the weight of the stone far more stably. ",
+              "Copying by hand, ",
+              "woodblock printing and rubbings were among the several methods used to preserve and spread star maps, and in the ",
+              "eighteenth century there is a case of the earlier Cheonsang yeolcha bunyajido drawn side by side with a Western ",
+              "star map on a folding screen of eight panels."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "goryeodo-record",
+      "category": "history",
+      "careers": [
+        "art",
+        "media",
+        "law"
+      ],
+      "issue": false,
+      "publishedAt": "2026-11-16",
+      "status": "published",
+      "sources": [
+        {
+          "title": "우리역사넷 한국사 연대기 — 고려도경",
+          "url": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_r200100&code=kc_age_20"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "글은 남고 그림은 전하지 않아요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "아주 오래전 일이에요. ",
+              "송이라는 나라에서 ",
+              "고려로 사절단이 왔어요. ",
+              "서긍도 그 일행이었어요."
+            ],
+            [
+              "서긍은 고려에서 ",
+              "본 것을 적었어요. ",
+              "송으로 돌아가 책을 만들었어요. ",
+              "책 이름은 고려도경이에요. ",
+              "책은 모두 40권이에요."
+            ],
+            [
+              "책에는 개경의 성과 ",
+              "궁전 이야기가 있어요. ",
+              "옷과 배 이야기도 있어요. ",
+              "서긍은 모양을 ",
+              "그릴 수 있는 것은 ",
+              "먼저 글로 설명했어요. ",
+              "그리고 그림을 덧붙였어요."
+            ],
+            [
+              "그런데 그 그림은 ",
+              "지금 전하지 않아요. ",
+              "글만 남았어요. ",
+              "그래서 우리는 글을 읽으며 ",
+              "옛 고려를 알아봐요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "사절단",
+              "easy": "나라의 일로 다른 나라에 가는 사람들의 무리예요."
+            },
+            {
+              "word": "고려도경",
+              "easy": "서긍이 고려에서 본 것을 적어 만든 책 이름이에요."
+            },
+            {
+              "word": "설명",
+              "easy": "모르는 것을 알아듣게 풀어서 말해 주는 일이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "고려 사람들이 송으로 가서 글을 배운 이야기",
+                "송에서 온 사절단이 고려에서 큰 배를 만든 이야기",
+                "서긍이 고려에서 본 것을 적어 책을 만든 이야기",
+                "고려에서 새 글자를 만들어 널리 가르친 이야기"
+              ],
+              "answer": 2,
+              "explain": "서긍은 고려에서 본 것을 적었고, 송으로 돌아가 책을 만들었어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "서긍이 만든 책은 모두 몇 권인가요?",
+              "choices": [
+                "4권",
+                "14권",
+                "28권",
+                "40권"
+              ],
+              "answer": 3,
+              "explain": "책은 모두 40권이에요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「설명」은 무슨 뜻인가요?",
+              "choices": [
+                "모르는 것을 풀어서 말해 주는 일",
+                "종이에 그림을 예쁘게 그려서 벽에 붙이는 일",
+                "먼 나라로 배를 타고 떠나는 일",
+                "책을 여러 권으로 나누어 묶는 일"
+              ],
+              "answer": 0,
+              "explain": "서긍은 모양을 그릴 수 있는 것을 먼저 글로 풀어서 말해 주었어요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "서긍이 덧붙인 그림에 대해 이 글에서 알 수 있는 것은 무엇인가요?",
+              "choices": [
+                "서긍이 그림을 한 장도 그리지 않았어요",
+                "그림이 지금 전하지 않아요",
+                "그림이 책 40권에 모두 남아 있어요",
+                "서긍이 송에서 그림을 다시 그렸어요"
+              ],
+              "answer": 1,
+              "explain": "서긍은 그림을 덧붙였지만 그 그림은 지금 전하지 않아요.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "서긍이 책을 만든 방법과 가장 비슷한 것은 무엇인가요?",
+              "choices": [
+                "친구가 쓴 글을 그대로 베껴서 공책에 옮기기",
+                "책에서 읽은 이야기를 외워 두기",
+                "그림만 그리고 글은 쓰지 않기",
+                "소풍에서 본 것을 글로 쓰고 그림을 붙이기"
+              ],
+              "answer": 3,
+              "explain": "서긍은 먼저 글로 설명하고 그다음에 그림을 덧붙였어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "한 달 동안 본 것으로 쓴 책",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "1123년, ",
+              "송의 사절단이 고려에 왔다. ",
+              "서긍은 이 사절단의 일행이었다. ",
+              "서긍은 고려에서 보고 ",
+              "들은 것을 적어 책을 만들었다. ",
+              "그 책이 고려도경이다."
+            ],
+            [
+              "사절단은 3월 14일에 ",
+              "송의 수도인 변경을 떠났다. ",
+              "6월 12일에 개경에 도착해 ",
+              "숙소인 순천관에 들어갔다. ",
+              "1개월간 고려에 머물다가 7월 ",
+              "13일에 다시 송으로 돌아갔다."
+            ],
+            [
+              "고려도경은 전 40권이다. ",
+              "본래 제목은 선화봉사고려도경이다. ",
+              "책은 모두 28개의 큰 항목으로 나뉘었고, ",
+              "다시 300여 개의 ",
+              "작은 항목으로 세분화되어 있다. ",
+              "고려 왕의 계보, ",
+              "개경의 성곽과 궁전, ",
+              "관복, ",
+              "종교, ",
+              "생활풍속, ",
+              "각종 배와 바닷길 등이 담겼다."
+            ],
+            [
+              "형상을 그릴 수 있는 것은 ",
+              "먼저 글로써 설명하고 ",
+              "그림을 덧붙이는 형식을 취하였는데, ",
+              "현재 그림은 전하지 않는다."
+            ],
+            [
+              "서긍이 서술한 내용들은 ",
+              "고려에 머문 1개월 사이에 보고 ",
+              "듣고 한 것들이다. ",
+              "서문에서 서긍은 “고려에서는 ",
+              "겨우 한 달 ",
+              "쯤을 머물렀을 뿐이다. ",
+              "숙소가 정해진 뒤에는 ",
+              "파수병이 지켜, ",
+              "문 밖을 나가 본 것이 ",
+              "5~6차례에 불과하였다”고 서술하고 있다. ",
+              "주로 개경을 중심으로 ",
+              "한 서술이 많은 것도 ",
+              "그러한 이유 때문이다."
+            ],
+            [
+              "그래서 이 책을 읽을 때는 ",
+              "먼저 물어볼 것이 있다. ",
+              "누가, 언제, ",
+              "얼마나 보고 쓴 기록인가. ",
+              "고려도경은 얼마나 보고 썼는가를 ",
+              "서문에 적어 두었다."
+            ]
+          ],
+          "en": [
+            "In 1123, an envoy group from Song came to Goryeo. Seo Geung was a member of this group. He wrote down what he saw and heard in Goryeo. That book is the Goryeodogyeong.",
+            "The group left Bianjing, the capital of Song, on March 14. On June 12 it reached Gaegyeong. There it entered Suncheongwan, its lodging. The group stayed in Goryeo for one month. On July 13 it went back to Song.",
+            "The Goryeodogyeong has forty volumes in all. Its original title was Seonhwa Bongsa Goryeodogyeong. The book is divided into 28 large items. These are divided again into more than 300 small items. It holds the line of Goryeo kings. The walls and palaces of Gaegyeong are in it. Official robes, religion and daily customs are in it. Many kinds of ships and the sea routes are in it too. Other things are in it as well.",
+            "For things that could be drawn, the book first explained them in words. Then it added a picture. But the pictures do not survive today.",
+            "What Seo Geung wrote came from the one month he spent in Goryeo. In the preface he wrote this. “I stayed in Goryeo only about a month. After my lodging was fixed, guards watched it. I went out of the gate only five or six times.” That is also why much of the book is about Gaegyeong.",
+            "So there is one question to ask first. Who wrote this book, when, and after seeing how much? The Goryeodogyeong wrote in its preface how much he saw."
+          ],
+          "enseg": [
+            [
+              "In 1123, ",
+              "an envoy group from Song ",
+              "came to Goryeo. ",
+              "Seo Geung was a member ",
+              "of this group. ",
+              "He wrote down ",
+              "what he saw and heard in Goryeo. ",
+              "That book is the Goryeodogyeong."
+            ],
+            [
+              "The group left Bianjing, ",
+              "the capital of Song, ",
+              "on March 14. ",
+              "On June 12 ",
+              "it reached Gaegyeong. ",
+              "There it entered Suncheongwan, ",
+              "its lodging. ",
+              "The group stayed in Goryeo ",
+              "for one month. ",
+              "On July 13 ",
+              "it went back to Song."
+            ],
+            [
+              "The Goryeodogyeong has forty volumes ",
+              "in all. ",
+              "Its original title was ",
+              "Seonhwa Bongsa Goryeodogyeong. ",
+              "The book is divided ",
+              "into 28 large items. ",
+              "These are divided again ",
+              "into more than 300 small items. ",
+              "It holds the line of Goryeo kings. ",
+              "The walls and palaces of Gaegyeong ",
+              "are in it. ",
+              "Official robes, religion and daily customs ",
+              "are in it. ",
+              "Many kinds of ships and ",
+              "the sea routes are in it ",
+              "too. Other things are in ",
+              "it as well."
+            ],
+            [
+              "For things that could be drawn, ",
+              "the book first explained them in words. ",
+              "Then it added a picture. ",
+              "But the pictures ",
+              "do not survive today."
+            ],
+            [
+              "What Seo Geung wrote ",
+              "came from the one month ",
+              "he spent in Goryeo. ",
+              "In the preface he wrote this. ",
+              "“I stayed in Goryeo ",
+              "only about a month. ",
+              "After my lodging was fixed, ",
+              "guards watched it. ",
+              "I went out of the gate ",
+              "only five or six times.” ",
+              "That is also why ",
+              "much of the book is about Gaegyeong."
+            ],
+            [
+              "So there is one question ",
+              "to ask first. ",
+              "Who wrote this book, when, ",
+              "and after seeing how much? ",
+              "The Goryeodogyeong wrote ",
+              "in its preface how much he ",
+              "saw."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "사절단",
+              "easy": "나라의 일을 맡아 다른 나라에 가는 사람들의 무리",
+              "hanja": "使(부릴 사)+節(마디 절)+團(둥글 단)"
+            },
+            {
+              "word": "숙소",
+              "easy": "길을 떠난 사람이 묵는 곳",
+              "hanja": "宿(잘 숙)+所(바 소)"
+            },
+            {
+              "word": "항목",
+              "easy": "내용을 갈라 놓은 하나하나의 갈래",
+              "hanja": "項(항목 항)+目(눈 목)"
+            },
+            {
+              "word": "서문",
+              "easy": "책 앞에 붙여 그 책에 대해 적은 글",
+              "hanja": "序(차례 서)+文(글월 문)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "envoy",
+              "ko": "사절 (명사)",
+              "base": "envoy [ˈenvɔɪ]"
+            },
+            {
+              "word": "volumes",
+              "ko": "권 (명사)",
+              "base": "volume [ˈvɑːljuːm]"
+            },
+            {
+              "word": "preface",
+              "ko": "서문 (명사)",
+              "base": "preface [ˈprefəs]"
+            },
+            {
+              "word": "lodging",
+              "ko": "숙소 (명사)",
+              "base": "lodging [ˈlɑːdʒɪŋ]"
+            },
+            {
+              "word": "survive",
+              "ko": "전하다 (동사)",
+              "base": "survive [sərˈvaɪv]"
+            },
+            {
+              "word": "customs",
+              "ko": "풍속 (명사)",
+              "base": "custom [ˈkʌstəm]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 고려도경을 읽을 때 먼저 물어보라고 한 것은 무엇인가?",
+              "choices": [
+                "책이 모두 몇 권으로 묶여 있는지",
+                "누가, 언제, 얼마나 보고 쓴 기록인지",
+                "책의 본래 제목이 무엇이고 뜻은 무엇인지",
+                "남아 있는 그림이 몇 장인지"
+              ],
+              "answer": 1,
+              "explain": "글은 누가, 언제, 얼마나 보고 쓴 기록인가를 먼저 물어보라고 한다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "detail",
+              "q": "서긍이 서문에 적은 것은 무엇인가?",
+              "choices": [
+                "숙소를 옮겨 다니며 고려의 여러 고을을 두루 보았다는 것",
+                "그림을 모두 잃어버렸다는 것",
+                "고려 왕을 여러 번 만났다는 것",
+                "문 밖을 나가 본 것이 5~6차례에 불과하였다는 것"
+              ],
+              "answer": 3,
+              "explain": "서문에서 서긍은 숙소가 정해진 뒤에는 파수병이 지켜 문 밖을 나가 본 것이 5~6차례에 불과하였다고 적었다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "「서문」은 무엇인가?",
+              "choices": [
+                "책 앞에 붙여 그 책에 대해 적은 글",
+                "임금에게 올리려고 따로 베껴 둔 보고",
+                "책을 묶을 때 쓰는 굵은 실",
+                "나라끼리 주고받는 편지"
+              ],
+              "answer": 0,
+              "explain": "서문은 책 앞에 붙여 그 책에 대해 적은 글이다. 서긍은 서문에 머문 기간과 나가 본 횟수를 적었다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "infer",
+              "q": "고려도경에 개경을 중심으로 한 서술이 많은 까닭으로 이 글이 든 것은?",
+              "choices": [
+                "개경이 고려에서 가장 넓고 사람이 많은 고을이었기 때문이다",
+                "서긍이 개경 밖에서는 글을 쓸 수 없도록 금지되었기 때문이다",
+                "서긍이 보고 들은 것이 한 달 사이의 일이었기 때문이다",
+                "송 휘종이 개경만 적어서 바치라고 명령하였기 때문이다"
+              ],
+              "answer": 2,
+              "explain": "서긍이 서술한 내용들은 고려에 머문 1개월 사이에 보고 듣고 한 것들이고, 개경을 중심으로 한 서술이 많은 것도 그러한 이유 때문이다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "이 글로 보아 고려도경의 그림에 대해 알 수 있는 것은?",
+              "choices": [
+                "서긍은 글만 적었고 그림은 한 장도 그리지 않았다",
+                "그림을 먼저 그리고 그 뒤에 글로 설명하였다",
+                "글 다음에 붙인 그림은 지금 전하지 않는다",
+                "그림은 송에서 다른 사람이 다시 그려 넣었다"
+              ],
+              "answer": 2,
+              "explain": "형상을 그릴 수 있는 것은 먼저 글로써 설명하고 그림을 덧붙이는 형식을 취하였는데, 현재 그림은 전하지 않는다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "다음 가운데 이 글이 가르치는 읽기 방법에 가장 가까운 것은?",
+              "choices": [
+                "글이 길고 자세하면 믿을 만한 기록이라고 본다",
+                "쓴 사람이 얼마나 보고 썼는지 먼저 확인한다",
+                "가장 오래된 기록이면 그대로 믿는다",
+                "그림이 있는 기록만 골라 읽는다"
+              ],
+              "answer": 1,
+              "explain": "글은 누가, 언제, 얼마나 보고 쓴 기록인가를 먼저 물어보라고 한다.",
+              "evidencePara": 5
+            }
+          ]
+        },
+        "L3": {
+          "title": "얼마나 보고 쓴 기록인가",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "어떤 기록을 읽을 때 ",
+              "먼저 물을 것이 있다. ",
+              "누가 썼는가, 얼마나 보고 썼는가. ",
+              "고려도경은 얼마나 보고 썼는가를 ",
+              "서문에 적어 둔 기록이다."
+            ],
+            [
+              "고려도경은 1123년에 송의 사절 ",
+              "서긍이 고려에 사행을 다녀왔다가 지은 책이다. ",
+              "그 해 3월 송 ",
+              "휘종은 정사 노윤적과 부사 부묵경을 ",
+              "대표로 하는 사절단을 고려에 보냈고, ",
+              "서긍은 이 사절단의 일행이었다. ",
+              "사절단은 6월 12일에 개경에 도착해 ",
+              "숙소인 순천관에 들어갔다. ",
+              "1개월간 고려에 체류하다가 7월 ",
+              "13일에 다시 송으로 돌아갔다."
+            ],
+            [
+              "책은 전 40권이고 ",
+              "본래 제목은 선화봉사고려도경이다. ",
+              "모두 28개의 큰 항목으로 나뉘었고, ",
+              "다시 300여 개의 ",
+              "작은 항목으로 세분화되어 있다."
+            ],
+            [
+              "담긴 것은 고려 왕의 계보, ",
+              "개경의 성곽과 궁전, ",
+              "관복, ",
+              "관부, ",
+              "종교, ",
+              "생활풍속, ",
+              "사절단에 대한 예우, ",
+              "각종 배와 바닷길 등이다. ",
+              "형상을 그릴 수 있는 것은 ",
+              "먼저 글로써 설명하고 ",
+              "그림을 덧붙이는 형식을 취하였는데, ",
+              "현재 그림은 전하지 않는다."
+            ],
+            [
+              "서긍이 찬술한 내용들은 ",
+              "고려에 머문 1개월 사이에 보고 ",
+              "듣고 한 것들이다. ",
+              "서문에서 서긍은 “고려에서는 겨우 ",
+              "한 달 쯤을 머물렀을 뿐이다. ",
+              "숙소가 정해진 뒤에는 파수병이 지켜, ",
+              "문 밖을 나가 본 것이 ",
+              "5~6차례에 불과하였다”고 서술하고 있다. ",
+              "주로 개경을 중심으로 한 서술이 ",
+              "많은 것도 그러한 이유 때문이다."
+            ],
+            [
+              "고려도경은 외국인이 직접 보고 ",
+              "겪었던 12세기 고려의 모습과 ",
+              "고려인들의 생활상 등을 기록한 당대의 ",
+              "자료라는 점에서 그 가치가 높다. ",
+              "고려사 등의 정사류 사서가 ",
+              "관심을 두지 않았던 내용들, ",
+              "예를 들면 ",
+              "고려 여성에 대한 정보 ",
+              "등도 자세하게 기록되어 있다."
+            ],
+            [
+              "한편 고려도경은 기본적으로 송 ",
+              "사람의 시선으로 고려를 서술한 것이다. ",
+              "서긍이 서술한 고려의 풍속에도 ",
+              "그 자신의 주관성이 상당부분 들어가 있고, ",
+              "고려 사람들의 살림과 풍속을 ",
+              "깎아내려 적은 대목도 있다. ",
+              "그가 숙소 밖을 나가 ",
+              "본 것이 5~6차례뿐이었다는 점을 고려하면, ",
+              "그가 고려의 풍속을 정확하게 이해하고 ",
+              "서술했다고 보기는 어렵다. ",
+              "서긍이 일반 백성들의 생활을 ",
+              "기록한 것은 가치가 있으나, ",
+              "그 기록을 액면 ",
+              "그대로 받아들이기에는 ",
+              "신중을 기해야 할 필요가 있다."
+            ]
+          ],
+          "en": [
+            "When you pick up a record, there is something to ask first. Who wrote it, and after seeing how much? The Goryeodogyeong is a record that says in its own preface how much he saw.",
+            "The Goryeodogyeong is a book written in 1123 by Seo Geung, a Song envoy, after a mission to Goryeo. In the third month of that year Emperor Huizong of Song sent an embassy to Goryeo headed by the chief envoy Lu Yundi and the deputy envoy Fu Moqing, and Seo Geung was a member of that embassy. The embassy reached Gaegyeong on June 12 and entered Suncheongwan, its lodging. It stayed in Goryeo for one month and went back to Song on July 13.",
+            "The book runs to forty volumes in all, and its original title was Seonhwa Bongsa Goryeodogyeong. It is divided into 28 large items, and these are subdivided again into more than 300 small items.",
+            "What it holds includes the line of Goryeo kings, the walls and palaces of Gaegyeong, official robes, government offices, religion, daily customs, the courtesies shown to the embassy, and many kinds of ships and sea routes. For anything whose shape could be drawn, the book first explained it in words and then added a picture; the pictures, however, do not survive today.",
+            "What Seo Geung compiled came from what he saw and heard during that one month in Goryeo. In the preface he writes, “I stayed in Goryeo only about a month. After my lodging was fixed, guards kept watch, and I went outside the gate no more than five or six times.” That, too, is why so much of the book centers on Gaegyeong.",
+            "Its value is high in that it is a contemporary record of twelfth-century Goryeo and of how Goryeo people lived, among other things a foreigner saw and experienced for himself. Matters that official histories such as the Goryeosa paid no attention to — information about Goryeo women, for example — are also recorded in detail.",
+            "At the same time, the Goryeodogyeong is basically an account of Goryeo seen through the eyes of a man of Song. His own subjectivity enters a considerable part of what he wrote about Goryeo customs, and there are also passages that set down the households and customs of Goryeo people in a belittling way. Given that he went outside his lodging only five or six times, it is hard to say that he understood and described the customs of Goryeo accurately. What Seo Geung set down about the lives of ordinary people has value, but taking that record at face value calls for caution."
+          ],
+          "enseg": [
+            [
+              "When you pick up a record, ",
+              "there is something to ask first. ",
+              "Who wrote it, ",
+              "and after seeing how much? ",
+              "The Goryeodogyeong is a ",
+              "record that says in its ",
+              "own preface how much he ",
+              "saw."
+            ],
+            [
+              "The Goryeodogyeong is a book written in 1123 ",
+              "by Seo Geung, a Song envoy, ",
+              "after a mission to Goryeo. ",
+              "In the third month of that year ",
+              "Emperor Huizong of Song sent an embassy to Goryeo ",
+              "headed by the chief envoy Lu Yundi ",
+              "and the deputy envoy Fu Moqing, ",
+              "and Seo Geung was a member of that embassy. ",
+              "The embassy reached Gaegyeong on June 12 ",
+              "and entered Suncheongwan, its lodging. ",
+              "It stayed in Goryeo for one month ",
+              "and went back to Song on July 13."
+            ],
+            [
+              "The book runs to forty volumes in all, ",
+              "and its original title was ",
+              "Seonhwa Bongsa Goryeodogyeong. ",
+              "It is divided into 28 large items, ",
+              "and these are subdivided again ",
+              "into more than 300 small items."
+            ],
+            [
+              "What it holds includes ",
+              "the line of Goryeo kings, ",
+              "the walls and palaces of Gaegyeong, ",
+              "official robes, government offices, ",
+              "religion, daily customs, ",
+              "the courtesies shown to the embassy, ",
+              "and many kinds of ships and sea routes. ",
+              "For anything whose shape could be drawn, ",
+              "the book first explained it in words ",
+              "and then added a picture; ",
+              "the pictures, however, ",
+              "do not survive today."
+            ],
+            [
+              "What Seo Geung compiled ",
+              "came from what he saw and heard ",
+              "during that one month in Goryeo. ",
+              "In the preface he writes, ",
+              "“I stayed in Goryeo only about a month. ",
+              "After my lodging was fixed, guards kept watch, ",
+              "and I went outside the gate ",
+              "no more than five or six times.” ",
+              "That, too, is why ",
+              "so much of the book centers on Gaegyeong."
+            ],
+            [
+              "Its value is high in that ",
+              "it is a contemporary record ",
+              "of twelfth-century Goryeo ",
+              "and of how Goryeo people ",
+              "lived, among other things a ",
+              "foreigner saw and ",
+              "experienced for himself. ",
+              "Matters that official histories ",
+              "such as the Goryeosa ",
+              "paid no attention to ",
+              "— information about Goryeo women, for example — ",
+              "are also recorded in detail."
+            ],
+            [
+              "At the same time, ",
+              "the Goryeodogyeong is basically an account of Goryeo ",
+              "seen through the eyes of a man of Song. ",
+              "His own subjectivity enters ",
+              "a considerable part of what he wrote ",
+              "about Goryeo customs, ",
+              "and there are also passages that set down ",
+              "the households and customs of Goryeo people ",
+              "in a belittling way. ",
+              "Given that he went outside his lodging ",
+              "only five or six times, ",
+              "it is hard to say that he understood ",
+              "and described the customs of Goryeo accurately. ",
+              "What Seo Geung set down ",
+              "about the lives of ",
+              "ordinary people has value, ",
+              "but taking that record at ",
+              "face value calls for ",
+              "caution."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "사행",
+              "easy": "나라의 일로 사신이 되어 다른 나라에 다녀오는 일",
+              "hanja": "使(부릴 사)+行(다닐 행)"
+            },
+            {
+              "word": "체류",
+              "easy": "다른 곳에 가서 얼마 동안 머무는 일",
+              "hanja": "滯(막힐 체)+留(머무를 류)"
+            },
+            {
+              "word": "찬술",
+              "easy": "자료를 모아 글로 지어 책을 엮는 일",
+              "hanja": "撰(지을 찬)+述(펼 술)"
+            },
+            {
+              "word": "당대",
+              "easy": "어떤 일이 있었던 바로 그 시대",
+              "hanja": "當(마땅 당)+代(대신할 대)"
+            },
+            {
+              "word": "주관성",
+              "easy": "보는 사람 자신의 생각이 섞여 드는 성질",
+              "hanja": "主(주인 주)+觀(볼 관)+性(성품 성)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "mission",
+              "ko": "사행 (명사)",
+              "base": "mission [ˈmɪʃn]"
+            },
+            {
+              "word": "embassy",
+              "ko": "사절단 (명사)",
+              "base": "embassy [ˈembəsi]"
+            },
+            {
+              "word": "contemporary",
+              "ko": "당대의 (형용사)",
+              "base": "contemporary [kənˈtempəreri]"
+            },
+            {
+              "word": "subjectivity",
+              "ko": "주관성 (명사)",
+              "base": "subjectivity [ˌsʌbdʒekˈtɪvəti]"
+            },
+            {
+              "word": "belittling",
+              "ko": "깎아내리는 (형용사)",
+              "base": "belittle [bɪˈlɪtl]"
+            },
+            {
+              "word": "caution",
+              "ko": "신중 (명사)",
+              "base": "caution [ˈkɔːʃn]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용은?",
+              "choices": [
+                "고려도경의 그림이 여러 판으로 나뉘어 지금까지 모두 남아 있다는 것",
+                "서긍이 고려에 머문 1개월 동안 고려의 모든 고을을 둘러보았다는 것",
+                "고려도경이 고려 왕의 계보만을 적어 둔 책이라는 것",
+                "얼마나 보고 쓴 기록인지 함께 보아야 한다는 것"
+              ],
+              "answer": 3,
+              "explain": "글은 기록을 읽을 때 누가 썼는가와 얼마나 보고 썼는가를 먼저 물으라고 하고, 고려도경이 얼마나 보고 썼는가를 서문에 적어 두었다고 한다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "서긍이 서문에서 밝힌, 고려에서 문 밖을 나가 본 횟수는?",
+              "choices": [
+                "5~6차례에 불과하였다",
+                "하루에 한 번씩 나갔다",
+                "한 번도 나가지 못하였다",
+                "서문에는 적지 않았다"
+              ],
+              "answer": 0,
+              "explain": "서문에서 서긍은 숙소가 정해진 뒤에는 파수병이 지켜 문 밖을 나가 본 것이 5~6차례에 불과하였다고 서술하고 있다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "「주관성」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "여러 사람이 함께 확인한 사실이라는 성질",
+                "자료를 남김없이 모아 두려는 태도",
+                "보는 사람 자신의 생각이 섞여 드는 성질",
+                "적은 것을 뒤에 다시 고쳐 쓰는 버릇"
+              ],
+              "answer": 2,
+              "explain": "서긍이 서술한 고려의 풍속에도 그 자신의 주관성이 상당부분 들어가 있다.",
+              "evidencePara": 6
+            },
+            {
+              "type": "infer",
+              "q": "이 글이 고려도경의 가치로 든 것은?",
+              "choices": [
+                "고려 사람이 직접 쓴 기록이어서 생활상을 정확히 알 수 있다는 점",
+                "정사류 사서가 관심을 두지 않았던 내용이 남아 있다는 점",
+                "고려도경의 그림이 지금까지 온전히 전해진다는 점",
+                "서긍이 고려의 모든 고을을 직접 돌아보고 적었다는 점"
+              ],
+              "answer": 1,
+              "explain": "고려사 등의 정사류 사서가 관심을 두지 않았던 내용들, 예를 들면 고려 여성에 대한 정보 등도 자세하게 기록되어 있다.",
+              "evidencePara": 5
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "이 글의 설명을 따를 때, 서긍이 적은 고려 풍속 기록을 다룰 때 필요한 태도는?",
+              "choices": [
+                "송 사람이 쓴 기록이므로 모두 버린다",
+                "서긍이 직접 본 것이므로 적힌 대로 액면 그대로 받아들인다",
+                "그림이 없으니 기록도 없는 것으로 본다",
+                "가치는 인정하되 그대로 받아들이기에는 신중을 기한다"
+              ],
+              "answer": 3,
+              "explain": "글은 기록의 가치를 적으면서도, 그 기록을 액면 그대로 받아들이기에는 신중을 기해야 할 필요가 있다고 한다.",
+              "evidencePara": 6
+            },
+            {
+              "type": "apply",
+              "q": "다음 가운데 이 글의 읽기 방식을 적용한 것은?",
+              "choices": [
+                "글쓴이가 그곳에 며칠 머물렀는지 함께 본다",
+                "분량이 많은 여행기를 더 믿을 만한 기록으로 여긴다",
+                "그림이 함께 실린 여행기만 골라서 읽기로 한다",
+                "가장 오래된 여행기를 가장 정확한 기록으로 본다"
+              ],
+              "answer": 0,
+              "explain": "글은 기록을 읽을 때 얼마나 보고 썼는가를 먼저 물으라고 한다.",
+              "evidencePara": 0
+            }
+          ]
+        },
+        "L4": {
+          "title": "가치와 한계를 함께 적는 까닭",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "어떤 기록을 읽을 때 ",
+              "먼저 물어야 할 것이 있다. ",
+              "누가, 언제, ",
+              "얼마나 보고 쓴 기록인가."
+            ],
+            [
+              "고려도경은 1123년에 송의 사절 ",
+              "서긍이 고려에 사행을 다녀왔다가 지은 책으로, ",
+              "전 40권으로 구성되어 있다. ",
+              "본래 제목은 선화봉사고려도경으로, ",
+              "선화 연간에 고려에 사신으로 다녀오며 ",
+              "본 것을 글과 그림을 곁들여 설명했다는 의미이다."
+            ],
+            [
+              "그 해 3월 송 ",
+              "휘종은 정사 노윤적과 부사 부묵경을 ",
+              "대표로 하는 사절단을 고려에 보냈고, ",
+              "서긍은 이 사절단의 일행으로 고려에 들어왔다. ",
+              "사절단은 3월 14일에 송의 수도인 변경을 떠났다. ",
+              "5월 4일에 명주에 도착하였다. ",
+              "5월 16일에 명주를 떠났다. ",
+              "6월 6일에 군산도에 당도하였다. ",
+              "같은 달 12일에는 개경에 도착해 ",
+              "숙소인 순천관에 들어갔다. ",
+              "이들은 1개월간 고려에 체류하다가 ",
+              "7월 13일에 다시 송으로 돌아갔다."
+            ],
+            [
+              "책은 모두 28개의 큰 항목으로 나뉘었고, ",
+              "다시 300여 개의 작은 항목으로 세분화되어 있다. ",
+              "1권과 2권은 고려 이전의 ",
+              "예종까지의 고려 왕 계보 등을, ",
+              "3권부터 7권까지는 고려의 영역과 형세, ",
+              "개경의 성곽과 궁전과 관복 등을 서술하였다. ",
+              "16권은 고려의 관부를, ",
+              "24권부터 32권까지는 사절단에 대한 ",
+              "여러 가지 예우와 의례 절차, ",
+              "숙소의 그릇 등의 비품을 서술하였다."
+            ],
+            [
+              "형상을 그릴 수 있는 것은 ",
+              "먼저 글로써 설명하고 ",
+              "그림을 덧붙이는 형식을 취하였는데, ",
+              "현재 그림은 전하지 않는다. ",
+              "서긍이 서술한 ",
+              "내용들은 이 1개월 ",
+              "사이에 보고 듣고 한 것들이다. ",
+              "서문에서 서긍은 “고려에서는 겨우 ",
+              "한 달 쯤을 머물렀을 뿐이다. ",
+              "숙소가 정해진 뒤에는 파수병이 지켜, ",
+              "문 밖을 나가 본 것이 ",
+              "5~6차례에 불과하였다”고 서술하고 있다. ",
+              "주로 개경을 중심으로 한 서술이 ",
+              "많은 것도 그러한 이유 때문이다. ",
+              "서긍은 송에 돌아간 지 약 1년 ",
+              "만에 저술을 마쳐 휘종에게 바쳤다."
+            ],
+            [
+              "고려도경은 기자조선에서 위만조선과 사군을 거쳐 ",
+              "고구려와 발해로 이어져 고려에 ",
+              "닿는 역사 계승인식을 보여준다. ",
+              "기자로부터 고려의 역사가 시작된다고 ",
+              "이해한 인식은 송사에도 나타나므로, ",
+              "일반적으로 당시 중국에서 인식했던 역사인식이었을 것이다. ",
+              "다만 단군조선의 존재를 서술하지 않고, ",
+              "백제와 신라를 언급하지 않았다는 점이 주목된다."
+            ],
+            [
+              "고려도경은 외국인이 직접 보고 ",
+              "겪었던 12세기 고려의 모습과 고려인들의 ",
+              "생활상 등을 기록한 당대의 자료로서 가치가 높다. ",
+              "고려사나 고려사절요 등의 정사류 ",
+              "사서가 관심을 두지 않았던 내용들, ",
+              "예를 들면 ",
+              "고려 여성에 대한 정보 ",
+              "등도 풍부하고 자세하게 기록되어 있다."
+            ],
+            [
+              "고려도경은 기본적으로 송 ",
+              "사람의 시선으로 고려를 서술한 것이다. ",
+              "서긍이 서술한 고려의 풍속에도 ",
+              "그 자신의 주관성이 상당부분 들어가 있고, ",
+              "고려 사람들의 살림과 풍속을 ",
+              "깎아내려 적은 대목도 있다. ",
+              "그가 숙소 밖을 ",
+              "나가 본 것이 5~6차례뿐이었다는 점을 고려하면, ",
+              "그가 고려의 풍속을 정확하게 이해하고 ",
+              "서술했다고 보기는 어렵다. ",
+              "서긍이 일반 백성들의 생활을 기록한 것을 ",
+              "액면 그대로 받아들이기에는 ",
+              "신중을 기해야 할 필요가 있다."
+            ]
+          ],
+          "en": [
+            "When you read a record, there is something to ask first. Who wrote it, when, and after seeing how much?",
+            "The Goryeodogyeong is a book written in 1123 by Seo Geung, a Song envoy, after a mission to Goryeo, and it is made up of forty volumes in all. Its original title was Seonhwa Bongsa Goryeodogyeong, meaning an account, with words and pictures together, of what he saw while serving as an envoy to Goryeo in the Xuanhe era.",
+            "In the third month of that year Emperor Huizong of Song sent to Goryeo an embassy headed by the chief envoy Lu Yundi and the deputy envoy Fu Moqing, and Seo Geung entered Goryeo as a member of that embassy. On March 14 it left Bianjing, the capital of Song. On May 4 it arrived at Mingzhou. On May 16 it left Mingzhou. On June 6 it reached Gunsando. On the 12th of the same month it arrived at Gaegyeong and entered Suncheongwan, its lodging. The party stayed in Goryeo for one month and went back to Song on July 13.",
+            "The book is divided into 28 large items, and these are subdivided again into more than 300 small items. Volumes 1 and 2 describe such things as the line of Goryeo kings, from before Goryeo down to Yejong, and volumes 3 to 7 the territory and lie of the land, the walls of Gaegyeong, the palaces and official robes, and the like. Volume 16 describes the government offices of Goryeo, and volumes 24 to 32 the many courtesies and ceremonial procedures given to the embassy, together with furnishings such as the dishes in the lodging.",
+            "For anything whose shape could be drawn, the book first explained it in words and then added a picture; the pictures do not survive today. What Seo Geung set down as he compiled it came from what he saw and heard during this one month. In the preface he writes, “I stayed in Goryeo only about a month. After my lodging was fixed, guards kept watch, and I went outside the gate no more than five or six times.” That, too, is why so much of the writing centers on Gaegyeong. About a year after returning to Song he finished the work and presented it to Huizong.",
+            "The Goryeodogyeong shows a view of historical succession running from Gija Joseon through Wiman Joseon and the Four Commanderies to Goguryeo and Balhae, and on to Goryeo. The understanding that Goryeo history begins with Gija appears in the History of Song as well, so it was probably the historical view generally held in China at that time. What draws notice, however, is that it does not describe the existence of Dangun Joseon and does not mention Baekje or Silla.",
+            "The value of the Goryeodogyeong is high in that it is a contemporary record of twelfth-century Goryeo and of how Goryeo people lived, among other things a foreigner saw and experienced for himself. Matters to which official histories such as the Goryeosa and the Goryeosajeoryo paid no attention — information about Goryeo women, for example — are also recorded fully and in detail.",
+            "The Goryeodogyeong is basically an account of Goryeo seen through the eyes of a man of Song. His own subjectivity enters a considerable part of what he wrote about Goryeo customs, and there are also passages that set down the households and customs of Goryeo people in a belittling way. Given that he went outside his lodging only five or six times, it is hard to say that he understood and described the customs of Goryeo accurately. Taking what he set down about the lives of ordinary people at face value calls for caution."
+          ],
+          "enseg": [
+            [
+              "When you read a record, ",
+              "there is something to ask first. ",
+              "Who wrote it, when, ",
+              "and after seeing how much?"
+            ],
+            [
+              "The Goryeodogyeong is a book written in 1123 ",
+              "by Seo Geung, a Song envoy, ",
+              "after a mission to Goryeo, ",
+              "and it is made up of forty volumes in all. ",
+              "Its original title was Seonhwa Bongsa Goryeodogyeong, ",
+              "meaning an account, with words and pictures together, ",
+              "of what he saw while serving as an envoy to Goryeo ",
+              "in the Xuanhe era."
+            ],
+            [
+              "In the third month of that year ",
+              "Emperor Huizong of Song sent to Goryeo an embassy ",
+              "headed by the chief envoy Lu Yundi ",
+              "and the deputy envoy Fu Moqing, ",
+              "and Seo Geung entered Goryeo ",
+              "as a member of that embassy. ",
+              "On March 14 it left Bianjing, ",
+              "the capital of Song. ",
+              "On May 4 it arrived at Mingzhou. ",
+              "On May 16 it left Mingzhou. ",
+              "On June 6 it reached Gunsando. ",
+              "On the 12th of the same month ",
+              "it arrived at Gaegyeong ",
+              "and entered Suncheongwan, its lodging. ",
+              "The party stayed in Goryeo for one month ",
+              "and went back to Song on July 13."
+            ],
+            [
+              "The book is divided into 28 large items, ",
+              "and these are subdivided again ",
+              "into more than 300 small items. ",
+              "Volumes 1 and 2 describe such things as ",
+              "the line of Goryeo kings, from before ",
+              "Goryeo down to Yejong, ",
+              "and volumes 3 to 7 ",
+              "the territory and lie of the land, ",
+              "the walls of Gaegyeong, ",
+              "the palaces and official robes, and the like. ",
+              "Volume 16 describes the government offices of Goryeo, ",
+              "and volumes 24 to 32 ",
+              "the many courtesies and ceremonial procedures ",
+              "given to the embassy, ",
+              "together with furnishings ",
+              "such as the dishes in the lodging."
+            ],
+            [
+              "For anything whose shape could be drawn, ",
+              "the book first explained it in words ",
+              "and then added a picture; ",
+              "the pictures do not survive today. ",
+              "What Seo Geung set down as he compiled ",
+              "it came from what he saw and heard ",
+              "during this one month. ",
+              "In the preface he writes, ",
+              "“I stayed in Goryeo only about a month. ",
+              "After my lodging was fixed, guards kept watch, ",
+              "and I went outside the gate ",
+              "no more than five or six times.” ",
+              "That, too, is why ",
+              "so much of the writing centers on Gaegyeong. ",
+              "About a year after returning to Song ",
+              "he finished the work ",
+              "and presented it to Huizong."
+            ],
+            [
+              "The Goryeodogyeong shows a view of historical succession ",
+              "running from Gija Joseon ",
+              "through Wiman Joseon and the Four Commanderies ",
+              "to Goguryeo and Balhae, ",
+              "and on to Goryeo. ",
+              "The understanding that ",
+              "Goryeo history begins with Gija ",
+              "appears in the History of Song as well, ",
+              "so it was probably the historical view ",
+              "generally held in China at that time. ",
+              "What draws notice, however, ",
+              "is that it does not describe ",
+              "the existence of Dangun Joseon ",
+              "and does not mention Baekje or Silla."
+            ],
+            [
+              "The value of the Goryeodogyeong ",
+              "is high in that it is a ",
+              "contemporary record of ",
+              "twelfth-century Goryeo and of ",
+              "how Goryeo people lived, among ",
+              "other things a foreigner saw ",
+              "and experienced for himself. ",
+              "Matters to which official histories ",
+              "such as the Goryeosa and the Goryeosajeoryo ",
+              "paid no attention ",
+              "— information about Goryeo women, for example — ",
+              "are also recorded fully and in detail."
+            ],
+            [
+              "The Goryeodogyeong is basically an account of Goryeo ",
+              "seen through the eyes of a man of Song. ",
+              "His own subjectivity enters a considerable ",
+              "part of what he wrote about Goryeo customs, ",
+              "and there are also passages that set down ",
+              "the households and customs of Goryeo people ",
+              "in a belittling way. ",
+              "Given that he went outside ",
+              "his lodging only five or ",
+              "six times, it is hard to ",
+              "say that he understood ",
+              "and described the customs of Goryeo accurately. ",
+              "Taking what he set down ",
+              "about the lives of ",
+              "ordinary people at face ",
+              "value calls for caution."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "계보",
+              "easy": "자리를 이어받은 차례를 적어 둔 것",
+              "hanja": "系(맬 계)+譜(족보 보)"
+            },
+            {
+              "word": "비품",
+              "easy": "어떤 곳에 갖추어 두고 쓰는 물건",
+              "hanja": "備(갖출 비)+品(물건 품)"
+            },
+            {
+              "word": "계승",
+              "easy": "앞사람이 하던 것을 이어받는 일",
+              "hanja": "繼(이을 계)+承(이을 승)"
+            },
+            {
+              "word": "주관성",
+              "easy": "보는 사람 자신의 생각이 섞여 드는 성질",
+              "hanja": "主(주인 주)+觀(볼 관)+性(성품 성)"
+            },
+            {
+              "word": "신중",
+              "easy": "가볍게 결정하지 않고 조심스럽게 하는 태도",
+              "hanja": "愼(삼갈 신)+重(무거울 중)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "envoy",
+              "ko": "사절 (명사)",
+              "base": "envoy [ˈenvɔɪ]"
+            },
+            {
+              "word": "embassy",
+              "ko": "사절단 (명사)",
+              "base": "embassy [ˈembəsi]"
+            },
+            {
+              "word": "succession",
+              "ko": "계승 (명사)",
+              "base": "succession [səkˈseʃn]"
+            },
+            {
+              "word": "contemporary",
+              "ko": "당대의 (형용사)",
+              "base": "contemporary [kənˈtempəreri]"
+            },
+            {
+              "word": "subjectivity",
+              "ko": "주관성 (명사)",
+              "base": "subjectivity [ˌsʌbdʒekˈtɪvəti]"
+            },
+            {
+              "word": "caution",
+              "ko": "신중 (명사)",
+              "base": "caution [ˈkɔːʃn]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 고려도경에 대해 말하는 바를 가장 잘 요약한 것은?",
+              "choices": [
+                "송과 고려가 주고받은 문서를 모아 엮은 외교 기록이다",
+                "가치와 한계를 함께 지닌 당대의 자료다",
+                "고려 왕조의 역사를 처음부터 끝까지 적은 정사류 사서다",
+                "그림만으로 고려의 모습을 전하는 화첩으로 지금까지 남아 있다"
+              ],
+              "answer": 1,
+              "explain": "글은 고려도경을 당대의 자료로 적으면서, 송 사람의 시선과 주관성, 숙소 밖을 나가 본 횟수를 들어 한계도 함께 적는다.",
+              "evidencePara": 7
+            },
+            {
+              "type": "detail",
+              "q": "사절단이 개경에 도착한 날은?",
+              "choices": [
+                "3월 14일",
+                "5월 16일",
+                "6월 12일",
+                "7월 13일"
+              ],
+              "answer": 2,
+              "explain": "앞 문장이 6월 6일 군산도 당도이므로 같은 달 12일은 6월 12일이다. 그날 개경에 도착해 숙소인 순천관에 들어갔다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「비품」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "어떤 곳에 갖추어 두고 쓰는 물건",
+                "사신이 임금에게 바치는 선물",
+                "책을 여러 권으로 나누어 묶는 단위",
+                "의례를 치를 때 입는 옷차림"
+              ],
+              "answer": 0,
+              "explain": "24권부터 32권까지는 숙소의 그릇 등의 비품을 서술하였다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "고려도경의 역사 계승인식에 대해 이 글이 「주목된다」고 적은 것은?",
+              "choices": [
+                "기자로부터 고려의 역사가 시작된다고 본 인식이 송사에는 없는 점",
+                "위만조선과 사군을 계승인식에서 빼놓은 점",
+                "발해가 고려로 이어진다는 서술을 넣지 않은 점",
+                "단군조선을 서술하지 않고 백제와 신라를 언급하지 않은 점"
+              ],
+              "answer": 3,
+              "explain": "다만 단군조선의 존재를 서술하지 않고, 백제와 신라를 언급하지 않았다는 점이 주목된다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "critical",
+              "q": "이 자료 본문만으로는 답할 수 없는 것은?",
+              "choices": [
+                "서긍이 고려에 체류한 기간과 송으로 돌아간 날짜",
+                "깎아내려 적은 풍속이 실제와 얼마나 달랐는지",
+                "고려도경이 모두 몇 권이고 큰 항목은 몇 개인지",
+                "사절단이 개경에 도착한 날과 들어간 숙소의 이름"
+              ],
+              "answer": 1,
+              "explain": "이 자료 본문에는 서긍이 적은 풍속이 실제와 얼마나 달랐는지가 없다. 본문은 그가 숙소 밖을 나가 본 것이 5~6차례뿐이었다는 점을 들어 풍속을 정확하게 이해하고 서술했다고 보기는 어렵다고만 적는다.",
+              "evidencePara": 7
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "이 글의 서술로 보아, 고려도경에서 개경에 관한 내용이 많은 것과 가장 관련이 깊은 것은?",
+              "choices": [
+                "송 휘종이 개경만 보고 와서 적으라고 명령하였다",
+                "서긍이 개경에서 벼슬을 받았다",
+                "서긍이 보고 들은 것이 한 달 사이의 일이었다",
+                "고려의 다른 고을에는 성곽과 궁전이 없었다"
+              ],
+              "answer": 2,
+              "explain": "서긍이 서술한 내용들은 이 1개월 사이에 보고 듣고 한 것들이고, 주로 개경을 중심으로 한 서술이 많은 것도 그러한 이유 때문이다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "어떤 기록을 평가할 때 이 글의 방식을 따른 것은?",
+              "choices": [
+                "글이 길고 자세하면 그만큼 믿을 만하다고 본다",
+                "외국인이 쓴 기록이면 모두 믿지 않기로 한다",
+                "가장 오래된 기록을 가장 정확한 기록으로 본다",
+                "가치와 한계를 함께 적어 두고 읽는다"
+              ],
+              "answer": 3,
+              "explain": "글은 고려도경의 가치를 적고, 이어서 송 사람의 시선과 주관성, 나가 본 횟수를 들어 한계도 함께 적는다.",
+              "evidencePara": 7
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "winter-bird-habitats",
+      "category": "environment",
+      "careers": [
+        "bio",
+        "it",
+        "env"
+      ],
+      "publishedAt": "2026-11-16",
+      "status": "published",
+      "issue": false,
+      "sources": [
+        {
+          "title": "기후에너지환경부 국립생물자원관 보도자료 (게시판 등록일자 2026-11-11)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1906120"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "겨울 새를 오래 세어 보았어요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "겨울이 되면 ",
+              "우리나라에 찾아오는 새가 있어요. ",
+              "이런 새를 ",
+              "철새라고 해요. ",
+              "철새는 물기가 많은 땅에 모여요. ",
+              "그런 땅을 ",
+              "습지라고 해요."
+            ],
+            [
+              "나라에서는 겨울에 ",
+              "이 새를 세어요. ",
+              "전국에서 같은 때에 ",
+              "한꺼번에 세어요. ",
+              "1999년부터 이런 조사를 해 왔어요. ",
+              "아주 오래 세어 둔 기록이에요."
+            ],
+            [
+              "오래 세어 둔 기록을 ",
+              "모아서 보았어요. ",
+              "새가 모이는 땅 100곳을 살펴보았어요. ",
+              "그랬더니 곳에 따라 할 일이 달랐어요."
+            ],
+            [
+              "잘 지켜야 하는 곳이 있어요. ",
+              "미리 준비해야 하는 곳이 있어요. ",
+              "지금처럼 쉬고 먹게 ",
+              "두어야 하는 곳이 있어요. ",
+              "더 지켜보아야 하는 곳도 있어요. ",
+              "오래 세어 보았더니 ",
+              "새가 어디에 오는지 ",
+              "알게 되었어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "철새",
+              "easy": "계절이 바뀌면 사는 곳을 옮기는 새예요."
+            },
+            {
+              "word": "습지",
+              "easy": "물기가 많아서 늘 축축한 땅이에요."
+            },
+            {
+              "word": "조사",
+              "easy": "자세히 살펴보고 알아보는 일이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "철새에게 먹이를 주는 방법",
+                "습지에 집을 짓는 사람들의 재미있는 이야기",
+                "겨울에 오는 새를 오래 센 일",
+                "새 이름을 새로 지어 주는 일"
+              ],
+              "answer": 2,
+              "explain": "겨울에 오는 새를 오래 세어 둔 기록으로 새가 어디에 오는지 알게 되었다는 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "이 조사는 몇 년부터 해 왔나요?",
+              "choices": [
+                "1999년부터",
+                "2026년부터",
+                "올해부터",
+                "지난달부터"
+              ],
+              "answer": 0,
+              "explain": "1999년부터 이런 조사를 해 왔다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「습지」는 어떤 땅인가요?",
+              "choices": [
+                "모래만 있는 뜨거운 땅",
+                "물기가 많아서 축축한 땅",
+                "돌로 덮여 있는 아주 단단한 땅",
+                "눈이 쌓여 있는 높은 산"
+              ],
+              "answer": 1,
+              "explain": "철새는 물기가 많은 땅에 모이고, 그런 땅을 습지라고 했어요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "곳마다 할 일이 다르다는 것을 어떻게 알았나요?",
+              "choices": [
+                "새가 우는 소리를 들어서 알았어요",
+                "한 곳만 하루 동안 지켜보아서 알았어요",
+                "새 그림을 여러 장 그려 보아서 알았어요",
+                "오래 세어 둔 기록을 보았기 때문이에요"
+              ],
+              "answer": 3,
+              "explain": "오래 세어 둔 기록을 모아서 보았더니 곳마다 할 일이 달랐다고 했어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "우리 동네 습지에 어떤 새가 오는지 알고 싶어요. 이 글에 따라 할 일은?",
+              "choices": [
+                "여러 해 동안 같은 때에 세어요",
+                "하루만 보고 바로 다 정해 버려요",
+                "새를 다른 곳으로 옮겨요",
+                "새 이름을 바꾸어 불러요"
+              ],
+              "answer": 0,
+              "explain": "이 조사는 전국에서 같은 때에 한꺼번에 세고, 1999년부터 오래 해 왔다고 했어요.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L2": {
+          "title": "묶어서 다시 센 100곳",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "겨울이 되면 ",
+              "우리나라 습지에 철새가 찾아온다. ",
+              "국립생물자원관은 1999년부터 ",
+              "전국의 주요 습지 200여 곳을 대상으로 ",
+              "「겨울철 조류 동시센서스」를 해 왔다. ",
+              "전국에서 같은 때에 ",
+              "한꺼번에 세는 동시조사다. ",
+              "겨울철 우리나라 습지에 ",
+              "도래하는 철새 현황을 파악하고 ",
+              "서식지를 보호하기 위한 조사다."
+            ],
+            [
+              "기존 200곳의 조사 지역은 ",
+              "이번에 다시 묶였다. ",
+              "하구와 갯벌, ",
+              "저수지와 주변 농경지, ",
+              "석호와 인접 해안처럼 ",
+              "생태적 특성과 기능이 유사한 조사 지역을 ",
+              "하나의 서식지로 통합·조정한 것이다. ",
+              "그렇게 물새류의 ",
+              "실질적 서식과 생활권을 고려한 ",
+              "100곳으로 재구성했다. ",
+              "새가 실제로 사는 범위가 ",
+              "한 단위가 되었다."
+            ],
+            [
+              "전국의 주요 서식지 100곳은 ",
+              "네 가지 유형, ",
+              "각 25개 지역으로 구분됐다. ",
+              "핵심보전형과 중점관리형, ",
+              "기능유지형과 지속관찰형이다."
+            ],
+            [
+              "유형마다 해야 할 일이 다르다. ",
+              "핵심보전형은 장기간 안정적으로 이용되어 ",
+              "적극적인 보호가 필요한 지역이다. ",
+              "중점관리형은 환경 변화에 ",
+              "선제적으로 대응해야 하는 지역이다. ",
+              "기능유지형은 현재 월동·휴식·먹이활동 기능을 ",
+              "지속적으로 유지해야 하는 지역이다. ",
+              "지속관찰형은 장기적인 조사로 ",
+              "잠재적인 서식지 기능을 ",
+              "확인해야 하는 지역이다. ",
+              "1999년부터 27년간 축적된 자료를 분석해 ",
+              "이런 관리 방향을 제시했다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "철새",
+              "easy": "계절에 따라 사는 곳을 옮기는 새",
+              "hanja": "候(기후 후)+鳥(새 조)"
+            },
+            {
+              "word": "습지",
+              "easy": "물에 젖어 있거나 물이 얕게 덮인 땅",
+              "hanja": "濕(젖을 습)+地(땅 지)"
+            },
+            {
+              "word": "서식지",
+              "easy": "생물이 자리를 잡고 살아가는 곳",
+              "hanja": "棲(깃들일 서)+息(쉴 식)+地(땅 지)"
+            },
+            {
+              "word": "유형",
+              "easy": "비슷한 것끼리 묶어 나눈 갈래",
+              "hanja": "類(무리 류)+型(모형 형)"
+            }
+          ],
+          "en": [
+            "In winter, migratory birds come to wetlands in Korea. Since 1999, the National Institute of Biological Resources has been running a count. It is called the Winter Bird Simultaneous Census. The count covers about 200 major wetlands across the country. It is one count made across the whole country at the same time. The census is made to learn about these winter birds. It is also meant to protect the places where they live.",
+            "The existing 200 survey areas were grouped again this time. Some survey areas are alike in ecology and in function. An estuary and a tidal flat are one example. A reservoir and the farm fields around it are another. So are a lagoon and the coast next to it. Areas like these were combined and adjusted into one habitat. In this way the list was reorganised into 100 habitats. The new list takes account of where the waterbirds really live and move. The range where birds really live is now one unit.",
+            "The 100 major habitats were then sorted into four types. Each type holds 25 places. The four types are core conservation, priority management, function keeping and continued watching.",
+            "Each type needs different work. Core conservation places have been used in a stable way for a long time. They need active protection. Priority management places must respond early, before the environment changes. Function keeping places must go on holding their present functions. The birds winter, rest and feed there. Continued watching places need long-term surveys. The surveys must check what habitat function these places may hold. The institute analysed data gathered for 27 years since 1999. From that data it suggested these management directions."
+          ],
+          "enseg": [
+            [
+              "In winter, ",
+              "migratory birds come to wetlands in Korea. ",
+              "Since 1999, ",
+              "the National Institute of Biological Resources ",
+              "has been running a count. ",
+              "It is called ",
+              "the Winter Bird Simultaneous Census. ",
+              "The count covers ",
+              "about 200 major wetlands ",
+              "across the country. ",
+              "It is one count ",
+              "made across the whole country ",
+              "at the same time. ",
+              "The census is made ",
+              "to learn about these winter birds. ",
+              "It is also meant to protect ",
+              "the places where they live."
+            ],
+            [
+              "The existing 200 survey areas ",
+              "were grouped again this time. ",
+              "Some survey areas are ",
+              "alike in ecology and in ",
+              "function. ",
+              "An estuary and a tidal flat ",
+              "are one example. ",
+              "A reservoir and the farm fields around it ",
+              "are another. ",
+              "So are a lagoon ",
+              "and the coast next to it. ",
+              "Areas like these ",
+              "were combined and adjusted into one habitat. ",
+              "In this way ",
+              "the list was reorganised into 100 habitats. ",
+              "The new list takes account of ",
+              "where the waterbirds really live and move. ",
+              "The range where birds really live ",
+              "is now one unit."
+            ],
+            [
+              "The 100 major habitats ",
+              "were then sorted into four types. ",
+              "Each type holds 25 places. ",
+              "The four types are ",
+              "core conservation, priority management, ",
+              "function keeping and continued watching."
+            ],
+            [
+              "Each type needs different work. ",
+              "Core conservation places ",
+              "have been used in a stable way ",
+              "for a long time. ",
+              "They need active protection. ",
+              "Priority management places ",
+              "must respond early, ",
+              "before the environment changes. ",
+              "Function keeping places must ",
+              "go on holding their present ",
+              "functions. ",
+              "The birds winter, rest and feed there. ",
+              "Continued watching places ",
+              "need long-term surveys. ",
+              "The surveys must check what ",
+              "habitat function these places ",
+              "may hold. ",
+              "The institute analysed data ",
+              "gathered for 27 years since 1999. ",
+              "From that data ",
+              "it suggested these management directions."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "wetland",
+              "ko": "습지 (명사)",
+              "base": "wetland [ˈwetlænd]"
+            },
+            {
+              "word": "census",
+              "ko": "인구·개체 전수조사 (명사)",
+              "base": "census [ˈsensəs]"
+            },
+            {
+              "word": "habitat",
+              "ko": "서식지 (명사)",
+              "base": "habitat [ˈhæbɪtæt]"
+            },
+            {
+              "word": "type",
+              "ko": "유형, 종류 (명사)",
+              "base": "type [taɪp]"
+            },
+            {
+              "word": "stable",
+              "ko": "안정적인 (형용사)",
+              "base": "stable [ˈsteɪbl]"
+            },
+            {
+              "word": "management",
+              "ko": "관리 (명사)",
+              "base": "management [ˈmænɪdʒmənt]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용은?",
+              "choices": [
+                "겨울철 조류 동시센서스를 올해 처음 시작했다",
+                "오래 쌓인 조사 자료로 서식지를 유형별로 갈랐다",
+                "습지를 메워 농경지로 바꾸기로 했다는 소식이다",
+                "철새가 오는 습지를 모두 공원으로 만들었다는 소식이다"
+              ],
+              "answer": 1,
+              "explain": "1999년부터 27년간 축적된 자료를 분석해 전국의 주요 서식지 100곳을 네 가지 유형으로 구분했다고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "기존 200곳의 조사 지역은 어떻게 되었나?",
+              "choices": [
+                "조사를 그만두는 곳이 절반이라서 모두 100곳만 남게 되었다",
+                "새로 200곳이 더해져 모두 400곳이 되었다",
+                "이름만 바꾸고 그대로 200곳으로 두었다",
+                "비슷한 것끼리 하나의 서식지로 묶여 100곳으로 재구성됐다"
+              ],
+              "answer": 3,
+              "explain": "생태적 특성과 기능이 유사한 조사 지역을 하나의 서식지로 통합·조정해 100곳으로 재구성했다고 했다. 이 자료 본문에 조사를 그만두었다는 말은 없다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "네 가지 유형은 각각 몇 개 지역인가?",
+              "choices": [
+                "각 25개 지역",
+                "각 50개 지역",
+                "각 100개 지역",
+                "유형마다 다르다"
+              ],
+              "answer": 0,
+              "explain": "네 가지 유형, 각 25개 지역으로 구분했다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「유형」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "조사를 맡은 기관의 이름",
+                "새가 한 해에 낳는 알의 수를 적은 것",
+                "비슷한 것끼리 묶어 나눈 갈래",
+                "습지의 넓이를 재는 단위"
+              ],
+              "answer": 2,
+              "explain": "성질이 비슷한 것끼리 묶어 나눈 갈래를 유형이라고 한다. 글은 100곳을 네 가지 유형으로 갈랐다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "핵심보전형과 지속관찰형의 차이를 가장 잘 말한 것은?",
+              "choices": [
+                "핵심보전형은 습지이고 지속관찰형은 산이다",
+                "둘 다 지금은 아무 일도 하지 않아도 되는 곳이다",
+                "핵심보전형은 적극적인 보호가, 지속관찰형은 장기적인 조사가 필요하다",
+                "지속관찰형이 핵심보전형보다 배정된 지역 수가 훨씬 더 많은 쪽에 해당한다"
+              ],
+              "answer": 2,
+              "explain": "핵심보전형은 적극적인 보호가 필요한 지역, 지속관찰형은 장기적인 조사로 잠재적인 서식지 기능을 확인해야 하는 지역이라고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "어떤 습지가 지금 월동·휴식·먹이활동 기능을 하고 있다. 이 글의 유형 가운데 어디에 가까운가?",
+              "choices": [
+                "핵심보전형",
+                "기능유지형",
+                "중점관리형",
+                "지속관찰형"
+              ],
+              "answer": 1,
+              "explain": "기능유지형은 현재 월동·휴식·먹이활동 기능을 지속적으로 유지해야 하는 지역이라고 했다.",
+              "evidencePara": 3
+            }
+          ]
+        },
+        "L3": {
+          "title": "오래 센 기록이 자리를 가른다",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "겨울철 우리나라 습지에 ",
+              "도래하는 철새 현황을 파악하고 ",
+              "서식지를 보호하기 위해, ",
+              "국립생물자원관은 1999년부터 ",
+              "전국의 주요 습지 200여 곳을 대상으로 ",
+              "「겨울철 조류 동시센서스」를 실시해 왔다. ",
+              "전국 단위의 동시조사다. ",
+              "기후에너지환경부 소속인 이 기관은 ",
+              "1999년부터 27년간 축적된 ",
+              "월동 물새류의 군집특성 자료를 분석해, ",
+              "11월 11일 ",
+              "「한국의 겨울철새 서식지역의 물새류 군집 특성」을 ",
+              "발간한다고 밝혔다."
+            ],
+            [
+              "이번 자료는 ",
+              "단순한 현황 파악을 넘어 ",
+              "과학적 분석을 통해 ",
+              "서식지의 생태적 가치와 보전 필요성을 평가했다. ",
+              "특히 기존 200곳의 동시센서스 조사 지역을 ",
+              "하나의 서식지로 다시 묶었다. ",
+              "하구와 갯벌, ",
+              "저수지와 주변 농경지, ",
+              "석호와 인접 해안처럼 ",
+              "생태적 특성과 기능이 유사한 조사 지역을 ",
+              "통합·조정한 것이다. ",
+              "그렇게 물새류의 실질적 서식과 생활권을 고려한 ",
+              "100곳으로 재구성했다."
+            ],
+            [
+              "각 서식지에 대해서는 ",
+              "여섯 개 지표를 종합적으로 분석했다. ",
+              "평균 개체수, 연도별 안정성, ",
+              "우점종 구조, 대표종 지속성, ",
+              "장기 추세, 멸종위기종 이용이다. ",
+              "이 지표로 ",
+              "서식지의 안정성과 보전 가치를 ",
+              "정밀하게 분석했다."
+            ],
+            [
+              "이를 바탕으로 ",
+              "전국의 주요 서식지 100곳을 ",
+              "네 가지 유형, 각 25개 지역으로 구분했다. ",
+              "핵심보전형은 장기간 안정적으로 이용되어 ",
+              "적극적인 보호가 필요한 지역으로, ",
+              "철원의 두루미류 등이 이용하는 농경지와 ",
+              "주남저수지, 우포늪 등이 해당된다. ",
+              "중점관리형은 핵심 서식지를 보완하거나 ",
+              "지역 내 주요 월동 기능을 담당해 ",
+              "환경 변화에 선제적으로 대응해야 하는 지역이다. ",
+              "기능유지형은 현재 월동·휴식·먹이활동 기능을 ",
+              "지속적으로 유지해야 하는 지역으로 ",
+              "팔당호와 북한강, 금강중류 등이다. ",
+              "지속관찰형은 장기적인 조사로 ",
+              "잠재적인 서식지 기능을 확인해야 하는 지역으로 ",
+              "대청호와 예당저수지, 탑정저수지 등이다."
+            ],
+            [
+              "이 책자는 발간과 동시에 ",
+              "국립생물자원관 누리집에 공개해 ",
+              "조류인플루엔자 대응과 환경영향평가 등 ",
+              "다양한 분야에서 활용될 수 있도록 할 계획이다. ",
+              "지표가 여섯이고 유형이 넷인 이 구분은 ",
+              "27년간 세어 둔 기록 위에 서 있다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "월동",
+              "easy": "겨울을 넘겨 지내는 일",
+              "hanja": "越(넘을 월)+冬(겨울 동)"
+            },
+            {
+              "word": "지표",
+              "easy": "무엇을 재거나 가늠할 때 쓰는 기준",
+              "hanja": "指(가리킬 지)+標(표할 표)"
+            },
+            {
+              "word": "우점종",
+              "easy": "한 군데에서 수나 비중이 가장 큰 종",
+              "hanja": "優(넉넉할 우)+占(차지할 점)+種(씨 종)"
+            },
+            {
+              "word": "보전",
+              "easy": "온전한 상태로 지켜 내는 일",
+              "hanja": "保(지킬 보)+全(온전 전)"
+            },
+            {
+              "word": "재구성",
+              "easy": "이미 있던 것을 다시 짜 맞추는 일",
+              "hanja": "再(다시 재)+構(얽을 구)+成(이룰 성)"
+            }
+          ],
+          "en": [
+            "To learn the state of the migratory birds that arrive at Korean wetlands in winter, and to protect their habitats, the National Institute of Biological Resources has carried out the Winter Bird Simultaneous Census since 1999, covering about 200 major wetlands across the country. It is a nationwide census taken at the same time everywhere. The institute, which belongs to the Ministry of Climate, Energy and Environment, said it will publish Waterbird Community Characteristics of Winter Migratory Bird Habitats in Korea on November 11, after analysing data on the community characteristics of wintering waterbirds gathered over 27 years since 1999.",
+            "The new material goes beyond simply recording what is there: through scientific analysis it assessed the ecological value of each habitat and the need to conserve it. In particular, the existing 200 census survey areas were grouped again into single habitats. Survey areas that are alike in ecological character and function — for example, an estuary and a tidal flat, a reservoir and the farm fields around it, a lagoon and the coast next to it — were combined and adjusted. In that way the list was reorganised into 100 places, chosen with the waterbirds' actual habitat use and home range in mind.",
+            "For each habitat, six indicators were analysed together. They are average number of individuals, year-by-year stability, dominant species structure, persistence of representative species, long-term trend, and use by endangered species. With these indicators the stability and the conservation value of each habitat were analysed in detail.",
+            "On that basis the 100 major habitats across the country were sorted into four types, 25 places in each. Core conservation type places have been used stably over a long period and need active protection; the farm fields in Cheorwon used by cranes and others, Junam Reservoir and Upo Wetland are among them. Priority management type places supplement core habitats, or carry a major wintering function within their region, so they must respond early to environmental change. Function keeping type places must go on holding their present wintering, resting and feeding functions; Paldang Lake, the Bukhan River and the middle Geum River are among them. Continued watching type places need long-term surveys to check the habitat function they may hold; Daecheong Lake, Yedang Reservoir and Tapjeong Reservoir are among them.",
+            "The institute plans to release the book on its website at the same time as it is published, so that it can be used in many fields, such as responding to avian influenza and environmental impact assessment. This sorting — six indicators, four types — stands on records counted over 27 years."
+          ],
+          "enseg": [
+            [
+              "To learn the state of the migratory birds ",
+              "that arrive at Korean wetlands in winter, ",
+              "and to protect their habitats, ",
+              "the National Institute of Biological Resources ",
+              "has carried out ",
+              "the Winter Bird Simultaneous Census since 1999, ",
+              "covering about 200 major wetlands ",
+              "across the country. ",
+              "It is a nationwide census ",
+              "taken at the same time everywhere. ",
+              "The institute, ",
+              "which belongs to the Ministry of Climate, Energy and Environment, ",
+              "said it will publish ",
+              "Waterbird Community Characteristics of ",
+              "Winter Migratory Bird Habitats in Korea ",
+              "on November 11, ",
+              "after analysing data on the community characteristics ",
+              "of wintering waterbirds ",
+              "gathered over 27 years since 1999."
+            ],
+            [
+              "The new material goes beyond ",
+              "simply recording what is there: ",
+              "through scientific analysis it assessed ",
+              "the ecological value of each habitat ",
+              "and the need to conserve it. ",
+              "In particular, ",
+              "the existing 200 census survey areas ",
+              "were grouped again into single habitats. ",
+              "Survey areas that are alike ",
+              "in ecological character and function ",
+              "— for example, an estuary and a tidal flat, ",
+              "a reservoir and the farm fields around it, ",
+              "a lagoon and the coast next to it — ",
+              "were combined and adjusted. ",
+              "In that way ",
+              "the list was reorganised into 100 places, ",
+              "chosen with the waterbirds' actual habitat use ",
+              "and home range in mind."
+            ],
+            [
+              "For each habitat, ",
+              "six indicators were analysed together. ",
+              "They are average number of individuals, ",
+              "year-by-year stability, ",
+              "dominant species structure, ",
+              "persistence of representative species, ",
+              "long-term trend, ",
+              "and use by endangered species. ",
+              "With these indicators ",
+              "the stability and the conservation value ",
+              "of each habitat ",
+              "were analysed in detail."
+            ],
+            [
+              "On that basis ",
+              "the 100 major habitats across the country ",
+              "were sorted into four types, ",
+              "25 places in each. ",
+              "Core conservation type places ",
+              "have been used stably over a long period ",
+              "and need active protection; ",
+              "the farm fields in Cheorwon ",
+              "used by cranes and others, ",
+              "Junam Reservoir and Upo Wetland ",
+              "are among them. ",
+              "Priority management type places ",
+              "supplement core habitats, ",
+              "or carry a major wintering function ",
+              "within their region, ",
+              "so they must respond early ",
+              "to environmental change. ",
+              "Function keeping type places ",
+              "must go on holding ",
+              "their present wintering, resting and feeding functions; ",
+              "Paldang Lake, the Bukhan River ",
+              "and the middle Geum River ",
+              "are among them. ",
+              "Continued watching type places ",
+              "need long-term surveys ",
+              "to check the habitat function they may hold; ",
+              "Daecheong Lake, Yedang Reservoir ",
+              "and Tapjeong Reservoir are among them."
+            ],
+            [
+              "The institute plans to ",
+              "release the book on its ",
+              "website at the same time as ",
+              "it is published, so that it ",
+              "can be used in many fields, ",
+              "such as responding to avian influenza ",
+              "and environmental impact assessment. ",
+              "This sorting — six indicators, four types — ",
+              "stands on records counted over 27 years."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "indicator",
+              "ko": "지표 (명사)",
+              "base": "indicator [ˈɪndɪkeɪtər]"
+            },
+            {
+              "word": "stability",
+              "ko": "안정성 (명사)",
+              "base": "stability [stəˈbɪləti]"
+            },
+            {
+              "word": "dominant species",
+              "ko": "우점종 (명사구)",
+              "base": "dominant [ˈdɑːmɪnənt] + species [ˈspiːʃiːz]"
+            },
+            {
+              "word": "endangered",
+              "ko": "멸종 위기에 놓인 (형용사)",
+              "base": "endangered [ɪnˈdeɪndʒərd]"
+            },
+            {
+              "word": "conservation value",
+              "ko": "보전 가치 (명사구)",
+              "base": "conservation [ˌkɑːnsərˈveɪʃn] + value [ˈvæljuː]"
+            },
+            {
+              "word": "reorganise",
+              "ko": "재구성하다 (동사)",
+              "base": "reorganise [riˈɔːrɡənaɪz]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 말하는 핵심은?",
+              "choices": [
+                "조사 지역을 절반으로 줄여서 조사 비용을 아꼈다는 것",
+                "겨울철새가 오는 습지가 올해 처음 확인되었다는 것",
+                "쌓인 조사 자료로 서식지를 유형별로 갈랐다는 것",
+                "책자가 이미 여러 분야에서 널리 활용되고 있다는 것"
+              ],
+              "answer": 2,
+              "explain": "1999년부터 27년간 축적된 자료를 여섯 개 지표로 분석하고, 그 결과를 바탕으로 100곳을 네 가지 유형으로 구분했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "각 서식지를 분석하는 데 쓴 지표는 몇 개인가?",
+              "choices": [
+                "여섯 개",
+                "네 개",
+                "스물다섯 개",
+                "백 개"
+              ],
+              "answer": 0,
+              "explain": "평균 개체수, 연도별 안정성, 우점종 구조, 대표종 지속성, 장기 추세, 멸종위기종 이용의 여섯 개 지표를 종합적으로 분석했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "유형 구분의 결과를 바르게 말한 것은?",
+              "choices": [
+                "네 가지 지표, 각 25개 지역",
+                "여섯 가지 유형, 각 25개 지역",
+                "여섯 가지 유형, 각 100개 지역",
+                "네 가지 유형, 각 25개 지역"
+              ],
+              "answer": 3,
+              "explain": "지표는 여섯 개이고 유형은 네 가지다. 100곳을 네 가지 유형, 각 25개 지역으로 구분했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「우점종」은 무엇인가?",
+              "choices": [
+                "멸종 위기에 놓인 종",
+                "한 군데에서 수나 비중이 가장 큰 종",
+                "사람이 집에서 기르는 종",
+                "그 지역을 상징하도록 사람이 따로 정한 종"
+              ],
+              "answer": 1,
+              "explain": "우점종은 한 군데에서 수나 비중이 가장 큰 종이다. 글은 우점종 구조를 여섯 개 지표 가운데 하나로 들었다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "지표와 유형의 관계를 바르게 말한 것은?",
+              "choices": [
+                "지표와 유형은 같은 것을 다르게 부른 두 이름이다",
+                "유형을 먼저 정한 뒤에 그에 맞추어 지표를 골랐다",
+                "지표는 네 개이고 유형은 여섯 개여서 서로 개수가 다르다",
+                "여섯 개 지표를 분석한 결과를 바탕으로 유형을 구분했다"
+              ],
+              "answer": 3,
+              "explain": "여섯 개 지표로 안정성과 보전 가치를 분석하고, 「이를 바탕으로」 네 가지 유형으로 구분했다고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "어떤 서식지가 핵심 서식지를 보완하며 지역 내 주요 월동 기능을 맡고 있다. 어떤 유형인가?",
+              "choices": [
+                "중점관리형",
+                "핵심보전형",
+                "기능유지형",
+                "지속관찰형"
+              ],
+              "answer": 0,
+              "explain": "중점관리형은 핵심 서식지를 보완하거나 지역 내 주요 월동 기능을 담당해 환경 변화에 선제적으로 대응해야 하는 지역이다.",
+              "evidencePara": 3
+            }
+          ]
+        },
+        "L4": {
+          "title": "지표는 자, 유형은 방향",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "겨울철 우리나라 습지에 도래하는 철새 현황을 파악하고 ",
+              "서식지를 보호하기 위해, ",
+              "국립생물자원관은 1999년부터 ",
+              "전국의 주요 습지 200여 곳을 대상으로 ",
+              "「겨울철 조류 동시센서스」를 실시해 왔다. ",
+              "전국 단위의 동시조사다. ",
+              "기후에너지환경부 소속인 이 기관은 ",
+              "전국 겨울철새 서식지 100곳을 대상으로 ",
+              "1999년부터 27년간 축적된 ",
+              "월동 물새류의 군집특성 자료를 분석해 ",
+              "효율적인 관리 방향을 제시한 ",
+              "「한국의 겨울철새 서식지역의 물새류 군집 특성」을 ",
+              "11월 11일 발간한다고 밝혔다."
+            ],
+            [
+              "보도자료는 이번 자료가 ",
+              "단순한 현황 파악을 넘어 ",
+              "과학적 분석을 통해 ",
+              "서식지의 생태적 가치와 보전 필요성을 평가했다는 점에서 ",
+              "의미가 크다고 적었다. ",
+              "특히 기존 200곳의 동시센서스 조사 지역을 ",
+              "하구와 갯벌, 저수지와 주변 농경지, ",
+              "석호와 인접 해안 등 ",
+              "생태적 특성과 기능이 유사한 조사 지역끼리 ",
+              "하나의 서식지로 통합·조정했다. ",
+              "그렇게 물새류의 실질적 서식과 생활권을 고려한 ",
+              "100곳으로 재구성했다. ",
+              "비슷한 것끼리 하나로 묶어 ",
+              "세는 단위를 다시 잡은 것이다."
+            ],
+            [
+              "각 서식지에 대해서는 ",
+              "여섯 개 지표를 종합적으로 분석했다. ",
+              "평균 개체수, 연도별 안정성, ",
+              "우점종 구조, 대표종 지속성, ",
+              "장기 추세, 멸종위기종 이용이다. ",
+              "연도별 안정성과 대표종 지속성, ",
+              "장기 추세라는 이름에는 ",
+              "여러 해라는 시간이 들어 있다. ",
+              "이 지표로 서식지의 안정성과 ",
+              "보전 가치를 정밀하게 분석했다."
+            ],
+            [
+              "이를 바탕으로 ",
+              "전국의 주요 서식지 100곳을 ",
+              "네 가지 유형, 각 25개 지역으로 구분했다. ",
+              "핵심보전형은 장기간 안정적으로 이용되어 ",
+              "적극적인 보호가 필요한 지역으로, ",
+              "철원의 두루미류 등이 이용하는 농경지와 ",
+              "주남저수지, 우포늪 등이 해당된다. ",
+              "중점관리형은 핵심 서식지를 보완하거나 ",
+              "지역 내 주요 월동 기능을 담당해 ",
+              "환경 변화에 선제적으로 대응해야 하는 지역이다. ",
+              "진양호-남강, 남한강(양평-여주), 아산호 등 ",
+              "수위 및 수질관리에 집중할 필요가 있는 ",
+              "지역이 해당된다. ",
+              "기능유지형은 현재 월동·휴식·먹이활동 기능을 ",
+              "지속적으로 유지해야 하는 지역으로 ",
+              "팔당호와 북한강, 금강중류 등이다. ",
+              "지속관찰형은 장기적인 조사로 ",
+              "잠재적인 서식지 기능을 확인해야 하는 지역으로 ",
+              "대청호와 예당저수지, 탑정저수지 등이다."
+            ],
+            [
+              "이 책자는 발간과 동시에 ",
+              "국립생물자원관 누리집에 공개해 ",
+              "조류인플루엔자 대응과 환경영향평가 등 ",
+              "다양한 분야에서 활용될 수 있도록 할 계획이다. ",
+              "유호 국립생물자원관장은 ",
+              "이번 성과가 27년간 축적된 ",
+              "국내 겨울철새 조사 자료를 ",
+              "집대성한 결과로써 ",
+              "단순한 기록을 넘어 ",
+              "겨울철 물새류 서식지의 효과적 관리, ",
+              "국제적 철새 이동 연구 등에 ",
+              "과학적 토대가 될 것이라고 밝혔다. ",
+              "앞으로도 데이터 기반의 ",
+              "정밀한 분석을 통해 ",
+              "기후 위기 시대에 대응하는 ",
+              "국가 생물 다양성 전략의 ",
+              "핵심 역할을 수행하겠다고도 밝혔다."
+            ],
+            [
+              "여섯 개 지표와 네 가지 유형은 ",
+              "개수부터 다르다. ",
+              "지표는 서식지를 재는 자이고, ",
+              "유형은 그 결과로 갈린 관리 방향이다. ",
+              "유형 구분은 27년간 축적된 ",
+              "자료를 분석한 결과다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "군집",
+              "easy": "같은 곳에 함께 모여 사는 생물 무리",
+              "hanja": "群(무리 군)+集(모을 집)"
+            },
+            {
+              "word": "통합",
+              "easy": "둘 이상을 하나로 모아 합치는 일",
+              "hanja": "統(거느릴 통)+合(합할 합)"
+            },
+            {
+              "word": "장기 추세",
+              "easy": "오랜 기간에 걸쳐 늘거나 줄어 온 방향",
+              "hanja": "長(길 장)+期(기약할 기)+趨(달릴 추)+勢(형세 세)"
+            },
+            {
+              "word": "선제적",
+              "easy": "일이 벌어지기 전에 먼저 손을 쓰는",
+              "hanja": "先(먼저 선)+制(절제할 제)+的(과녁 적)"
+            },
+            {
+              "word": "지속관찰형",
+              "easy": "장기적인 조사로 잠재적인 서식지 기능을 확인해야 하는 유형",
+              "hanja": "持(가질 지)+續(이을 속)+觀(볼 관)+察(살필 찰)+型(모형 형)"
+            }
+          ],
+          "en": [
+            "To learn the state of the migratory birds that arrive at Korean wetlands in winter and to protect their habitats, the National Institute of Biological Resources has carried out the Winter Bird Simultaneous Census since 1999, covering about 200 major wetlands across the country. It is a nationwide census taken at the same time everywhere. The institute, which belongs to the Ministry of Climate, Energy and Environment, said it will publish on November 11 a volume titled Waterbird Community Characteristics of Winter Migratory Bird Habitats in Korea. The volume analyses data on the community characteristics of wintering waterbirds, gathered over 27 years since 1999 for 100 winter migratory bird habitats across the country, and sets out an efficient direction for managing them.",
+            "The release says this new material matters in that it goes beyond simply recording what is there and, through scientific analysis, assessed the ecological value of each habitat and the need to conserve it. In particular, the existing 200 census survey areas were combined and adjusted into single habitats, grouping survey areas alike in ecological character and function — estuaries and tidal flats, reservoirs and the farm fields around them, lagoons and the coasts next to them, among others. In that way the list was reorganised into 100 places, chosen with the waterbirds' actual habitat use and home range in mind. Alike places were put together, and the unit of counting was drawn again.",
+            "For each habitat, six indicators were analysed together. They are average number of individuals, year-by-year stability, dominant species structure, persistence of representative species, long-term trend, and use by endangered species. The names year-by-year stability, persistence of representative species and long-term trend each carry a span of several years inside them. With these indicators the stability and the conservation value of each habitat were analysed in detail.",
+            "On that basis the 100 major habitats across the country were sorted into four types, 25 places in each. Core conservation type places have been used stably over a long period and need active protection; the farm fields in Cheorwon used by cranes and others, Junam Reservoir and Upo Wetland are among them. Priority management type places supplement core habitats, or carry a major wintering function within their region, so they must respond early to environmental change. Jinyang Lake and the Nam River, the South Han River between Yangpyeong and Yeoju, and Asan Lake are among the places that need to concentrate on managing water level and water quality. Function keeping type places must go on holding their present wintering, resting and feeding functions; Paldang Lake, the Bukhan River and the middle Geum River are among them. Continued watching type places need long-term surveys to check the habitat function they may hold; Daecheong Lake, Yedang Reservoir and Tapjeong Reservoir are among them.",
+            "The institute plans to release the book on its website at the same time as it is published, so that it can be used in many fields, such as responding to avian influenza and environmental impact assessment. Yoo Ho, head of the institute, said the result brings together 27 years of domestic winter migratory bird survey data and will be, beyond a mere record, a scientific base for the effective management of winter waterbird habitats and for international research on bird migration, among other things. He also said the institute will go on carrying out a central role in the national biodiversity strategy that answers the age of climate crisis, through precise data-based analysis.",
+            "Six indicators and four types differ even in number. The indicators are the ruler that measures a habitat; the types are the management directions that the measuring divided it into. The sorting into types comes from analysing data gathered over 27 years."
+          ],
+          "enseg": [
+            [
+              "To learn the state of the migratory birds ",
+              "that arrive at Korean wetlands in winter ",
+              "and to protect their habitats, ",
+              "the National Institute of Biological Resources ",
+              "has carried out ",
+              "the Winter Bird Simultaneous Census since 1999, ",
+              "covering about 200 major wetlands ",
+              "across the country. ",
+              "It is a nationwide census ",
+              "taken at the same time everywhere. ",
+              "The institute, ",
+              "which belongs to the Ministry of Climate, Energy and Environment, ",
+              "said it will publish on November 11 ",
+              "a volume titled Waterbird Community Characteristics ",
+              "of Winter Migratory Bird Habitats in Korea. ",
+              "The volume analyses data ",
+              "on the community characteristics of wintering waterbirds, ",
+              "gathered over 27 years since 1999 ",
+              "for 100 winter migratory bird habitats ",
+              "across the country, ",
+              "and sets out an efficient direction ",
+              "for managing them."
+            ],
+            [
+              "The release says this new material ",
+              "matters ",
+              "in that it goes beyond ",
+              "simply recording what is there ",
+              "and, through scientific analysis, ",
+              "assessed the ecological value of each habitat ",
+              "and the need to conserve it. ",
+              "In particular, ",
+              "the existing 200 census survey areas ",
+              "were combined and adjusted into single habitats, ",
+              "grouping survey areas alike ",
+              "in ecological character and function ",
+              "— estuaries and tidal flats, ",
+              "reservoirs and the farm fields around them, ",
+              "lagoons and the coasts next to them, ",
+              "among others. ",
+              "In that way ",
+              "the list was reorganised into 100 places, ",
+              "chosen with the waterbirds' actual habitat use ",
+              "and home range in mind. ",
+              "Alike places were put together, ",
+              "and the unit of counting was drawn again."
+            ],
+            [
+              "For each habitat, ",
+              "six indicators were analysed together. ",
+              "They are average number of individuals, ",
+              "year-by-year stability, ",
+              "dominant species structure, ",
+              "persistence of representative species, ",
+              "long-term trend, ",
+              "and use by endangered species. ",
+              "The names year-by-year stability, ",
+              "persistence of representative species ",
+              "and long-term trend ",
+              "each carry a span of several years inside them. ",
+              "With these indicators ",
+              "the stability and the conservation value ",
+              "of each habitat ",
+              "were analysed in detail."
+            ],
+            [
+              "On that basis ",
+              "the 100 major habitats across the country ",
+              "were sorted into four types, ",
+              "25 places in each. ",
+              "Core conservation type places ",
+              "have been used stably over a long period ",
+              "and need active protection; ",
+              "the farm fields in Cheorwon ",
+              "used by cranes and others, ",
+              "Junam Reservoir and Upo Wetland ",
+              "are among them. ",
+              "Priority management type places ",
+              "supplement core habitats, ",
+              "or carry a major wintering function ",
+              "within their region, ",
+              "so they must respond early ",
+              "to environmental change. ",
+              "Jinyang Lake and the Nam River, ",
+              "the South Han River between Yangpyeong and Yeoju, ",
+              "and Asan Lake are among the places ",
+              "that need to concentrate on managing ",
+              "water level and water quality. ",
+              "Function keeping type places ",
+              "must go on holding ",
+              "their present wintering, resting and feeding functions; ",
+              "Paldang Lake, the Bukhan River ",
+              "and the middle Geum River ",
+              "are among them. ",
+              "Continued watching type places ",
+              "need long-term surveys ",
+              "to check the habitat function they may hold; ",
+              "Daecheong Lake, Yedang Reservoir ",
+              "and Tapjeong Reservoir are among them."
+            ],
+            [
+              "The institute plans to release the book ",
+              "on its website ",
+              "at the same time as it is published, ",
+              "so that it can be used in many fields, ",
+              "such as responding to avian influenza ",
+              "and environmental impact assessment. ",
+              "Yoo Ho, head of the institute, ",
+              "said the result brings together ",
+              "27 years of domestic winter migratory bird survey data ",
+              "and will be, beyond a mere record, ",
+              "a scientific base for the effective management ",
+              "of winter waterbird habitats ",
+              "and for international research on bird migration, ",
+              "among other things. ",
+              "He also said the institute will go on ",
+              "carrying out a central role ",
+              "in the national biodiversity strategy ",
+              "that answers the age of climate crisis, ",
+              "through precise data-based analysis."
+            ],
+            [
+              "Six indicators and four types ",
+              "differ even in number. ",
+              "The indicators are the ruler ",
+              "that measures a habitat; ",
+              "the types are the management directions ",
+              "that the measuring divided it into. ",
+              "The sorting into types ",
+              "comes from analysing data ",
+              "gathered over 27 years."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "community",
+              "ko": "군집, 공동체 (명사)",
+              "base": "community [kəˈmjuːnəti]"
+            },
+            {
+              "word": "combine",
+              "ko": "합치다, 통합하다 (동사)",
+              "base": "combine [kəmˈbaɪn]"
+            },
+            {
+              "word": "long-term trend",
+              "ko": "장기 추세 (명사구)",
+              "base": "long-term [ˌlɔːŋ ˈtɜːrm] + trend [trend]"
+            },
+            {
+              "word": "endangered species",
+              "ko": "멸종위기종 (명사구)",
+              "base": "endangered [ɪnˈdeɪndʒərd] + species [ˈspiːʃiːz]"
+            },
+            {
+              "word": "biodiversity",
+              "ko": "생물 다양성 (명사)",
+              "base": "biodiversity [ˌbaɪoʊdaɪˈvɜːrsəti]"
+            },
+            {
+              "word": "avian influenza",
+              "ko": "조류인플루엔자 (명사구)",
+              "base": "avian [ˈeɪviən] + influenza [ˌɪnfluˈenzə]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용은?",
+              "choices": [
+                "겨울철새 조사를 올해 처음 시작했다는 발표",
+                "오래 쌓인 조사 기록을 분석해 관리 방향을 갈랐다는 발표",
+                "조사 지역을 줄여서 관리 비용을 아꼈다는 발표",
+                "겨울철새가 크게 줄어들어 습지 출입을 모두 닫는다는 발표"
+              ],
+              "answer": 1,
+              "explain": "1999년부터 27년간 축적된 자료를 여섯 개 지표로 분석하고, 그 결과로 전국의 주요 서식지 100곳을 네 가지 관리 유형으로 구분했다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "detail",
+              "q": "기존 200곳의 조사 지역에 대해 자료가 적은 것은?",
+              "choices": [
+                "조사를 그만둔 곳이 절반이다",
+                "100곳을 새로 더해 모두 300곳이 되었다",
+                "조사 지역마다 이름을 하나씩 새로 지어 주고 번호까지 붙였다",
+                "특성과 기능이 유사한 것끼리 하나의 서식지로 통합·조정했다"
+              ],
+              "answer": 3,
+              "explain": "자료는 기존 200곳의 조사 지역을 생태적 특성과 기능이 유사한 것끼리 하나의 서식지로 통합·조정해 100곳으로 재구성했다고 적었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "책자의 공개와 활용에 대해 자료가 적은 것은?",
+              "choices": [
+                "발간과 동시에 누리집에 공개해 활용될 수 있도록 할 계획이다",
+                "이미 조류인플루엔자 대응과 환경영향평가 두 곳에 모두 쓰이고 있다",
+                "환경영향평가에만 쓰기로 미리 정해 두었다",
+                "공개하지 않고 기관 안에서만 쓰기로 했다"
+              ],
+              "answer": 0,
+              "explain": "자료는 발간과 동시에 누리집에 공개해 여러 분야에서 활용될 수 있도록 할 「계획」이라고 적었다. 이 보도자료 본문에 이미 쓰이고 있다는 말은 없다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "「선제적」의 뜻에 가장 가까운 것은?",
+              "choices": [
+                "이미 벌어진 일을 뒤늦게 되돌려 고치는",
+                "여러 사람의 뜻을 모아서 정하는",
+                "일이 벌어지기 전에 먼저 손을 쓰는",
+                "가장 적은 비용으로 해내는"
+              ],
+              "answer": 2,
+              "explain": "중점관리형은 환경 변화에 선제적으로 대응해야 하는 지역이다. 변화가 온 뒤가 아니라 그 전에 움직인다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "이 보도자료 본문만으로는 알 수 없는 것은?",
+              "choices": [
+                "전국의 주요 서식지 100곳을 네 가지 유형으로 구분했다는 것",
+                "분석에 여섯 개 지표를 썼다는 것",
+                "책자를 11월 11일 발간한다는 것",
+                "한 서식지가 그 유형으로 갈린 지표별 수치"
+              ],
+              "answer": 3,
+              "explain": "이 보도자료 본문에는 지표 이름과 유형 이름, 해당 지역까지만 적혀 있고 서식지마다의 지표별 수치는 적혀 있지 않다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "여섯 개 지표 가운데 이름에 여러 해라는 시간이 들어 있다고 본문이 든 것끼리 묶은 것은?",
+              "choices": [
+                "평균 개체수, 우점종 구조, 멸종위기종 이용",
+                "연도별 안정성, 대표종 지속성, 장기 추세",
+                "우점종 구조, 대표종 지속성, 평균 개체수",
+                "장기 추세, 평균 개체수, 우점종 구조"
+              ],
+              "answer": 1,
+              "explain": "본문은 연도별 안정성과 대표종 지속성, 장기 추세라는 이름에 여러 해라는 시간이 들어 있다고 적었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "한 습지의 잠재적인 서식지 기능을 더 확인해야 한다. 자료의 유형 가운데 어디에 해당하는가?",
+              "choices": [
+                "핵심보전형",
+                "중점관리형",
+                "지속관찰형",
+                "기능유지형"
+              ],
+              "answer": 2,
+              "explain": "지속관찰형은 장기적인 조사로 잠재적인 서식지 기능을 확인해야 하는 지역이다.",
+              "evidencePara": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "car-term-korean",
+      "category": "humanities",
+      "careers": [
+        "it",
+        "biz",
+        "media"
+      ],
+      "issue": true,
+      "publishedAt": "2026-11-16",
+      "status": "published",
+      "sources": [
+        {
+          "title": "국립국어원 보도자료 (게시판 등록일자 2026-11-12)",
+          "url": "https://www.korean.go.kr/front/board/boardStandardView.do?board_id=6&mn_id=183&b_seq=1077"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "차 화면의 쉬운 말을 마련했어요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "차에는 ",
+              "차량 화면이 있어요. ",
+              "운전하는 사람은 이 화면에서 ",
+              "차의 기능을 정해요. ",
+              "안내하는 내용도 이 화면에서 확인해요. ",
+              "이 밖에 하는 일도 있어요. ",
+              "그래서 화면은 ",
+              "차를 쓰는 주요 통로예요."
+            ],
+            [
+              "화면에 어려운 말이 있으면 어떨까요? ",
+              "국립국어원은 현대차·기아와 함께 일했어요. ",
+              "화면에 쓰인 ",
+              "어려운 외국어와 한자어를 골랐어요. ",
+              "그리고 쉬운 우리말로 바꿀 표현을 마련했어요."
+            ],
+            [
+              "‘팝업 도어 핸들’은 ",
+              "‘매립형 손잡이’예요. ",
+              "‘퍼들 램프’는 ‘승하차 노면등’이에요. ",
+              "‘글로브 박스’는 ‘동승석 수납함’이에요. ",
+              "바꿀 말은 ",
+              "이 밖에도 더 있어요. ",
+              "말이 쉬워지면 ",
+              "차를 쓰기도 편해져요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "통로",
+              "easy": "어떤 일을 하려고 거쳐 가는 길"
+            },
+            {
+              "word": "기능",
+              "easy": "기계나 물건이 할 수 있는 일"
+            },
+            {
+              "word": "표현",
+              "easy": "생각이나 뜻을 말이나 글로 나타낸 것"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 하고 싶은 말은 무엇일까요?",
+              "choices": [
+                "차에 있는 화면을 아주 크게 만들었어요",
+                "운전을 잘하는 방법을 하나하나 알려 주어요",
+                "차 화면의 어려운 말을 바꿀 쉬운 말을 골랐어요",
+                "차 화면에서 노래를 듣고 고르는 방법을 알려 주어요"
+              ],
+              "answer": 2,
+              "explain": "화면에 쓰인 어려운 외국어와 한자어를 골라 쉬운 우리말로 바꿀 표현을 마련했다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "‘글로브 박스’를 바꿀 말로 고른 것은 무엇인가요?",
+              "choices": [
+                "동승석 수납함",
+                "매립형 손잡이",
+                "승하차 노면등",
+                "차량 안내 화면"
+              ],
+              "answer": 0,
+              "explain": "글에 ‘글로브 박스’는 ‘동승석 수납함’이라고 적혀 있어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "‘통로’는 무슨 뜻일까요?",
+              "choices": [
+                "차에 다는 아주 밝은 등",
+                "길을 알려 주는 종이 지도",
+                "차가 달리는 빠른 속도",
+                "무엇을 하려고 거치는 길"
+              ],
+              "answer": 3,
+              "explain": "통로는 어떤 일을 하려고 거쳐 가는 길이에요. 글은 화면이 차를 쓰는 주요 통로라고 했어요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "화면의 말이 쉬워지면 무엇이 좋아질까요?",
+              "choices": [
+                "차가 더 빨리 달리게 되어요",
+                "차 값이 더 싸져요",
+                "차를 쓰기가 더 편해져요",
+                "화면이 저절로 꺼지고 켜져요"
+              ],
+              "answer": 2,
+              "explain": "글에 말이 쉬워지면 차를 쓰기도 편해진다고 적혀 있어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "차 화면에 ‘퍼들 램프’라고 적혀 있었어요. 바꿀 말로 쓰면 무엇일까요?",
+              "choices": [
+                "동승석 수납함이라고 바꾸어 쓰면 되어요",
+                "승하차 노면등이라고 쓰면 되어요",
+                "매립형 손잡이라고 쓰면 되어요",
+                "주요 통로라고 쓰면 되어요"
+              ],
+              "answer": 1,
+              "explain": "글에 ‘퍼들 램프’는 ‘승하차 노면등’이라고 적혀 있어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "‘글로브 박스’의 쉬운 말을 마련하였다",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "차에 타면 ",
+              "차량 화면이 있다. ",
+              "운전자는 이 화면에서 ",
+              "차의 기능을 설정하고 ",
+              "안내 정보를 확인하는 ",
+              "등의 일을 한다. ",
+              "그래서 화면은 ",
+              "차량 이용의 주요 통로가 된다. ",
+              "화면의 말을 쉽게 바꾸는 것은 ",
+              "차량 이용 편의와 ",
+              "정보 접근성을 높이는 일이다."
+            ],
+            [
+              "국립국어원은 차량 화면에 쓰이는 ",
+              "어려운 외국어와 한자어를 ",
+              "쉬운 말로 바꾸기 위해 ",
+              "현대차·기아와 협력했다. ",
+              "국어원과 두 기업은 ",
+              "어려운 차량 용어를 선정해 ",
+              "쉬운 대체 표현을 검토하였다. ",
+              "그리하여 ‘팝업 도어 핸들’은 ‘매립형 손잡이’, ",
+              "‘퍼들 램프’는 ‘승하차 노면등’, ",
+              "‘글로브 박스’는 ‘동승석 수납함’ ",
+              "등 대체 표현을 마련하였다."
+            ],
+            [
+              "국어원은 대체 표현에 대한 ",
+              "국민 의견을 확인하기 위해 ",
+              "수용도 조사를 실시했다. ",
+              "대상은 전국 20세~69세 성인 3,000명이었다. ",
+              "평소에 어려운 차량 용어 때문에 ",
+              "내용을 이해하기 어려웠다는 ",
+              "응답은 59.2%였다. ",
+              "차량 기능을 설명하는 ",
+              "외국어 단어에 거부감을 느낀 적이 있다는 ",
+              "응답은 58.5%였다. ",
+              "어려운 차량 용어를 ",
+              "쉬운 말로 개선할 필요가 있다는 ",
+              "응답은 86.0%에 달했다. ",
+              "이 응답들은 ",
+              "서로 다른 물음에 대한 답이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "설정",
+              "easy": "어떤 값이나 방식을 정해 두는 일",
+              "hanja": "設(베풀 설)+定(정할 정)"
+            },
+            {
+              "word": "대체",
+              "easy": "다른 것으로 바꾸어 놓는 일",
+              "hanja": "代(대신할 대)+替(바꿀 체)"
+            },
+            {
+              "word": "접근성",
+              "easy": "누구나 가까이 다가가 쓸 수 있는 정도",
+              "hanja": "接(이을 접)+近(가까울 근)+性(성품 성)"
+            },
+            {
+              "word": "수용도",
+              "easy": "사람들이 받아들이는 정도",
+              "hanja": "受(받을 수)+容(얼굴 용)+度(법도 도)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "차량 화면을 더 크고 밝게 만드는 기술이 개발되었다",
+                "어려운 차량 용어의 쉬운 대체 표현을 마련하였다",
+                "차량 화면을 쓰는 운전자의 수가 해마다 늘고 있다",
+                "차량 화면에서 외국어를 아예 쓰지 못하도록 정하였다"
+              ],
+              "answer": 1,
+              "explain": "국어원과 두 기업이 어려운 차량 용어를 선정해 쉬운 대체 표현을 마련하였다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "수용도 조사의 대상으로 글에 적힌 것은?",
+              "choices": [
+                "전국의 운전면허를 가진 사람 모두",
+                "차량 화면을 만드는 기술자 3,000명",
+                "전국 초등학생과 중학생 3,000명",
+                "전국 20세~69세 성인 3,000명"
+              ],
+              "answer": 3,
+              "explain": "조사 대상은 전국 20세~69세 성인 3,000명이라고 적혀 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "‘대체 표현’의 뜻으로 알맞은 것은?",
+              "choices": [
+                "다른 말로 바꾸어 쓰는 표현",
+                "외국에서 그대로 들여온 표현",
+                "소리를 똑같이 따라 적은 표현",
+                "뜻을 일부러 숨겨서 적은 표현"
+              ],
+              "answer": 0,
+              "explain": "대체는 다른 것으로 바꾸어 놓는 일이다. ‘글로브 박스’의 대체 표현이 ‘동승석 수납함’이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "86.0%는 무엇에 대한 응답의 비율인가?",
+              "choices": [
+                "평소에 어려운 차량 용어 때문에 내용을 이해하기 어려웠다는 응답",
+                "차량 기능을 설명하는 외국어 단어에 거부감을 느낀 적이 있다는 응답",
+                "어려운 차량 용어를 쉬운 말로 개선할 필요가 있다는 응답",
+                "차량 화면의 글자 크기를 더 키울 필요가 있다는 응답"
+              ],
+              "answer": 2,
+              "explain": "86.0%는 개선할 필요가 있다는 응답의 비율이다. 이해하기 어려웠다는 응답은 59.2%, 거부감을 느낀 적이 있다는 응답은 58.5%였다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "조사 결과의 세 비율을 바르게 읽은 것은?",
+              "choices": [
+                "세 비율이 모두 같은 물음에 대한 답이다",
+                "86.0%는 차량 용어를 어려워한 사람의 비율이다",
+                "59.2%는 개선이 필요하다고 본 사람의 비율이다",
+                "비율마다 센 응답이 서로 다르다"
+              ],
+              "answer": 3,
+              "explain": "이해하기 어려웠다는 응답, 거부감을 느낀 적이 있다는 응답, 개선할 필요가 있다는 응답은 서로 다른 물음에 대한 답이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "차량 화면에 ‘팝업 도어 핸들’이라고 적혀 있다. 글에 적힌 대체 표현으로 바꾸면?",
+              "choices": [
+                "승하차 노면등으로 바꾸어 적으면 된다",
+                "매립형 손잡이로 바꾸어 적으면 된다",
+                "동승석 수납함으로 바꾸어 적으면 된다",
+                "차량 이용 통로로 바꾸어 적으면 된다"
+              ],
+              "answer": 1,
+              "explain": "‘팝업 도어 핸들’의 대체 표현은 ‘매립형 손잡이’라고 적혀 있다.",
+              "evidencePara": 1
+            }
+          ],
+          "en": [
+            "There is a car screen. The driver sets the car's functions on this screen. The driver also checks guide information there, among other things. So the screen is a main way of using the car. Making the screen's words easy raises ease of use and access to information.",
+            "The National Institute of Korean Language worked with Hyundai Motor and Kia. The institute wanted to change hard foreign and Chinese-character words into words people understand. The institute and the two companies picked hard car terms. They also reviewed easy replacement expressions. So for 'pop-up door handle' they chose a Korean phrase meaning 'recessed handle'. For 'puddle lamp' they chose a phrase meaning 'road light for getting on and off'. For 'glove box' they chose a phrase meaning 'passenger-seat storage box'. They prepared these and other replacements.",
+            "The institute then ran an acceptance survey about the replacement expressions. It asked 3,000 adults aged 20 to 69 across the country. 59.2% said hard car terms had made content hard to understand in everyday use. 58.5% said they had at some time felt put off by foreign words that explain car functions. The share who said such terms need to be made easier reached 86.0%. These answers are answers to different questions."
+          ],
+          "enseg": [
+            [
+              "There is a car screen. ",
+              "The driver sets the car's functions on this screen. ",
+              "The driver also checks guide information there, among other things. ",
+              "So the screen is a main way of using the car. ",
+              "Making the screen's words easy raises ease of use and access to information."
+            ],
+            [
+              "The National Institute of Korean Language worked with Hyundai Motor and Kia. ",
+              "The institute wanted to change hard foreign and Chinese-character words into ",
+              "words people understand. ",
+              "The institute and the two companies picked hard car terms. ",
+              "They also reviewed easy replacement expressions. ",
+              "So for 'pop-up door handle' they chose a Korean phrase meaning 'recessed ",
+              "handle'. ",
+              "For 'puddle lamp' they chose a phrase meaning 'road light for getting on and off'. ",
+              "For 'glove box' they chose a phrase meaning 'passenger-seat storage box'. ",
+              "They prepared these and other replacements."
+            ],
+            [
+              "The institute then ran an acceptance survey ",
+              "about the replacement expressions. ",
+              "It asked 3,000 adults aged 20 to 69 across the country. ",
+              "59.2% said hard car terms had made content hard to understand in everyday use. ",
+              "58.5% said they had at some time felt ",
+              "put off by foreign words that explain ",
+              "car functions. ",
+              "The share who said such terms need to be made easier reached 86.0%. ",
+              "These answers are answers to different questions."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "screen",
+              "ko": "화면 (명사)",
+              "base": "screen [skriːn]"
+            },
+            {
+              "word": "functions",
+              "ko": "기능들 (명사 function의 복수)",
+              "base": "function [ˈfʌŋkʃn]"
+            },
+            {
+              "word": "replacements",
+              "ko": "바꾸어 쓰는 것들, 대체물들 (명사 replacement의 복수)",
+              "base": "replacement [rɪˈpleɪsmənt]"
+            },
+            {
+              "word": "acceptance",
+              "ko": "받아들임, 수용 (명사)",
+              "base": "acceptance [əkˈseptəns]"
+            },
+            {
+              "word": "adults",
+              "ko": "성인들 (명사 adult의 복수)",
+              "base": "adult [əˈdʌlt]"
+            },
+            {
+              "word": "reached",
+              "ko": "이르렀다 (동사 reach의 과거)",
+              "base": "reach [riːtʃ]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "어려운 말을 바꾸면 무엇이 달라지는가",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "차에 타면 ",
+              "차량 화면이 있다. ",
+              "운전자는 이 화면에서 차량의 기능을 설정하고 ",
+              "안내 정보를 확인하는 등 ",
+              "차량 이용의 주요 통로가 된다. ",
+              "그래서 화면에 쓰인 말을 쉽게 바꾸는 것은 ",
+              "차량 이용 편의와 ",
+              "정보 접근성을 높이는 일이다."
+            ],
+            [
+              "국립국어원은 차량 화면에 쓰이는 ",
+              "어려운 외국어와 한자어를 국민이 ",
+              "이해하기 쉬운 말로 바꾸기 위해 ",
+              "현대차·기아와 협력하여 ",
+              "우리말 대체어 선정 사업을 추진했다. ",
+              "국어원과 두 기업은 ",
+              "어려운 차량 용어를 선정해 ",
+              "쉬운 대체 표현을 검토하였으며, ",
+              "‘팝업 도어 핸들 → 매립형 손잡이’, ",
+              "‘퍼들 램프 → 승하차 노면등’, ",
+              "‘글로브 박스 → 동승석 수납함’ ",
+              "등 대체 표현을 마련하였다."
+            ],
+            [
+              "국어원은 대체 표현에 대한 ",
+              "국민 의견을 확인하기 위해 ",
+              "전국 20세~69세 성인 3,000명을 ",
+              "대상으로 수용도 조사를 실시했다. ",
+              "조사가 물은 것은 서로 다르다. ",
+              "평소에 어려운 차량 용어 때문에 ",
+              "내용을 이해하기 어려웠다는 응답은 59.2%, ",
+              "차량 기능을 설명하는 ",
+              "외국어 단어에 거부감을 느낀 적이 있다는 ",
+              "응답은 58.5%였다. ",
+              "어려운 차량 용어를 ",
+              "쉬운 말로 개선할 필요가 있다는 ",
+              "응답은 86.0%에 달했다. ",
+              "가장 높은 이 비율은 ",
+              "개선이 필요하다고 본 사람의 몫이고, ",
+              "어려워했다는 응답의 몫이 아니다."
+            ],
+            [
+              "이번 협업은 그동안 ",
+              "공공기관을 중심으로 이루어지던 공공언어 개선에 ",
+              "민간 기업이 참여한 사례로 의미가 있다. ",
+              "국어원은 쉬운 우리말 대체어 선정의 ",
+              "체계적인 방법을 제시하고, ",
+              "두 기업은 ",
+              "사용자 친화적인 기술 개발 경험과 전문성을 더하여 ",
+              "쉬운 우리말 차량 용어를 선정하였다. ",
+              "국어원은 이런 협업이 ",
+              "자동차 분야를 넘어 ",
+              "국민이 자주 이용하는 다양한 제품과 서비스로 확장되는 ",
+              "민관 협력 사례로 이어지기를 기대한다. ",
+              "국어원 관계자는 ",
+              "국민 생활과 가까운 ",
+              "금융, 의료, 정보 통신 등 ",
+              "다양한 분야에서 기업·기관과 협력해 ",
+              "쉬운 우리말 사용 환경을 ",
+              "넓혀 갈 계획이라고 밝혔다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "용어",
+              "easy": "어떤 분야에서 정해 쓰는 말",
+              "hanja": "用(쓸 용)+語(말씀 어)"
+            },
+            {
+              "word": "선정",
+              "easy": "여럿 가운데서 골라 정하는 일",
+              "hanja": "選(가릴 선)+定(정할 정)"
+            },
+            {
+              "word": "접근성",
+              "easy": "누구나 가까이 다가가 쓸 수 있는 정도",
+              "hanja": "接(이을 접)+近(가까울 근)+性(성품 성)"
+            },
+            {
+              "word": "수용도",
+              "easy": "사람들이 받아들이는 정도",
+              "hanja": "受(받을 수)+容(얼굴 용)+度(법도 도)"
+            },
+            {
+              "word": "민간",
+              "easy": "정부나 공공기관이 아닌 쪽",
+              "hanja": "民(백성 민)+間(사이 간)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "차량 화면에 외국어를 쓰지 못하게 하는 법이 새로 만들어졌다",
+                "차량 화면을 만드는 기술이 해마다 빠르게 좋아지고 있다",
+                "공공기관이 공공언어 개선을 모두 민간 기업에 넘기기로 정하였다",
+                "차량 화면의 어려운 말을 쉬운 우리말로 바꿀 표현을 마련하였다"
+              ],
+              "answer": 3,
+              "explain": "국어원과 두 기업이 어려운 차량 용어를 선정해 쉬운 대체 표현을 마련하였다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "글에 적힌 대체 표현의 짝으로 알맞은 것은?",
+              "choices": [
+                "매립형 손잡이 → 팝업 도어 핸들",
+                "퍼들 램프 → 승하차 노면등",
+                "동승석 수납함 → 글로브 박스",
+                "승하차 노면등 → 동승석 수납함"
+              ],
+              "answer": 1,
+              "explain": "짝의 방향은 어려운 말에서 쉬운 말로 간다. ‘퍼들 램프’의 대체 표현이 ‘승하차 노면등’이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "‘접근성’의 뜻으로 알맞은 것은?",
+              "choices": [
+                "기계를 다루는 솜씨가 얼마나 좋은지의 정도",
+                "값이 얼마나 싸고 사기 쉬운지의 정도",
+                "누구나 가까이 다가가 쓸 수 있는 정도",
+                "어떤 물건이 얼마나 오래 쓰이는지의 정도"
+              ],
+              "answer": 2,
+              "explain": "화면의 말을 쉽게 바꾸는 것은 차량 이용 편의와 정보 접근성을 높이는 일이라고 적혀 있다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "수용도 조사 결과에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "개선할 필요가 있다는 응답이 86.0%에 달했다",
+                "내용을 이해하기 어려웠다는 응답이 86.0%였다",
+                "거부감을 느낀 적이 있다는 응답이 86.0%였다",
+                "세 응답의 비율이 모두 같게 나왔다"
+              ],
+              "answer": 0,
+              "explain": "86.0%는 개선할 필요가 있다는 응답이다. 이해하기 어려웠다는 응답은 59.2%, 거부감을 느낀 적이 있다는 응답은 58.5%였다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "이번 협업에서 맡은 몫에 대해 글을 근거로 바르게 말한 것은?",
+              "choices": [
+                "두 기업이 대체어 선정의 체계적인 방법을 제시하였다",
+                "국어원이 대체어 선정의 체계적인 방법을 제시하였다",
+                "국어원이 사용자 친화적인 기술 개발 경험을 더하였다",
+                "공공기관이 빠지고 두 기업만으로 용어를 선정하였다"
+              ],
+              "answer": 1,
+              "explain": "국어원은 체계적인 방법을 제시하고, 두 기업은 사용자 친화적인 기술 개발 경험과 전문성을 더하였다고 적혀 있다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 글에 적힌 계획을 다른 사람에게 전한다면 어떻게 말해야 하는가?",
+              "choices": [
+                "금융·의료·정보 통신 분야의 어려운 용어를 이미 모두 바꾸어 두었다",
+                "자동차 분야 말고는 더 넓히지 않기로 이미 정하여 두었다",
+                "민간 기업과 하는 일을 올해로 끝내기로 이미 정하여 두었다",
+                "다양한 분야에서 기업·기관과 협력해 넓혀 갈 계획이라고 밝혔다"
+              ],
+              "answer": 3,
+              "explain": "넓혀 갈 계획이라고 밝힌 것이므로 이미 끝낸 일이 아니다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "When you get into a car, there is a car screen. On this screen the driver sets the car's functions and checks guide information, among other things, so that it becomes a main path for using the car. So making the words on the screen easier is work that raises ease of use and access to information.",
+            "To turn the hard foreign and Chinese-character words used on car screens into words people can understand easily, the National Institute of Korean Language worked with Hyundai Motor and Kia and pushed ahead with a project to choose plain Korean replacements. The institute and the two companies selected hard car terms and reviewed easy replacement expressions, and they prepared replacement expressions such as 'pop-up door handle' to maeripyeong sonjabi, a recessed handle; 'puddle lamp' to seunghacha nomyeondeung, a road-surface light for getting on and off; and 'glove box' to dongseungseok sunapham, a passenger-seat storage box.",
+            "To check what people thought of the replacement expressions, the institute ran an acceptance survey of 3,000 adults aged 20 to 69 across the country. What the survey asked was not one thing. 59.2% answered that hard car terms had made content hard to understand in everyday use, and 58.5% answered that they had at some time felt put off by foreign words that explain car functions. The answer that hard car terms need to be improved into easier words reached 86.0%. This highest share belongs to the people who saw a need for improvement, and it is not the share of those who answered that the terms were hard to understand.",
+            "This collaboration is meaningful as a case in which private companies took part in the improvement of public language, which until then had been carried out mainly by public institutions. The institute offered a systematic method for choosing plain Korean replacements, and the two companies added their experience and expertise in user-friendly technology development, and so plain Korean car terms were selected. The institute hopes that such collaboration will lead on to cases of public-private cooperation that spread beyond the car field to the many products and services people use often. An institute official said the institute plans to work with companies and institutions in many fields close to people's lives, such as finance, medicine and information and communication, and so widen the setting in which plain Korean is used."
+          ],
+          "enseg": [
+            [
+              "When you get into a car, there is a car screen. ",
+              "On this screen the driver sets the car's functions and checks guide information, among other things, so that it becomes a main path for using the car. ",
+              "So making the words on the screen easier is work that raises ease of use and access to information."
+            ],
+            [
+              "To turn the hard foreign ",
+              "and Chinese-character words used on car screens ",
+              "into words people can understand easily, ",
+              "the National Institute of Korean Language worked with Hyundai Motor ",
+              "and Kia and pushed ahead ",
+              "with a project to choose plain Korean replacements. ",
+              "The institute and the two companies selected hard car terms ",
+              "and reviewed easy replacement expressions, ",
+              "and they prepared replacement expressions ",
+              "such as 'pop-up door handle' to maeripyeong sonjabi, ",
+              "a recessed handle; 'puddle lamp' to seunghacha nomyeondeung, ",
+              "a road-surface light for getting on and off; ",
+              "and 'glove box' to dongseungseok sunapham, ",
+              "a passenger-seat storage box."
+            ],
+            [
+              "To check what people thought of the replacement expressions, ",
+              "the institute ran an acceptance survey of 3,000 adults aged 20 to 69 ",
+              "across the country. ",
+              "What the survey asked was not one thing. ",
+              "59.2% answered that hard car terms had made content hard to understand ",
+              "in everyday use, and 58.5% answered that they ",
+              "had at some time felt put off by foreign ",
+              "words ",
+              "that explain car functions. ",
+              "The answer that hard car terms need to be improved ",
+              "into easier words reached 86.0%. ",
+              "This highest share belongs to the people who saw a need ",
+              "for improvement, and it is not the share of those who answered ",
+              "that the terms were hard to understand."
+            ],
+            [
+              "This collaboration is meaningful as a ",
+              "case in which private companies took ",
+              "part ",
+              "in the improvement of public language, ",
+              "which until then had been carried out mainly by public institutions. ",
+              "The institute offered a systematic method ",
+              "for choosing plain Korean replacements, ",
+              "and the two companies added their experience and expertise ",
+              "in user-friendly technology development, ",
+              "and so plain Korean car terms were selected. ",
+              "The institute hopes ",
+              "that such collaboration will lead on to cases of public-private cooperation ",
+              "that spread beyond the car field to the many products ",
+              "and services people use often. ",
+              "An institute official said the institute plans to work ",
+              "with companies and institutions ",
+              "in many fields close to people's lives, such as finance, medicine ",
+              "and information and communication, and so widen the setting ",
+              "in which plain Korean is used."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "screen",
+              "ko": "화면 (명사)",
+              "base": "screen [skriːn]"
+            },
+            {
+              "word": "replacement",
+              "ko": "바꾸어 쓰는 것, 대체 (명사)",
+              "base": "replacement [rɪˈpleɪsmənt]"
+            },
+            {
+              "word": "acceptance",
+              "ko": "받아들임, 수용 (명사)",
+              "base": "acceptance [əkˈseptəns]"
+            },
+            {
+              "word": "expertise",
+              "ko": "전문성 (명사)",
+              "base": "expertise [ˌekspɜːrˈtiːz]"
+            },
+            {
+              "word": "collaboration",
+              "ko": "협업 (명사)",
+              "base": "collaboration [kəˌlæbəˈreɪʃn]"
+            },
+            {
+              "word": "improvement",
+              "ko": "개선 (명사)",
+              "base": "improvement [ɪmˈpruːvmənt]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "말을 바꾸는 일은 누구의 일인가",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "차량 화면은 운전자가 ",
+              "기능을 설정하고 ",
+              "안내 정보를 확인하는 등 ",
+              "차량 이용의 주요 통로가 된다. ",
+              "그래서 화면에 쓰인 말을 ",
+              "쉽게 바꾸는 것은 ",
+              "차량 이용 편의와 ",
+              "정보 접근성을 높이는 일이다."
+            ],
+            [
+              "국립국어원은 차량 화면에 쓰이는 ",
+              "어려운 외국어와 한자어를 국민이 ",
+              "이해하기 쉬운 말로 바꾸기 위해 ",
+              "현대차·기아와 협력하여 ",
+              "우리말 대체어 선정 사업을 추진했다. ",
+              "국어원과 두 기업은 ",
+              "어려운 차량 용어를 선정해 ",
+              "쉬운 대체 표현을 검토하였으며, ",
+              "‘팝업 도어 핸들 → 매립형 손잡이’, ",
+              "‘퍼들 램프 → 승하차 노면등’, ",
+              "‘글로브 박스 → 동승석 수납함’ ",
+              "등 대체 표현을 마련하였다. ",
+              "바꾸는 방향은 어려운 말에서 ",
+              "쉬운 말로 한쪽이다."
+            ],
+            [
+              "국어원은 대체 표현에 대한 ",
+              "국민 의견을 확인하기 위해 ",
+              "전국 20세~69세 성인 3,000명을 ",
+              "대상으로 수용도 조사를 실시했다. ",
+              "조사가 물은 것은 서로 다르다. ",
+              "평소에 어려운 차량 용어 때문에 ",
+              "내용을 이해하기 어려웠다는 응답은 59.2%, ",
+              "차량 기능을 설명하는 외국어 단어에 ",
+              "거부감을 느낀 적이 있다는 응답은 58.5%였다. ",
+              "어려운 차량 용어를 쉬운 말로 ",
+              "개선할 필요가 있다는 응답은 86.0%에 달했다."
+            ],
+            [
+              "가장 높은 86.0%는 ",
+              "개선이 필요하다고 본 사람의 몫이다. ",
+              "어려워했다는 응답의 몫도, ",
+              "거부감을 느꼈다는 응답의 몫도 아니다. ",
+              "자료의 소제목은 「운전자 대다수, ",
+              "차량 용어 개선 필요성에 공감」이지만 ",
+              "조사 대상으로 적힌 것은 ",
+              "전국 20세~69세 성인이다. ",
+              "비율을 읽을 때는 무엇을 센 비율인지와 ",
+              "누구를 대상으로 센 비율인지를 함께 보아야 한다."
+            ],
+            [
+              "이번 협업은 그동안 ",
+              "공공기관을 중심으로 이루어지던 공공언어 개선에 ",
+              "민간 기업이 참여한 사례로 의미가 있다. ",
+              "국어원은 쉬운 우리말 대체어 선정의 ",
+              "체계적인 방법을 제시하고, ",
+              "두 기업은 ",
+              "사용자 친화적인 기술 개발 경험과 전문성을 더하여 ",
+              "쉬운 우리말 차량 용어를 선정하였다. ",
+              "국어원 관계자는 이번 협력이 ",
+              "민간 기업과 함께 공공언어를 개선하는 ",
+              "새로운 방식을 보여 준 것이라고 밝혔다. ",
+              "국어원은 이런 협업이 ",
+              "자동차 분야를 넘어 ",
+              "국민이 자주 이용하는 다양한 제품과 서비스로 확장되는 ",
+              "민관 협력 사례로 이어지기를 기대한다. ",
+              "국민 생활과 가까운 ",
+              "금융, 의료, 정보 통신 등 ",
+              "다양한 분야에서 기업·기관과 협력해 ",
+              "쉬운 우리말 사용 환경을 ",
+              "넓혀 갈 계획이라고도 밝혔다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "공공",
+              "easy": "사회 전체에 두루 관계되는 것",
+              "hanja": "公(공평할 공)+共(한가지 공)"
+            },
+            {
+              "word": "거부감",
+              "easy": "받아들이고 싶지 않은 느낌",
+              "hanja": "拒(막을 거)+否(아닐 부)+感(느낄 감)"
+            },
+            {
+              "word": "전문성",
+              "easy": "한 분야를 깊이 아는 성질",
+              "hanja": "專(오로지 전)+門(문 문)+性(성품 성)"
+            },
+            {
+              "word": "확장",
+              "easy": "범위를 더 넓히는 일",
+              "hanja": "擴(넓힐 확)+張(베풀 장)"
+            },
+            {
+              "word": "민관",
+              "easy": "민간과 공공기관을 아울러 이르는 말",
+              "hanja": "民(백성 민)+官(벼슬 관)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "차량 화면에서 외국어를 쓰지 않도록 법으로 새로 정하였다",
+                "공공언어 개선을 공공기관이 모두 맡기로 다시 정하였다",
+                "민간 기업과 함께 어려운 차량 용어의 대체 표현을 마련하였다",
+                "차량 화면을 더 크고 밝게 만드는 기술을 민간 기업이 개발하였다"
+              ],
+              "answer": 2,
+              "explain": "국어원과 두 기업이 협력하여 어려운 차량 용어의 쉬운 대체 표현을 마련하였다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "수용도 조사에 대한 설명으로 글과 일치하는 것은?",
+              "choices": [
+                "전국 20세~69세 성인 3,000명을 대상으로 실시했다",
+                "전국 운전면허 소지자 3,000명을 대상으로 실시했다",
+                "전국 성인 가운데 운전자 3,000명만을 골라서 실시했다",
+                "전국 20세 이상 성인 모두를 대상으로 실시했다"
+              ],
+              "answer": 0,
+              "explain": "조사 대상은 전국 20세~69세 성인 3,000명이다. 이 자료 본문에 운전자만 골랐다는 말은 없다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "‘거부감’의 뜻으로 알맞은 것은?",
+              "choices": [
+                "무엇을 몹시 가지고 싶어 하는 마음",
+                "무엇을 오래 기다려 지루해지는 마음",
+                "무엇이 낯설어 더 알고 싶어지는 마음",
+                "받아들이고 싶지 않은 느낌"
+              ],
+              "answer": 3,
+              "explain": "차량 기능을 설명하는 외국어 단어에 거부감을 느낀 적이 있다는 응답은 58.5%였다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "국어원과 두 기업이 각각 한 일로 글과 일치하는 것은?",
+              "choices": [
+                "국어원은 기술 개발 경험을, 두 기업은 체계적인 방법을 더하였다",
+                "국어원은 체계적인 방법을, 두 기업은 기술 개발 경험을 더하였다",
+                "국어원과 두 기업이 모두 체계적인 방법만을 제시하였다",
+                "두 기업이 공공언어 개선 사업 전체를 맡아 추진하였다"
+              ],
+              "answer": 1,
+              "explain": "국어원은 쉬운 우리말 대체어 선정의 체계적인 방법을 제시하고, 두 기업은 사용자 친화적인 기술 개발 경험과 전문성을 더하였다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "critical",
+              "q": "이 자료 본문만으로는 답할 수 없는 것은?",
+              "choices": [
+                "조사 대상 인원이 몇 명이었는지",
+                "거부감을 느낀 적이 있다는 응답이 몇 %였는지",
+                "86.0%에 든 사람이 59.2%에도 들었는지",
+                "개선할 필요가 있다는 응답이 몇 %였는지"
+              ],
+              "answer": 2,
+              "explain": "이 자료 본문에는 세 응답의 비율이 따로 적혀 있을 뿐, 한 사람이 둘 이상에 함께 답했는지는 적혀 있지 않다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "자료의 소제목과 조사 대상에 대해 바르게 말한 것은?",
+              "choices": [
+                "소제목이 ‘운전자 대다수’이므로 조사 대상도 운전자였다",
+                "소제목이 ‘운전자 대다수’이므로 조사 대상은 국민 전체였다고 보아야 한다",
+                "소제목과 조사 대상이 글에 똑같은 말로 적혀 있다",
+                "소제목은 ‘운전자 대다수’이지만 조사 대상은 성인으로 적혀 있다"
+              ],
+              "answer": 3,
+              "explain": "소제목은 「운전자 대다수, 차량 용어 개선 필요성에 공감」이지만, 조사 대상으로 적힌 것은 전국 20세~69세 성인이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "어떤 차량 화면에 ‘글로브 박스’라고 적혀 있다. 글에 적힌 대로 바꾸면?",
+              "choices": [
+                "‘동승석 수납함’으로 바꾸어 적는다",
+                "‘매립형 손잡이’로 바꾸어 적는다",
+                "‘승하차 노면등’으로 바꾸어 적는다",
+                "‘글로브 박스’가 쉬운 말이므로 그대로 둔다"
+              ],
+              "answer": 0,
+              "explain": "‘글로브 박스’의 대체 표현은 ‘동승석 수납함’이라고 적혀 있다.",
+              "evidencePara": 1
+            }
+          ],
+          "en": [
+            "The car screen, on which the driver sets the car's functions and checks guide information, among other things, becomes a main path for using the car. So making the words on the screen easier is work that raises ease of use and access to information.",
+            "To turn the hard foreign and Chinese-character words used on car screens into words people can understand easily, the National Institute of Korean Language worked with Hyundai Motor and Kia and pushed ahead with a project to choose plain Korean replacements. The institute and the two companies selected hard car terms and reviewed easy replacement expressions, and they prepared replacement expressions such as 'pop-up door handle' to maeripyeong sonjabi, a recessed handle; 'puddle lamp' to seunghacha nomyeondeung, a road-surface light for getting on and off; and 'glove box' to dongseungseok sunapham, a passenger-seat storage box. The direction of the change runs one way, from hard words to easy ones.",
+            "To check what people thought of the replacement expressions, the institute ran an acceptance survey of 3,000 adults aged 20 to 69 across the country. What the survey asked was not one thing. 59.2% answered that hard car terms had made content hard to understand in everyday use, and 58.5% answered that they had at some time felt put off by foreign words that explain car functions. The answer that hard car terms need to be improved into easier words reached 86.0%.",
+            "The highest figure, 86.0%, is the share of those who saw a need for improvement. It is not the share of those who answered that the terms were hard to understand, nor the share of those who answered that they had felt put off. The subheading in the release reads that most drivers agree on the need to improve car terms, yet what is written as the survey group is adults aged 20 to 69 across the country. When you read a share, you have to look at both what was counted and who was counted.",
+            "This collaboration is meaningful as a case in which private companies took part in the improvement of public language, which until then had been carried out mainly by public institutions. The institute offered a systematic method for choosing plain Korean replacements, and the two companies added their experience and expertise in user-friendly technology development, and so plain Korean car terms were selected. An institute official said this cooperation had shown a new way of improving public language together with private companies. The institute hopes that such collaboration will lead on to cases of public-private cooperation that spread beyond the car field to the many products and services people use often. The official also said the institute plans to work with companies and institutions in many fields close to people's lives, such as finance, medicine and information and communication, and so widen the setting in which plain Korean is used."
+          ],
+          "enseg": [
+            [
+              "The car screen, on which the driver sets the car's functions and checks guide information, among other things, becomes a main path for using the car. ",
+              "So making the words on the screen easier is work that raises ease of use and access to information."
+            ],
+            [
+              "To turn the hard foreign ",
+              "and Chinese-character words used on car screens ",
+              "into words people can understand easily, ",
+              "the National Institute of Korean Language worked with Hyundai Motor ",
+              "and Kia and pushed ahead ",
+              "with a project to choose plain Korean replacements. ",
+              "The institute and the two companies selected hard car terms ",
+              "and reviewed easy replacement expressions, ",
+              "and they prepared replacement expressions ",
+              "such as 'pop-up door handle' to maeripyeong sonjabi, ",
+              "a recessed handle; 'puddle lamp' to seunghacha nomyeondeung, ",
+              "a road-surface light for getting on and off; ",
+              "and 'glove box' to dongseungseok sunapham, ",
+              "a passenger-seat storage box. ",
+              "The direction of the change runs one way, ",
+              "from hard words to easy ones."
+            ],
+            [
+              "To check what people thought of the replacement expressions, ",
+              "the institute ran an acceptance survey of 3,000 adults aged 20 to 69 ",
+              "across the country. ",
+              "What the survey asked was not one thing. ",
+              "59.2% answered that hard car terms had made content hard to understand ",
+              "in everyday use, and 58.5% answered that they ",
+              "had at some time felt put off by foreign ",
+              "words ",
+              "that explain car functions. ",
+              "The answer that hard car terms need to be improved ",
+              "into easier words reached 86.0%."
+            ],
+            [
+              "The highest figure, 86.0%, is the share of those who saw a need for improvement. ",
+              "It is not the share of those who answered ",
+              "that the terms were hard to understand, ",
+              "nor the share of those who answered that they had felt put off. ",
+              "The subheading in the release reads ",
+              "that most drivers agree on the need to improve car terms, ",
+              "yet what is written as the survey group is adults aged 20 to 69 ",
+              "across the country. ",
+              "When you read a share, you have to look at both what was counted ",
+              "and who was counted."
+            ],
+            [
+              "This collaboration is meaningful as a ",
+              "case in which private companies took ",
+              "part ",
+              "in the improvement of public language, ",
+              "which until then had been carried out mainly by public institutions. ",
+              "The institute offered a systematic method ",
+              "for choosing plain Korean replacements, ",
+              "and the two companies added their experience and expertise ",
+              "in user-friendly technology development, ",
+              "and so plain Korean car terms were selected. ",
+              "An institute official said this cooperation had shown a new way ",
+              "of improving public language together with private companies. ",
+              "The institute hopes ",
+              "that such collaboration will lead on to cases of public-private cooperation ",
+              "that spread beyond the car field to the many products ",
+              "and services people use often. ",
+              "The official also said the institute plans to work with companies ",
+              "and institutions in many fields close to people's lives, ",
+              "such as finance, medicine and information and communication, ",
+              "and so widen the setting in which plain Korean is used."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "acceptance",
+              "ko": "받아들임, 수용 (명사)",
+              "base": "acceptance [əkˈseptəns]"
+            },
+            {
+              "word": "replacement",
+              "ko": "바꾸어 쓰는 것, 대체 (명사)",
+              "base": "replacement [rɪˈpleɪsmənt]"
+            },
+            {
+              "word": "expertise",
+              "ko": "전문성 (명사)",
+              "base": "expertise [ˌekspɜːrˈtiːz]"
+            },
+            {
+              "word": "collaboration",
+              "ko": "협업 (명사)",
+              "base": "collaboration [kəˌlæbəˈreɪʃn]"
+            },
+            {
+              "word": "subheading",
+              "ko": "소제목 (명사)",
+              "base": "subheading [ˈsʌbhedɪŋ]"
+            },
+            {
+              "word": "improvement",
+              "ko": "개선 (명사)",
+              "base": "improvement [ɪmˈpruːvmənt]"
             }
           ]
         }
