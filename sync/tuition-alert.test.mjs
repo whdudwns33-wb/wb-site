@@ -1364,3 +1364,17 @@ test('admin can reset finalized attendance with audit while retaining notes and 
   assert.equal((await correct(db,{status:'',expectedUpdatedAt:result.body.check.data.updatedAt})).body.unchanged,true);
   assert.equal((await correct(db,{status:'',expectedUpdatedAt:result.body.check.data.updatedAt},{scope:'own',id:'teacher-a'})).status,403);
 });
+
+test('예정 담당자는 출결을 미리 조회하지만 다른 교사와 종료·삭제 수업은 거절한다', async () => {
+  const db=new TestD1();
+  seedRoster(db,[rosterStudent('student-a','예정학생',{billingMode:'monthly'})]);
+  seedTask(db,'lesson-next','student-a','teacher-next',{start:'2026-08-29'});
+  seedTask(db,'lesson-ended','student-a','teacher-ended',{end:'2026-08-27'});
+  seedTask(db,'lesson-deleted','student-a','teacher-deleted',{deleted:true});
+  const body={action:'get',studentId:'student-a',month:'2026-08'};
+  assert.equal((await attendanceApi(db,body,{scope:'own',id:'teacher-next'})).status,200);
+  for(const id of ['teacher-other','teacher-ended','teacher-deleted']) {
+    const r=await attendanceApi(db,body,{scope:'own',id});
+    assert.equal(r.status,403);assert.equal(r.body.code,'STUDENT_ATTENDANCE_FORBIDDEN');
+  }
+});

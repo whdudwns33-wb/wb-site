@@ -306,6 +306,7 @@ function publicCase(row, student, task, parentResponse, lessonTask) {
   const manual = creationType === 'manual' ? history[0] : null;
   const linked = history.slice().reverse().find(item => item && item.action === 'link_completed');
   return {
+    ...(row.scheduledAttendance ? { scheduledAttendance: row.scheduledAttendance } : {}),
     caseId: String(row.case_id), studentId: String(row.student_id),
     studentName: student ? String(student.name || '') : '', grade: student ? String(student.grade || '') : '',
     sourceTaskId: String(row.source_task_id), sourceDate: String(row.source_date),
@@ -1438,10 +1439,31 @@ function directCompletionAttestationStatement(env, app, row, completionRow, staf
     actor, 'makeup_direct_completion_v1', now);
 }
 
+// 완료 창에서 확인한 출결만 보완한다. 메모와 기존 출결은 지우지 않고 CAS로 보호한다.
+async function scheduledCompletionAttestation(env, app, row, staffId, attendance, now) {
+  const date = confirmedMakeupRange(row).date;
+  const taskId = makeupLessonId(String(row.case_id));
+  const key = taskId + '|' + date;
+  const old = await env.DB.prepare('SELECT owner,data,updated_at FROM checks WHERE app=? AND k=? LIMIT 1').bind(app, key).first();
+  const data = old && parseJson(old.data);
+  if (old && (old.owner !== staffId || !data || data.taskId !== taskId || data.date !== date))
+    problem('보강 출결의 학생·담당 연결을 확인해 주세요', 409, 'MAKEUP_ATTENDANCE_REQUIRED');
+  if (data && data.att === 'A') problem('결석한 보강은 새 일정을 잡아 주세요', 409, 'MAKEUP_ATTENDANCE_ABSENT');
+  const next = { ...(data || {}), taskId, date, att: data && COMPLETED_ATTENDANCE.has(data.att) ? data.att : attendance, updatedAt: now };
+  return old ? env.DB.prepare('UPDATE checks SET data=?,updated_at=?,srv_at=? WHERE app=? AND k=? AND owner=? AND data=? AND updated_at=?')
+    .bind(JSON.stringify(next), now, now, app, key, staffId, old.data, old.updated_at)
+    : env.DB.prepare('INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind(app, key, staffId, JSON.stringify(next), now, now);
+}
+
 async function saveCompletion(env, app, row, next, event, document, source, student, staffId, range,
   direct, currentSourceTeacherId, sourceIdentity, json, origin, now, forcedImpact = null,
   directAttendanceStatus = '') {
-  const taskWrite = await prepareMakeupLessonWrite(env, app, row, source, student, staffId, range, now, true);
+  const retryCompletion = !!event.adminAbsentCompletion;
+  const taskWrite = retryCompletion
+    ? await prepareMakeupLessonRescheduleAfterAbsence(env, app, row, source, student, staffId, range, now, event.actorId)
+    : await prepareMakeupLessonWrite(env, app, row, source, student, staffId,
+      !direct && event.explicitCompletion ? confirmedMakeupRange(row) : range, now, true);
   const planned = forcedImpact ? { impact: forcedImpact } :
     await completionImpact(env, app, row, document, currentSourceTeacherId);
   const impact = planned.impact;
@@ -1454,6 +1476,23 @@ async function saveCompletion(env, app, row, next, event, document, source, stud
   statements.push(await casGuard(env, app, 'makeup_complete_conflict', row, now));
   let completionRow = row;
   let completionNext = next;
+
+  if (retryCompletion) {
+    const retryNext = { ...row, confirmed_start_at: range.startAt, confirmed_end_at: range.endAt,
+      confirmed_staff_id: staffId, notification_needed: 0 };
+    const retryEvent = { action: 'reschedule_after_absence', from: row.status, to: row.status,
+      actorId: event.actorId, previousDate: taskWrite.retry.previousDate, previousAttendance: 'A',
+      date: range.date, startTime: range.startTime, endTime: range.endTime, staffId, notificationNeeded: false };
+    statements.push(taskWrite.retryEvent);
+    statements.push(await casGuard(env, app, 'makeup_complete_retry_event', row, now));
+    statements.push(transitionStatement(env, app, row, retryNext, retryEvent, now));
+    statements.push(await casGuard(env, app, 'makeup_complete_retry_case', row, now));
+    statements.push(taskWrite.statement);
+    statements.push(await casGuard(env, app, 'makeup_complete_retry_task', row, now));
+    taskWrite.statement = null;
+    completionRow = transitionSnapshot(row, retryNext, retryEvent, now);
+    completionNext = { ...completionRow, status: 'completed', completed_at: now, completed_by: staffId };
+  }
 
   if (direct) {
     let scheduleBase = row;
@@ -1502,9 +1541,18 @@ async function saveCompletion(env, app, row, next, event, document, source, stud
       cleanCompletedAttendance(directAttendanceStatus), now));
     statements.push(await casGuard(env, app, 'makeup_direct_attendance', row, now));
   } else {
-    statements.push(scheduledCompletionAttendanceGuardStatement(env, app, row, staffId));
+    if (event.explicitCompletion) {
+      if (!taskWrite.existed && taskWrite.statement) {
+        statements.push(taskWrite.statement);
+        statements.push(await casGuard(env, app, 'makeup_complete_restore', row, now));
+        taskWrite.statement = null;
+      }
+      statements.push(await scheduledCompletionAttestation(env, app, completionRow, staffId, event.attendanceStatus, now));
+      statements.push(await casGuard(env, app, 'makeup_complete_attest', row, now));
+    }
+    statements.push(scheduledCompletionAttendanceGuardStatement(env, app, completionRow, staffId));
     statements.push(await casGuard(env, app, 'makeup_complete_attendance', row, now));
-    statements.push(transitionStatement(env, app, row, completionNext,
+    statements.push(transitionStatement(env, app, completionRow, completionNext,
       { ...event, sessionPackImpact: impact }, now));
     statements.push(await casGuard(env, app, 'makeup_complete_case', row, now));
     if (taskWrite.statement) {
@@ -1585,6 +1633,12 @@ async function historicalRevocationRows(env, app, staffId) {
   return result.results || [];
 }
 
+export function excludedFromMakeupNeeds(student, task) {
+  return !!task && ([task.subject, task.className, task.lessonRole].some(v => String(v || '').trim() === '클리닉') ||
+    !!student && student.billingMode === 'session4' &&
+      (!student.sessionBillingSubject || student.sessionBillingSubject === task.subject));
+}
+
 async function listCases(env, app, body, auth, json, origin) {
   exactBody(body, ['status', 'studentId', 'fromDate', 'toDate', 'limit', 'caseId']);
   const clauses = ['app=?'];
@@ -1636,6 +1690,7 @@ async function listCases(env, app, body, auth, json, origin) {
     const student = students.get(String(row.student_id));
     const taskId = String(row.source_task_id);
     const task = tasks.get(taskId);
+    if (['review_pending', 'reviewed', 'awaiting_parent'].includes(row.status) && excludedFromMakeupNeeds(student, task)) return false;
     const unrelated = manualSourceMode(row) === 'unrelated';
     if (!student || (!unrelated && (!task || String(task.studentId || '') !== String(row.student_id)))) return false;
     const visibleStaffIds = [unrelated ? null : currentOwners.get(taskId), row.source_teacher_id, row.confirmed_staff_id];
@@ -1646,6 +1701,22 @@ async function listCases(env, app, body, auth, json, origin) {
       .some(staffId => String(staffId || '') === String(auth.id || '')));
   };
   const visible = candidates.filter(normalVisibility);
+  // 목록 권한 검사 후 해당 보강·확정일의 출결만 묶어서 읽는다. 과거 날짜 화면을 열 필요가 없다.
+  const attendance = new Map();
+  const scheduled = visible.filter(row => row.confirmed_start_at && lessonTasks.has(String(row.case_id)));
+  for (let offset = 0; offset < scheduled.length; offset += 80) {
+    const chunk = scheduled.slice(offset, offset + 80);
+    const keys = chunk.map(row => makeupLessonId(String(row.case_id)) + '|' + String(row.confirmed_start_at).slice(0,10));
+    const records = await env.DB.prepare('SELECT k,owner,data,updated_at FROM checks WHERE app=? AND k IN (' + keys.map(() => '?').join(',') + ')').bind(app, ...keys).all();
+    for (const record of records.results || []) attendance.set(record.k, record);
+  }
+  for (const row of visible) {
+    const date = String(row.confirmed_start_at || '').slice(0,10), taskId = makeupLessonId(String(row.case_id));
+    const record = attendance.get(taskId + '|' + date), data = record && parseJson(record.data);
+    row.scheduledAttendance = { value: record && record.owner === row.confirmed_staff_id && data &&
+      data.taskId === taskId && data.date === date && ['P','A','L','E'].includes(data.att) ? data.att : '',
+      updatedAt: Number(record && record.updated_at || 0), date };
+  }
   const notes = await instructionRows(env, app, visible.map(row => String(row.case_id)));
   for (const row of visible) row.instructionRecord = notes.get(String(row.case_id));
   // 중간 과거 담당자에게 학생 표시 정보와 history를 다시 노출하지 않는다. 태블릿에서
@@ -1660,7 +1731,7 @@ async function listCases(env, app, body, auth, json, origin) {
   const responses = await latestParentResponses(env, app);
   return json({ ok: true, cases: visible.map(row => publicCase(row, students.get(String(row.student_id)),
     sourceForCase(row, tasks.get(String(row.source_task_id))), responses.get(String(row.case_id)),
-    lessonTasks.get(String(row.case_id)))), revocations }, 200, origin);
+    lessonTasks.get(String(row.case_id)))), revocations, archiveThrough: makeupArchiveThrough(env) }, 200, origin);
 }
 
 // 완료된 수업을 기존 미처리 보강에 연결한다. 출결·회차 원장은 다시 쓰지 않고,
@@ -1987,6 +2058,11 @@ async function createManual(env, app, body, auth, json, origin) {
     case: publicCase(saved, student, sourceForCase(saved, source.task), null, lessonTask), lessonTask }, 200, origin);
 }
 
+export function makeupArchiveThrough(env) {
+  const value = String(env.WB_MAKEUP_ARCHIVE_THROUGH || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+}
+
 async function createFromAbsence(env, app, body, auth, json, origin) {
   exactBody(body, ['sourceTaskId', 'sourceDate', 'creationMode']);
   const sourceTaskId = cleanId(body.sourceTaskId, 'sourceTaskId');
@@ -1995,21 +2071,21 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
   if (!['automatic', 'manual'].includes(creationMode)) {
     problem('보강 생성 방식을 확인해 주세요', 400, 'MAKEUP_CREATION_MODE_INVALID');
   }
+  if (creationMode === 'automatic' && makeupArchiveThrough(env) && sourceDate <= makeupArchiveThrough(env)) {
+    return json({ ok: true, skipped: true, code: 'MAKEUP_LEGACY_ARCHIVED',
+      reason: '기존 결석 보강은 정리되었습니다. 필요하면 보강생성으로 직접 추가해 주세요' }, 200, origin);
+  }
   const source = await sourceTask(env, app, sourceTaskId, sourceDate);
   const studentId = cleanId(source.task.studentId, 'studentId');
   const sourceTeacherId = cleanId(source.row.owner, '수업 담당자');
   const document = await loadRoster(env, app);
   const student = rosterStudent(document, studentId, sourceDate);
-  // 구형 화면은 creationMode를 보내지 않으므로 automatic으로 닫는다. 회차제 결석은
-  // 해당 과목의 시작일 대기 중이거나 유효한 회차 시작일 이후부터 자동 생성하지 않는다. 시작일 이전 결석은
-  // 당시 월제였던 기존 운영 규칙을 보존하고, 사용자가 보강 버튼을 직접 누른 경우는 허용한다.
-  const cycleStartDate = String(student.sessionCycleStartDate || '');
-  const parsedCycleStart = new Date(cycleStartDate + 'T00:00:00Z');
-  const validCycleStart = ISO_DATE.test(cycleStartDate) && !Number.isNaN(parsedCycleStart.getTime()) &&
-    parsedCycleStart.toISOString().slice(0, 10) === cycleStartDate;
-  if (String(student.billingMode || 'monthly') === 'session4' &&
-      (!student.sessionBillingSubject || source.task.subject === student.sessionBillingSubject) &&
-      (!cycleStartDate || (validCycleStart && sourceDate >= cycleStartDate)) && creationMode !== 'manual') {
+  // 현재 회차제 해당 과목·클리닉은 과거 결석도 필요 목록에서 제외한다.
+  // 구형 화면의 자동 요청도 차단하되 기존 직접 생성 API와 확정·완료 이력은 유지한다.
+  if (excludedFromMakeupNeeds(student, source.task) && creationMode !== 'manual') {
+    if ([source.task.subject, source.task.className, source.task.lessonRole].some(v => String(v || '').trim() === '클리닉')) {
+      problem('클리닉 수업은 결석 보강을 자동 생성하지 않습니다', 409, 'CLINIC_AUTOMATIC_MAKEUP_DISABLED');
+    }
     problem('회차제 학생의 결석 보강은 자동 생성되지 않습니다. 필요하면 보강 버튼에서 직접 생성해 주세요',
       409, 'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
   }
@@ -2263,7 +2339,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     if (action === 'reconcile_attendance') return await reconcileAttendance(env, app, body, auth, json, origin);
 
     const administrative = new Set([
-      'review', 'propose', 'confirm', 'reschedule',
+      'review', 'propose', 'confirm',
       'restore_schedule', 'no_makeup', 'cancel'
     ]);
     if (administrative.has(action) && auth.scope !== 'all') {
@@ -2427,6 +2503,9 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       };
       scheduledSave = { staffId, range };
     } else if (action === 'reschedule') {
+      if (auth.scope !== 'all' && (String(auth.id || '') !== String(row.confirmed_staff_id || '') ||
+          String(body.staffId || '') !== String(auth.id || '') || Object.prototype.hasOwnProperty.call(body, 'instructionText')))
+        return json({ ok: false, error: '본인이 담당한 보강 일정만 변경할 수 있습니다' }, 403, origin);
       if (row.status !== 'confirmed' || !row.confirmed_start_at || !row.confirmed_end_at || !row.confirmed_staff_id) {
         problem('이미 생성된 보강만 일정과 담당자를 변경할 수 있습니다', 409, 'INVALID_TRANSITION');
       }
@@ -2507,7 +2586,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         problem('실제 보강 날짜·시작시간·종료시간을 모두 입력해 주세요');
       }
       const confirmedRange = direct ? null : confirmedMakeupRange(row);
-      if (!direct && supplied.every(Boolean) && supplied[0] !== confirmedRange.date) {
+      if (!direct && !body.attendanceStatus && supplied.every(Boolean) && supplied[0] !== confirmedRange.date) {
         problem('예약 보강의 날짜는 완료 단계에서 바꿀 수 없습니다. 출결·메모를 입력하기 전에 보강 수정에서 날짜를 변경해 주세요',
           409, 'MAKEUP_COMPLETION_DATE_MISMATCH');
       }
@@ -2544,8 +2623,36 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       if (!await activeStaff(env, app, staffId)) {
         problem('확정된 보강 담당 선생님이 비활성 상태입니다', 409, 'STAFF_INACTIVE');
       }
+      if (direct && !timeUnrecorded && body.attendanceStatus) {
+        // 같은 학생·과목·실제 일시·담당의 완료 수업만 자동 연결한다. 이름만으로 추측하지 않는다.
+        const response = await linkCandidates(env, app, { action: 'link_candidates', caseId, revision }, auth, json, origin);
+        const candidates = (await response.json()).candidates || [];
+        const matches = [];
+        for (const candidate of candidates) {
+          if (candidate.completedDate !== range.date || candidate.completedStartTime !== range.startTime ||
+              candidate.completedEndTime !== range.endTime || candidate.completedStaffId !== staffId) continue;
+          const taskRow = await env.DB.prepare('SELECT data FROM tasks WHERE app=? AND id=? LIMIT 1')
+            .bind(app, makeupLessonId(candidate.caseId)).first();
+          const task = taskRow && parseJson(taskRow.data);
+          if (task && String(task.subject || '') === String(source.subject || '')) matches.push(candidate);
+        }
+        if (matches.length === 1) return await linkCompleted(env, app, { action: 'link_completed', caseId, revision,
+          completedCaseId: matches[0].caseId, completedRevision: matches[0].revision }, auth, json, origin);
+        if (matches.length > 1) problem('같은 일시의 완료 기록이 여러 건입니다. 관리자 확인이 필요합니다', 409, 'MAKEUP_COMPLETION_AMBIGUOUS');
+      }
       if (!timeUnrecorded) await assertNoConflict(env, app, caseId, String(row.student_id), range);
-      if (!direct) await scheduledCompletionAttendance(env, app, row, staffId);
+      if (!direct && !body.attendanceStatus) await scheduledCompletionAttendance(env, app, row, staffId);
+      if (!direct && body.attendanceStatus) cleanCompletedAttendance(body.attendanceStatus);
+      let adminAbsentCompletion = false;
+      if (!direct && body.attendanceStatus && auth.scope === 'all') {
+        const key = makeupLessonId(caseId) + '|' + confirmedRange.date;
+        const prior = await env.DB.prepare('SELECT data FROM checks WHERE app=? AND k=? LIMIT 1').bind(app, key).first();
+        if (prior && parseJson(prior.data)?.att === 'A') {
+          if (range.date === confirmedRange.date) problem('결석했던 날짜와 다른 실제 진행 날짜를 입력해 주세요', 409, 'MAKEUP_RETRY_DATE_REQUIRED');
+          if (requestNow < Date.parse(range.endAt)) problem('실제 종료시간이 지난 뒤 완료해 주세요', 409, 'MAKEUP_NOT_ENDED');
+          adminAbsentCompletion = true;
+        }
+      }
       next.status = 'completed';
       next.completed_at = requestNow;
       // DB trigger는 완료 수업의 담당자를 completed_by로 강제하고, 실제 조작자는 history에 별도로 남긴다.
@@ -2556,7 +2663,8 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         date: timeUnrecorded ? null : range.date,
         startTime: timeUnrecorded ? null : range.startTime,
         endTime: timeUnrecorded ? null : range.endTime, staffId, direct,
-        ...(direct ? { attendanceStatus: directAttendanceStatus } : {}),
+        ...(adminAbsentCompletion ? { adminAbsentCompletion: true } : {}),
+        ...(direct ? { attendanceStatus: directAttendanceStatus } : body.attendanceStatus ? { attendanceStatus: cleanCompletedAttendance(body.attendanceStatus), explicitCompletion: true } : {}),
         ...(legacyDefaults.length ? { legacyDefaults } : {}), notificationNeeded: false
       };
       if (timeUnrecorded) {

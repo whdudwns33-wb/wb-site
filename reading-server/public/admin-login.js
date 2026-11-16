@@ -69,6 +69,31 @@
     var path = o.path || '/api/admin/login';
     var fetchFn = o.fetchFn || (typeof fetch === 'function' ? fetch : null);
 
+    function changePassword(ticket) {
+      host.innerHTML = '<p>임시 비밀번호로 로그인했습니다. 새 비밀번호를 설정해야 관리 화면을 사용할 수 있습니다. 영어·국어에 함께 적용됩니다.</p>' +
+        '<form id="wbaChangeForm"><p><input id="wbaNew" type="password" autocomplete="new-password" minlength="10" maxlength="256" required placeholder="새 비밀번호 (10자 이상)"></p>' +
+        '<p><input id="wbaConfirm" type="password" autocomplete="new-password" minlength="10" maxlength="256" required placeholder="새 비밀번호 확인"></p>' +
+        '<button id="wbaSave" type="submit">비밀번호 변경 후 계속</button></form>' +
+        '<p id="wbaChangeErr" class="err" role="alert" hidden></p><p><a id="wbaBack" href="#">다시 로그인</a></p>';
+      host.querySelector('#wbaBack').onclick = function (e) { e.preventDefault(); ticket = ''; draw(''); };
+      host.querySelector('#wbaChangeForm').onsubmit = function (e) {
+        e.preventDefault();
+        var password = host.querySelector('#wbaNew').value, confirmPassword = host.querySelector('#wbaConfirm').value;
+        var err = host.querySelector('#wbaChangeErr'), go = host.querySelector('#wbaSave');
+        if (password.length < 10 || password !== confirmPassword) { err.hidden = false; err.textContent = '새 비밀번호를 10자 이상 동일하게 두 번 입력해 주세요.'; return; }
+        go.disabled = true; err.hidden = true;
+        fetchFn('/api/admin/password', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + ticket },
+          body: JSON.stringify({ password: password, confirmPassword: confirmPassword })
+        }).then(function (r) { return r.json().then(function (j) {
+          if (!r.ok) throw new Error(j.error || '변경하지 못했습니다. 다시 로그인해 주세요.');
+          if (!j.token) throw new Error('다시 로그인해 주세요.');
+          ticket = ''; host.querySelector('#wbaNew').value = ''; host.querySelector('#wbaConfirm').value = '';
+          if (o.onToken) o.onToken(j.token, j.via || 'account');
+        }); }).catch(function (e2) { go.disabled = false; err.hidden = false; err.textContent = e2.message || '서버에 연결할 수 없습니다.'; });
+      };
+      host.querySelector('#wbaNew').focus();
+    }
+
     function draw(msg) {
       host.innerHTML = formHtml(mode, msg, o.classes);
       var form = host.querySelector('#wbaForm');
@@ -90,6 +115,7 @@
             return j;
           });
         }).then(function (j) {
+          if (j && j.passwordChangeRequired && j.changeToken) { changePassword(j.changeToken); return; }
           if (!j || !j.token) throw new Error('토큰을 받지 못했습니다.');
           if (o.onToken) o.onToken(j.token, j.via || '');
         }).catch(function (e2) {

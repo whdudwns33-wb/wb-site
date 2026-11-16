@@ -10,6 +10,7 @@ import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from 
 import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru, weeklyAgg } from './haru-api.mjs';
 import { handleNaesinKo, naesinKoBodyLimit } from './naesin-ko-api.mjs';
+import { handleNaesinTg, naesinTgBodyLimit } from './naesin-tg-api.mjs';
 import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
 import { handleChunk, dropStudentChunk, pushDueChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
@@ -253,6 +254,24 @@ function chunkStore(env) {
   };
 }
 
+/* 탐구브레인 저장소 어댑터 — naesintg: 접두 키만. 쪽 그림은 쪽마다 한 키(문제지 한 건을 통째로 두면 KV 값 상한에 닿는다). */
+function naesinTgStore(env) {
+  const get = (k) => env.DB.get(k, 'json');
+  const put = (k, v) => env.DB.put(k, JSON.stringify(v));
+  return {
+    getSheet: (id) => get('naesintg:sheet:' + id), putSheet: (id, rec) => put('naesintg:sheet:' + id, rec), delSheet: (id) => env.DB.delete('naesintg:sheet:' + id),
+    getSheetIds: () => get('naesintg:sheets'), putSheetIds: (ids) => put('naesintg:sheets', ids),
+    getPage: (id, n) => env.DB.get('naesintg:page:' + id + ':' + n), putPage: (id, n, data) => env.DB.put('naesintg:page:' + id + ':' + n, data),
+    delPage: (id, n) => env.DB.delete('naesintg:page:' + id + ':' + n),
+    getState: (c) => get('naesintg:state:' + c), putState: (c, rec) => put('naesintg:state:' + c, rec),
+    listStateCodes: async () => (await kvListAll(env, 'naesintg:state:')).map((k) => k.slice('naesintg:state:'.length)),
+    getExam: (s) => get('naesintg:exam:' + s), putExam: (s, rec) => put('naesintg:exam:' + s, rec),
+    getTasks: () => get('naesintg:tasks'), putTasks: (v) => put('naesintg:tasks', v),
+    getStudent: (c) => get('student:' + c),
+    listStudentCodes: async () => (await kvListAll(env, 'student:')).map((k) => k.slice('student:'.length)),
+  };
+}
+
 function naesinKoStore(env) {
   return {
     getPack: (id) => env.DB.get('naesinko:pack:' + id, 'json'),
@@ -428,7 +447,14 @@ async function fullDump(env) {
   const letter = await dumpLetter(letterStore(env));
   /* 어휘브레인 — 목록(메타)·학생 기록·배정. 단어장 본문은 내신 팩과 같은 이유로 id 만 */
   const hanja = await dumpHanja(hanjaStore(env));
-  return { service: 'wb-reading', savedAt: nowIso(), students, portalFamilies, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk, letter, hanja };
+  /* 탐구브레인 — 학생 기록·시험 배정·과제와 문제지 목록(메타). 문제지 본문·쪽 그림은 구매 자료라 팩과 같은 이유로 뺀다.
+     로컬 store.naesinTgSnapshot 과 같은 모양. */
+  const naesinTg = { sheetIds: (await env.DB.get('naesintg:sheets', 'json')) || [], states: {}, exams: {},
+    tasks: (await env.DB.get('naesintg:tasks', 'json')) || [] };
+  for (const [pre, tgt] of [['naesintg:state:', naesinTg.states], ['naesintg:exam:', naesinTg.exams]]) {
+    for (const k of await kvListAll(env, pre)) tgt[k.slice(pre.length)] = await env.DB.get(k, 'json');
+  }
+  return { service: 'wb-reading', savedAt: nowIso(), students, portalFamilies, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk, letter, hanja, naesinTg };
 }
 
 async function snapshotBackup(env) {
@@ -802,6 +828,17 @@ export default {
         return json(out.status, out.body);
       }
 
+      /* 탐구브레인 (/api/naesin-tg/*) — 사회·과학 내신. 같은 격리 원칙, 저장소만 naesintg: */
+      if (p.startsWith('/api/naesin-tg/')) {
+        const len = Number(req.headers.get('content-length') || 0);
+        if (len > naesinTgBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
+        const out = await handleNaesinTg({
+          path: p, method: req.method, who, query: url.searchParams,
+          getBody: () => readJsonBody(req, naesinTgBodyLimit(p)), store: naesinTgStore(env),
+        });
+        return json(out.status, out.body);
+      }
+
       if (p === '/api/pull' && req.method === 'GET' && !who.admin) {
         const st = await env.DB.get('state:' + who.code, 'json');
         const stu = await env.DB.get('student:' + who.code, 'json');
@@ -1108,6 +1145,9 @@ export default {
         await drop('naesinko:review:' + c);
         await drop('naesinko:exam:' + c);
         await drop('naesinko:overlay:' + c);
+        /* 탐구브레인 — 풀이 기록(서술형 답안 포함)과 이 학생만의 시험 배정 */
+        await drop('naesintg:state:' + c);
+        await drop('naesintg:exam:' + c);
 
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표(haru:paperkey:*)는 학생 것이 아니라 그대로 둔다. */
         await dropStudentHaru(haruStore(env), c);

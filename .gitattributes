@@ -1,0 +1,3 @@
+# Source extraction and generated-file checks must use the same newlines on Windows and CI.
+/consult/index.html text eol=lf
+/reading/*.json text eol=lf
