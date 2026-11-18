@@ -446,3 +446,6 @@ export async function handleCenterChat(env, app, body, origin, auth, json) {
   if (action === 'read') return read(env, app, body, origin, actor, json);
   return json({ ok: false, error: '지원하지 않는 센터 소통 작업입니다' }, 400, origin);
 }
+
+// CT도 화면과 같은 대표 읽음 기준을 사용하며 읽음 기록은 바꾸지 않는다.
+export { unreadCount as countCenterUnread };
