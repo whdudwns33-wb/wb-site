@@ -39,8 +39,8 @@ async function jsonBody(request) {
   try { const data = JSON.parse(Buffer.concat(chunks).toString('utf8'), (key, value) => { if (['__proto__', 'constructor', 'prototype'].includes(key)) throw Error(); return value; }); if (!data || typeof data !== 'object' || Array.isArray(data)) throw Error(); return data; }
   catch { throw new HttpError(400, 'JSON 자료 형식을 확인하세요.'); }
 }
-export function createAccountHost({directory, appKey, store, publicOrigin = 'https://workbench.wbcowork.com'}) {
-  const origin = new URL(publicOrigin), release = readWorkbenchRelease(directory), app = prepareAccountApp(release, appKey);
+export function createAccountHost({directory, appKey, store, publicOrigin = 'https://workbench.wbcowork.com', aliasOrigins = []}) {
+  const origins = [publicOrigin, ...aliasOrigins].map(o => new URL(o)), release = readWorkbenchRelease(directory), app = prepareAccountApp(release, appKey);
   const health = {ok: true, build: release.envelope.t, authentication: 'required', hashes: {'index.html': digest(release.index), 'bulk.enc.json': digest(release.bulk)}};
   const loginAttempts = new Map();
   const server = createServer(async (request, response) => {
@@ -53,6 +53,8 @@ export function createAccountHost({directory, appKey, store, publicOrigin = 'htt
     const setSession = session => response.setHeader('Set-Cookie', cookieName + '=' + session.token + '; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=28800');
     try {
       const host = String(request.headers.host || '');
+      // 새 주소 · 옛 주소를 함께 받는다(2026-11-18 consult.wbcowork.com). 출처 확인 · 주소 넘기기는 요청이 들어온 주소 기준
+      const origin = origins.find(o => o.host === host) || origins[0];
       if (![origin.host, '127.0.0.1:' + request.socket.localPort, 'localhost:' + request.socket.localPort].includes(host)) throw new HttpError(403, '허용하지 않는 접속 주소입니다.');
       const incomingOrigin = request.headers.origin;
       if (incomingOrigin && incomingOrigin !== origin.origin) throw new HttpError(403, '허용하지 않는 요청 출처입니다.');
