@@ -1639,7 +1639,7 @@ export function excludedFromMakeupNeeds(student, task) {
       (!student.sessionBillingSubject || student.sessionBillingSubject === task.subject));
 }
 
-async function listCases(env, app, body, auth, json, origin) {
+async function listCases(env, app, body, auth, json, origin, countsOnly = false) {
   exactBody(body, ['status', 'studentId', 'fromDate', 'toDate', 'limit', 'caseId']);
   const clauses = ['app=?'];
   const binds = [app];
@@ -1654,7 +1654,7 @@ async function listCases(env, app, body, auth, json, origin) {
   const limit = Math.floor(Math.max(1, Math.min(500, Number(body.limit) || 200)));
   const result = await env.DB.prepare('SELECT * FROM makeup_cases WHERE ' + clauses.join(' AND ') +
     ' ORDER BY CASE status WHEN \'review_pending\' THEN 0 WHEN \'awaiting_parent\' THEN 1 WHEN \'confirmed\' THEN 2 ELSE 3 END,' +
-    ' updated_at DESC LIMIT ' + limit).bind(...binds).all();
+    ' updated_at DESC' + (countsOnly ? '' : ' LIMIT ' + limit)).bind(...binds).all();
   const document = await loadRoster(env, app);
   const students = new Map(document.roster.students.map(student => [student.id, student]));
   const candidates = result.results || [];
@@ -1717,6 +1717,9 @@ async function listCases(env, app, body, auth, json, origin) {
       data.taskId === taskId && data.date === date && ['P','A','L','E'].includes(data.att) ? data.att : '',
       updatedAt: Number(record && record.updated_at || 0), date };
   }
+  // CT는 화면의 보강 필요 판정을 그대로 쓰되 목록 상한으로 건수가 잘리지 않게 한다.
+  if (countsOnly) return visible.filter(row => !['completed', 'cancelled'].includes(row.status) &&
+    (row.status !== 'confirmed' || row.scheduledAttendance.value === 'A')).length;
   const notes = await instructionRows(env, app, visible.map(row => String(row.case_id)));
   for (const row of visible) row.instructionRecord = notes.get(String(row.case_id));
   // 중간 과거 담당자에게 학생 표시 정보와 history를 다시 노출하지 않는다. 태블릿에서
@@ -2734,4 +2737,8 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     return json({ ok: false, ...(error.code ? { code: error.code } : {}), error: String(error.message || error) },
       Number(error.status) || 400, origin);
   }
+}
+
+export async function countMakeupNeeded(env) {
+  return listCases(env, 'task', {}, { scope: 'all' }, null, '', true);
 }
