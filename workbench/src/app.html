@@ -1,4 +1,4 @@
-<title>WB 컨설팅 워크벤치</title>
+<title>WB 컨설팅 앱</title>
 <style>
 :root{
   --bg:#F3F5F8; --panel:#FFFFFF; --ink:#141A24; --ink2:#566175; --line:#DCE1E8;
@@ -664,7 +664,7 @@ function focusList(){
 function renderSide(){
   const grades=["고3","고2","고1","중3","퇴원"];
   $("#side").innerHTML=`
-  <div class="brand" onclick="go('home')"><div class="mark">WB</div><div><b>컨설팅 워크벤치</b><small>웩슬러브레인센터</small></div></div>
+  <div class="brand" onclick="go('home')"><div class="mark">WB</div><div><b>컨설팅 앱</b><small>웩슬러브레인센터</small></div></div>
   <button class="navbtn ${view.page==='home'?'on':''}" onclick="go('home')">🏠 <span class="txt">대시보드</span></button>
   <button class="navbtn ${view.page==='cal'?'on':''}" onclick="go('cal')">🗓 <span class="txt">월간 캘린더</span></button>
   <button class="navbtn ${view.page==='apply'?'on':''}" onclick="go('apply')">📮 <span class="txt">수시 지원 현황</span></button>
@@ -1153,7 +1153,7 @@ ${exams}
 3. 일정 전략 — 시험기간에 월 8개까지 몰리는 패턴 대비. 시험 2주 전 구간과 겹치는 수행은 미리 앞당길 것 지정
 4. 세특 전환 계획 — 어떤 수행을 생기부 어느 항목(세특/자율/동아리/진로)으로 연결할지 매핑
 5. 버릴 것 — 투자 대비 세특 가치가 낮은 수행은 "기본만" 등급으로 명시 (모든 수행에 전력하지 않는 것이 전략이다)
-6. 출력 마지막에 "전략 요약 5줄" — 워크벤치 수행평가 탭 전략 메모에 저장할 형태로`);}
+6. 출력 마지막에 "전략 요약 5줄" — 컨설팅 앱 수행평가 탭 전략 메모에 저장할 형태로`);}
 
 // COURSE_PLAN_CORE_START
 const CP_TERMS=["고1-1","고1-2","고2-1","고2-2","고3-1","고3-2"];
@@ -1468,7 +1468,7 @@ ${subs}
 3. 다음 시험까지의 교정 우선순위 3가지 (구체적으로 — 교재·기출 단위)
 4. 잘한 것 2가지 — 반드시 포함 (성취 인정이 자신감 관리의 핵심, LCSI ${s.lcsi||"미파악"} 유형 반영)
 5. 플래너 반영 항목 — 주간 루틴에 추가할 것 2~3개
-6. 출력 마지막에 "리뷰 요약 5줄" — 워크벤치 시험 리뷰 칸에 저장할 형태로`);}
+6. 출력 마지막에 "리뷰 요약 5줄" — 컨설팅 앱 시험 리뷰 칸에 저장할 형태로`);}
 function genVacationPrompt(){
  modal(`<h2>방학 로드맵 프롬프트</h2>
  <div class="frow" style="grid-template-columns:70px 1fr"><label>방학</label>
@@ -2065,7 +2065,7 @@ function copyTrendScan(){
 - 항목별 핵심 5줄 이내 + 출처 URL
 - 마지막에 "WB 컨설팅 시사점" 2가지 — 고등 컨설팅 14명 운영에 바로 적용할 문장으로
 - 제목: "YYYY-MM N주차 입시 동향"
-- 이 결과를 워크벤치 앱 노하우 랩 → 동향 노트에 붙여넣어 저장한다`);}
+- 이 결과를 컨설팅 앱 노하우 랩 → 동향 노트에 붙여넣어 저장한다`);}
 function copyDeepDive(){
  modal(`<h2>심화 학습 프롬프트</h2>
  <div class="frow" style="grid-template-columns:70px 1fr"><label>주제</label>
@@ -2084,7 +2084,7 @@ function doDeepDive(){const topic=$("#dd_topic").value.trim()||"고등 컨설팅
 3. 현장의 흔한 오해 3가지와 교정
 4. WB 고등 컨설팅(14명 — 세특·수행평가·탐구보고서 지원)에 적용할 실행 노하우 5개
    — 각각 "언제 · 무엇을 · 어떻게" 형식의 실행 문장으로
-5. 마무리 지시: 실행 노하우 5개를 워크벤치 앱 "노하우 랩 → 노하우 노트"에 저장하고,
+5. 마무리 지시: 실행 노하우 5개를 컨설팅 앱 "노하우 랩 → 노하우 노트"에 저장하고,
    다음 달 상담 아젠다에 반영할 1개를 고른다`);}
 
 /* ═══════════ 입시 검색 (어디가식 대학·고교 검색) ═══════════ */
@@ -3686,7 +3686,7 @@ function copyHsdbExtract(){
    학교명,유형(일반고/자사고/외고·국제고/과학고/특성화),지역(구·시),내신경쟁(상/중/하),특징 한 줄,출처
    - 내신경쟁은 콘텐츠DB의 학업 수준·선호도 정보로 판단하고, 근거 없으면 "중"으로 두고 특징란에 "경쟁도 미확인" 표기
 3. 콘텐츠DB에 없는 학교는 지어내지 마라. 출처 등급(L1~L6)이 낮은 정보는 특징란에 표기.
-4. CSV 전체를 출력하라 — 워크벤치 진학 가능권 분석 → 고교 DB에 붙여넣는다.`);}
+4. CSV 전체를 출력하라 — 컨설팅 앱 진학 가능권 분석 → 고교 DB에 붙여넣는다.`);}
 function copyIpsiReport(){
   const R=view.ipsiResult;if(!R)return;
   const myG=(R.band[0]+R.band[1])/2;

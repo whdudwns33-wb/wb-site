@@ -15,7 +15,7 @@ import {createHostStore} from './host-store.mjs';
 import {readWorkbenchRelease} from './serve.mjs';
 
 const origin = 'https://workbench.wbcowork.com', initial = 'initial-fixture', next = 'new-fixture-password';
-async function fixture(t) {
+async function fixture(t, hostOptions = {}) {
   const root = mkdtempSync(join(tmpdir(), 'wb-account-test-')), key = randomBytes(32);
   const envelope = plain => { const iv = randomBytes(12), c = createCipheriv('aes-256-gcm', key, iv); return {i: iv.toString('base64'), c: Buffer.concat([c.update(plain), c.final(), c.getAuthTag()]).toString('base64')}; };
   const app = '<title>Synthetic workbench</title><script>let db=load();function save(next=db){try{const text=JSON.stringify(next);localStorage.setItem(LS,text);db=next;_savedDb=text;}catch{}}</script>';
@@ -31,7 +31,7 @@ async function fixture(t) {
     rmSync(root, {recursive: true});
   });
   await store.bootstrap([{username: 'owner-test', name: '테스트 관리자 A', password: initial}, {username: 'wb테스트', name: '테스트 관리자 B', password: initial}], {students: [{id: 'fake-1', name: 'Synthetic_Private_Student', records: [{text: 'Synthetic_Private_Record'}], consult: {reports: [], jeongsi: {exams: [], plans: [], history: []}}}], meta: {fixture: true}});
-  server = createAccountHost({directory: root, appKey: key, store});
+  server = createAccountHost({directory: root, appKey: key, store, ...hostOptions});
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const base = 'http://127.0.0.1:' + server.address().port;
   const call = async (path, {method = 'GET', body, cookie, csrf, bearer, requestOrigin = origin, extra = {}} = {}) => {
@@ -230,4 +230,14 @@ test('registration password failures share persistent administrator lockout with
   for(let i=0;i<5;i++)assert.equal((await f.call('/api/admin/users',{...owner,method:'POST',body})).status,401);
   assert.equal((await f.call('/api/admin/users',{...owner,method:'POST',body:{...body,currentPassword:next}})).status,429);
   assert.equal(f.store.listUsers().length,2);assert.deepEqual(f.store.snapshot(),before);
+});
+
+test('new and old public addresses both work; other hosts and cross-address origins are refused', async t => {
+  const f = await fixture(t, {publicOrigin: 'https://consult.wbcowork.com', aliasOrigins: [origin]});
+  const status = (host, requestOrigin) => new Promise((ok, no) => httpGet(f.base + '/healthz', {headers: {Host: host, ...(requestOrigin ? {Origin: requestOrigin} : {})}}, r => { r.resume(); ok(r.statusCode); }).on('error', no));
+  assert.equal(await status('consult.wbcowork.com'), 200);
+  assert.equal(await status('workbench.wbcowork.com'), 200, '옛 주소도 그대로');
+  assert.equal(await status('consult.wbcowork.com', 'https://consult.wbcowork.com'), 200);
+  assert.equal(await status('consult.wbcowork.com', origin), 403, '다른 주소에서 온 요청은 막는다');
+  assert.equal(await status('evil.example.com'), 403);
 });
