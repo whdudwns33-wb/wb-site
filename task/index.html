@@ -1429,6 +1429,7 @@
 </div>
 
 <script src="./lesson-form-core.js?v=2026-10-22.1"></script>
+<script src="./lesson-progress-core.js?v=2026-10-22.1"></script>
 <script src="./task-push-client.js?v=2026-10-22.1"></script>
 <script src="./schedule-board-core.js?v=2026-10-22.1"></script>
 <script src="./week-timetable.js?v=2026-10-22.1&patch=weekend-20261028"></script>
@@ -1690,14 +1691,11 @@ function tasksFor(staffId, date) {
 
 const ckey = (taskId, date) => taskId + '|' + date;
 const getCheck = (taskId, date) => state.checks[ckey(taskId, date)] || null;
+const { LESSON_OPERATIONAL_STEP_LABELS, usesStandardLessonDisplay, taskSteps, lessonReferenceSteps, lessonCheckIsDone } = window.WBLessonProgressCore;
 function isDone(taskId, date) {
   const c = getCheck(taskId, date);
   const task = typeof taskById === 'function' ? taskById(taskId) : state.tasks.find(row => row.id === taskId);
-  const steps = taskSteps(task, c);
-  if (usesStandardLessonDisplay(task) && steps.length === LESSON_OPERATIONAL_STEP_LABELS.length) {
-    return steps.every(step => c && c.steps && c.steps[step.id]);
-  }
-  return !!(c && c.done);
+  return lessonCheckIsDone(task, c);
 }
 
 function setCheck(taskId, date, patch) {
@@ -1748,42 +1746,6 @@ function setAsset(id, patch) {
   save();
   queueSync();
   return next;
-}
-
-/** 수업 화면은 생성 시기와 무관하게 같은 운영 5단계를 쓴다.
- *  예전 단계에 이미 체크한 날짜는 그날 기록을 그대로 보여 주고, 새 날짜부터 표준으로 전환한다. */
-const LESSON_OPERATIONAL_STEP_LABELS = [
-  '지난 숙제·온라인 수행 확인',
-  '교재와 오늘 진도 진행',
-  '이해도·오답·학생 반응 확인',
-  '다음 숙제 안내',
-  '실제 진도와 특이사항 기록'
-];
-
-function usesStandardLessonDisplay(t) {
-  return !!(t && (t.taskKind === 'lesson_instruction' || /^\[수업\]/.test(t.title || '')));
-}
-
-function storedTaskSteps(t) { return t && Array.isArray(t.steps) ? t.steps : []; }
-
-function hasStandardLessonSteps(t) {
-  const steps = storedTaskSteps(t);
-  return steps.length === LESSON_OPERATIONAL_STEP_LABELS.length &&
-    steps.every((step, index) => String(step.label || '') === LESSON_OPERATIONAL_STEP_LABELS[index]);
-}
-
-function taskSteps(t, c) {
-  const stored = storedTaskSteps(t);
-  if (!usesStandardLessonDisplay(t) || hasStandardLessonSteps(t)) return stored;
-  const legacyProgress = c && c.steps && stored.some(step => c.steps[step.id]);
-  if (legacyProgress) return stored;
-  return LESSON_OPERATIONAL_STEP_LABELS.map((label, index) => ({
-    id: String(t.id || 'lesson') + '-standard-step-' + (index + 1), label: label
-  }));
-}
-
-function lessonReferenceSteps(t) {
-  return usesStandardLessonDisplay(t) && !hasStandardLessonSteps(t) ? storedTaskSteps(t) : [];
 }
 
 function lessonScheduleMetaHtml(task, date) {
@@ -6399,6 +6361,10 @@ function viewToday() {
   h += '<details class="today-date-picker" data-persist-key="today-date-picker"><summary>날짜 선택</summary>' +
     '<div class="today-date-picker-body"><label class="field"><span class="fl">확인할 날짜</span>' +
     '<input class="in" type="date" data-today-date value="' + esc(cursor) + '"></label></div></details>';
+
+  if (session.isStaffLink && !session.isAdmin && me.id === session.staffId) {
+    h += '<div class="mb8"><a class="btn btn-ghost" style="min-height:44px" href="https://tower.wbcowork.com/my-apps">내 앱 보기</a></div>';
+  }
 
   const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
   h += quickAttendanceHtml(me.id, cursor);

@@ -13,8 +13,10 @@ function block(from, to) {
 }
 
 function displayCore() {
-  const source = block('const LESSON_OPERATIONAL_STEP_LABELS = [', '/** 단계·수량을 고려한 개별 업무 진행률 */');
-  return new Function(`${source}\nreturn { LESSON_OPERATIONAL_STEP_LABELS, taskSteps, lessonReferenceSteps, taskCardDetail };`)();
+  const core = require('./lesson-progress-core.js');
+  const source = block('function taskCardDetail(', '/** 단계·수량을 고려한 개별 업무 진행률 */');
+  const taskCardDetail = new Function(source + '\nreturn taskCardDetail;')();
+  return { ...core, taskCardDetail };
 }
 
 function scheduleDisplayCore() {

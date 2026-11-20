@@ -31,12 +31,12 @@ function fixture() {
   return { DB, TASK_TOWER_READ_SECRET: KEY, TASK_MCP_READ_SECRET: OLD_KEY,
     TASK_ADMIN_SECRET: OLD_KEY, ALLOW_ORIGIN: 'https://pages.example' };
 }
-async function call(env, {token = KEY, method = 'GET', headers = {}, query = '', path = '/api/tower/summary'} = {}) {
+async function call(env, {token = KEY, method = 'GET', headers = {}, query = '', path = '/api/tower/summary', now = NOW} = {}) {
   const request = new Request('https://worker.example' + path + query, {
     method, headers: {...headers, ...(token ? {Authorization:'Bearer ' + token} : {})}
   });
   const original = Date.now;
-  Date.now = () => NOW;
+  Date.now = () => now;
   try { return await worker.fetch(request, env, {}); }
   finally { Date.now = original; }
 }
@@ -178,4 +178,122 @@ test('비정기 주말은 예약이 있는 오늘만 막힘에 포함하며 지�
     const body = await response.json(); assert.equal(body.counts.blocked,1);
     assert.equal(body.asOf,'2026-11-21T00:10:00.000+09:00');
   } finally {Date.now = original;}
+});
+
+const USAGE = '/api/tower/usage';
+const day = '2026-11-18';
+const midnight = Date.parse(day + 'T00:00:00+09:00');
+function lesson(env, id, options = {}, completion = {}, date = day) {
+  const steps = Object.fromEntries(Array.from({length:5}, (_, i) => [id + '-standard-step-' + (i + 1), true]));
+  task(env, id, { title:'[수업] synth-title', taskKind:'lesson_instruction', studentId:'synth-student', ...options },
+    { done:true, at:midnight, steps, ...completion }, date);
+}
+function report(env, id, {owner = 'teacher', date = day, at = midnight, version = 'v3', status = 'sent'} = {}) {
+  env.DB.db.prepare(
+    'INSERT INTO feedback_requests(app,request_key,task_id,owner,feedback_date,feedback_type,template_version,' +
+    'body,body_hash,teacher_name,student_id,student_name,status,created_at,updated_at) ' +
+    "VALUES('task',?,?,?,?, 'class_feedback',?,'synth-body','synth-hash','synth-name','synth-student','synth-guardian',?,?,?)"
+  ).run(id+'-'+version,id,owner,date,version,status,at,at);
+}
+
+test('usage는 summary의 전용 인증·Origin·조회 조건·GET 규칙을 그대로 쓴다', async () => {
+  const env = fixture();
+  for (const [options, code] of [[{token:''},401],[{token:'wrong'},401],
+    [{headers:{Origin:''}},403],[{query:'?date=2026-11-18'},400],[{method:'POST'},405]]) {
+    const response = await call(env,{path:USAGE,...options});
+    assert.equal(response.status,code);
+    assert.match(response.headers.get('cache-control'),/no-store/);
+  }
+  assert.deepEqual(env.DB.reads,[]);
+});
+
+test('usage v2는 서울 오늘 완료와 저장된 보고를 세며 분모 0·삭제·개인정보를 처리한다', async () => {
+  const env = fixture();
+  lesson(env,'synth-first');
+  report(env,'synth-first',{at:midnight+1});
+  report(env,'synth-first',{at:midnight+2,version:'v2'});
+  lesson(env,'synth-second',{}, {at:midnight+60_000});
+  report(env,'synth-second',{status:'cancelled'});
+  lesson(env,'synth-ordinary',{taskKind:'work',title:'synth-general'});
+  lesson(env,'synth-incomplete',{}, {steps:{}});
+  lesson(env,'synth-blocked',{}, {blocked:true});
+  lesson(env,'synth-future',{}, {at:NOW+1});
+  lesson(env,'synth-deleted',{deleted:true});
+  report(env,'synth-deleted');
+  lesson(env,'synth-inactive',{staffId:'synth-deleted-person'});
+  report(env,'synth-inactive',{owner:'synth-deleted-person'});
+  env.DB.db.prepare("UPDATE staff SET data=? WHERE id='synth-deleted-person'").run(JSON.stringify({deleted:true}));
+  lesson(env,'synth-empty',{staffId:'synth-empty-person'}, {steps:{}});
+  const before = await (await call(env)).text();
+  const response = await call(env,{path:USAGE});
+  const raw = await response.text(), data = JSON.parse(raw);
+  assert.equal(response.status,200);
+  assert.match(response.headers.get('cache-control'),/no-store/);
+  assert.equal(response.headers.get('access-control-allow-origin'), null);
+  assert.deepEqual(data, {
+    version:2, source:'wb-task', timezone:'Asia/Seoul', generatedAt:'2026-11-18T00:30:00.000+09:00',
+    date:day, actions:['lesson_done','report_written'],
+    people:[
+      {login:'synth-empty-person',lastAt:null,today:{lesson_done:0,report_written:0},hours:Array(24).fill(0),signals:{report_today:null}},
+      {login:'teacher',lastAt:'2026-11-18T00:01:00.000+09:00',today:{lesson_done:2,report_written:1},
+        hours:[3,...Array(23).fill(0)],signals:{report_today:{num:1,den:2}}}
+    ]
+  });
+  assert.doesNotMatch(raw,/synth-(?:name|title|student|guardian|body|deleted|first)|합성 직원/);
+  assert.equal(await (await call(env)).text(),before);
+});
+
+test('한 밀리초 차이로 서울 날짜가 바뀌고 보고는 저장 시각을 사용한다', async () => {
+  const env = fixture(), previous = '2026-11-17';
+  lesson(env,'synth-last',{}, {at:midnight-1},previous);
+  report(env,'synth-last',{date:previous,at:midnight});
+  lesson(env,'synth-first');
+  const at = async now => await (await call(env,{path:USAGE,now})).json();
+  const yesterday = await at(midnight-1), today = await at(midnight);
+  assert.equal(yesterday.date,previous);
+  assert.deepEqual(yesterday.people[0].today,{lesson_done:1,report_written:0});
+  assert.equal(yesterday.people[0].hours[23],1);
+  assert.equal(today.date,day);
+  assert.deepEqual(today.people[0].today,{lesson_done:1,report_written:1});
+  assert.equal(today.people[0].hours[0],2);
+  assert.deepEqual(today.people[0].signals.report_today,{num:0,den:1});
+});
+
+test('완료 시각 없는 과거 형식의 기록은 임의 시각을 만들지 않는다', async () => {
+  const env = fixture();
+  lesson(env,'synth-old',{}, {at:null});
+  const {people:[person]} = await (await call(env,{path:USAGE})).json();
+  assert.deepEqual(person.today,{lesson_done:null,report_written:0});
+  assert.deepEqual(person.hours,Array(24).fill(null));
+  assert.equal(person.lastAt,null);
+  assert.deepEqual(person.signals.report_today,{num:0,den:1});
+});
+
+test('정규 수업 ID로 저장되는 보강 피드백과 인계받아 완료한 수업을 반영한다', async () => {
+  const env = fixture();
+  task(env,'synth-origin',{title:'[수업] synth-title',taskKind:'lesson_instruction',studentId:'synth-student'},null);
+  lesson(env,'synth-makeup',{lessonInstanceType:'makeup',makeupSourceTaskId:'synth-origin'});
+  report(env,'synth-origin');
+  lesson(env,'synth-transfer',{},{steps:{}});
+  report(env,'synth-transfer',{at:midnight+12});
+  lesson(env,'synth-waiting');
+  task(env,'synth-recipient-fixture',{staffId:'synth-recipient'},null);
+  const handoff = env.DB.db.prepare(
+    'INSERT INTO lesson_handoffs(app,handoff_id,data_generation,lesson_task_id,student_id,source_date,record_date,' +
+    'source_staff_id,recipient_staff_id,start_time,total_half_units,completed_half_units,remaining_half_units,' +
+    'note,source_memo_json,memo_json,student_snapshot_json,lesson_snapshot_json,status,revision,created_at,' +
+    'updated_at,created_by,updated_by,accepted_at,completed_at) ' +
+    "VALUES('task',?,0,?,'synth-student',?,?,'teacher','synth-recipient','00:00',2,0,2,'','{}','{}','{}','{}',?,1,?,?, 'teacher','synth-recipient',?,?)"
+  );
+  handoff.run('lh_'+'a'.repeat(32),'synth-transfer',day,day,'completed',midnight,midnight+15,midnight+5,midnight+15);
+  handoff.run('lh_'+'b'.repeat(32),'synth-waiting',day,day,'pending',midnight,midnight,null,null);
+  const response = await call(env,{path:USAGE});
+  assert.equal(response.status,200);
+  const {people} = await response.json();
+  const source = people.find(p => p.login === 'teacher');
+  const recipient = people.find(p => p.login === 'synth-recipient');
+  assert.deepEqual(source.today,{lesson_done:1,report_written:2});
+  assert.deepEqual(source.signals.report_today,{num:1,den:1});
+  assert.deepEqual(recipient.today,{lesson_done:1,report_written:0});
+  assert.deepEqual(recipient.signals.report_today,{num:1,den:1});
 });
