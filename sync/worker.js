@@ -7,6 +7,7 @@ import { handleScheduledTuitionAlerts } from './tuition-alert.js';
 import { applyTestStaffNextDayAttendance } from './test-staff-attendance.js';
 import { dispatchTaskPush } from './task-push.js';
 import { handleTaskDirector } from './task-director.js';
+import { handleTaskChecker } from './task-checker.js';
 
 const BOOK_ORDER_CRON = '0 11 * * *';
 const BOOK_ORDER_STATUS_CRON = '*/10 * * * *';
@@ -27,6 +28,8 @@ export function cleanupCurriculum(text) {
 
 export default {
   async fetch(request, env, ctx) {
+    const checker = await handleTaskChecker(request, env);
+    if (checker) return checker;
     const director = await handleTaskDirector(request, env, forwarded => curriculumWorker.fetch(forwarded, env, ctx));
     if (director) return director;
     const url = new URL(request.url);

@@ -1,5 +1,6 @@
 import lessonProgress from '../task/lesson-progress-core.js';
 import { digest } from './task-director.js';
+import { CHECKER_ID } from './task-checker.js';
 import { countCenterUnread } from './center-chat.js';
 import { countMakeupNeeded } from './makeup.js';
 import { hasWeekendActualVisit } from './weekend-flex.js';
@@ -48,8 +49,8 @@ async function countBlocked(env, date) {
   const result = await env.DB.prepare(
     'SELECT t.data task_data,c.data check_data,s.data staff_data FROM tasks t ' +
     'JOIN checks c ON c.app=t.app AND c.k=t.id||\'|\'||? ' +
-    "JOIN staff s ON s.app=t.app AND s.id=t.owner WHERE t.app='task'"
-  ).bind(date).all();
+    "JOIN staff s ON s.app=t.app AND s.id=t.owner WHERE t.app='task' AND s.id NOT IN (?,?)"
+  ).bind(date,CHECKER_ID,'wb점검').all();
   let count = 0;
   for (const row of result.results) {
     const task = object(row.task_data), check = object(row.check_data), staff = object(row.staff_data);
@@ -122,7 +123,7 @@ async function taskUsage(env, observed, date, canonicalFeedbackTaskId) {
 
   const staff = new Map();
   for (const row of staffRows.results) {
-    if (!object(row.data).deleted && row.id !== 'wb점검' && LOGIN_PATTERN.test(row.id)) {
+    if (!object(row.data).deleted && row.id !== 'wb점검' && row.id !== CHECKER_ID && LOGIN_PATTERN.test(row.id)) {
       staff.set(row.id, { login:row.id, lastAt:null, today:{lesson_done:0,report_written:0},
         hours:Array(24).fill(0), signals:{report_today:null} });
     }
