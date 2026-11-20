@@ -14,14 +14,15 @@ test('일반 선생님 수업 카드는 큰 완료 체크를 숨기고 관리담
 test('수업은 저장된 done 플래그가 있어도 5개 체크리스트가 다 체크되어야 완료다', () => {
   const start = source.indexOf('function isDone(');
   const end = source.indexOf('function setCheck(', start);
-  const factory = new Function('getCheck', 'state', 'taskSteps', 'usesStandardLessonDisplay', 'LESSON_OPERATIONAL_STEP_LABELS',
+  const { lessonCheckIsDone, taskSteps } = require('./lesson-progress-core.js');
+  const factory = new Function('getCheck', 'state', 'lessonCheckIsDone',
     source.slice(start, end) + '\nreturn isDone;');
-  const task = { id: 'lesson-1' };
-  const labels = ['1', '2', '3', '4', '5'];
-  let check = { done: true, steps: { 1: true, 2: true, 3: true, 4: true } };
-  const isDone = factory(() => check, { tasks: [task] }, () => labels.map(id => ({ id })), () => true, labels);
+  const task = { id: 'lesson-1', taskKind: 'lesson_instruction' };
+  const ids = taskSteps(task, null).map(step => step.id);
+  const check = { done: true, steps: Object.fromEntries(ids.slice(0, 4).map(id => [id, true])) };
+  const isDone = factory(() => check, { tasks: [task] }, lessonCheckIsDone);
   assert.equal(isDone(task.id, '2026-08-14'), false);
-  check.steps[5] = true;
+  check.steps[ids[4]] = true;
   assert.equal(isDone(task.id, '2026-08-14'), true);
 });
 

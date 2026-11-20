@@ -96,7 +96,7 @@ import { handleAdminDirective } from './admin-directive.js';
 import { handleTeacherLiveRequest } from './teacher-live-request.js';
 import { handleCenterChat } from './center-chat.js';
 import { handleTaskExport } from './task-export.js';
-import { handleTaskTowerSummary } from './task-tower-summary.js';
+import { handleTaskTowerSummary, handleTaskTowerUsage } from './task-tower-summary.js';
 import { taskDirectorSession } from './task-director.js';
 import { handlePrivateChat } from './private-chat.js';
 import { handleSelfIdentity } from './self-identity.js';
@@ -3506,6 +3506,7 @@ export default {
     // 브라우저용 관리자·개인 인증과 분리된 서버 간 읽기 전용 경로다.
     // Origin/CORS 허용보다 먼저 분기하되, handler가 Origin 부재와 전용 Bearer를 모두 검증한다.
     if (url.pathname === '/api/tower/summary') return await handleTaskTowerSummary(request, env);
+    if (url.pathname === '/api/tower/usage') return await handleTaskTowerUsage(request, env, feedbackCanonicalTaskId);
     if (url.pathname === '/task-export') return await handleTaskExport(request, env);
 
     const allowed = (env.ALLOW_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
