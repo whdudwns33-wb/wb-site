@@ -576,6 +576,22 @@ export default {
     const url = new URL(req.url);
     const p = url.pathname;
 
+    /* 공유 학생 코드 화면은 그대로 쓰고 탐구브레인 연동일 때만 설치 정보를 바꾼다. */
+    if (p === '/' && req.method === 'GET' && url.searchParams.get('app') === 'naesin-tg') {
+      const asset = await env.ASSETS.fetch(new Request(url.origin + '/'));
+      if (!asset.ok) return asset;
+      const html = (await asset.text())
+        .replace(/<title>[^<]*<\/title>/, '<title>WB 탐구브레인 · 학생 연동</title>')
+        .replace(/(<link rel="manifest" href=")[^"]+/, '$1/naesin-tg/manifest.webmanifest')
+        .replace(/(<link rel="apple-touch-icon" href=")[^"]+/, '$1/naesin-tg/apple-touch-icon.png')
+        .replace(/(<meta name="theme-color" content=")[^"]+/, '$1#2a3b2e')
+        .replace(/(<meta name="apple-mobile-web-app-title" content=")[^"]+/, '$1탐구브레인');
+      const headers = new Headers(asset.headers);
+      for (const name of ['Content-Length', 'Content-Encoding', 'ETag', 'Last-Modified']) headers.delete(name);
+      headers.set('Cache-Control', 'no-store');
+      return new Response(html, { status: asset.status, headers });
+    }
+
     if (p === '/mcp') return serveReadingMcp(req, env, {
       app:'wb-reading', prefix:'rdr_', tool:'wb_reading_status', description:'현재 지문 건수',
       async summary(bindings) {
