@@ -1,3 +1,4 @@
+import { serveReadingMcp } from './standard-mcp.mjs';
 'use strict';
 /* WB 진로독서 — Cloudflare Workers 버전 (server.mjs의 이식)
    저장: KV(DB 바인딩) — student:<code> / state:<code> / token:<t> / parent:<t> / pubmap / backup:<날짜>
@@ -533,6 +534,27 @@ function parentSummary(stu, st, titles, vst, book) {
   };
 }
 
+async function readPublishedArticles(req, env) {
+  const p = new URL(req.url).pathname;
+    const res = await env.ASSETS.fetch(req);
+    try {
+      const map = await env.DB.get('pubmap', 'json');
+      if (!map || !Object.keys(map).length) return res;
+      const data = await res.json();
+      (data.articles || []).forEach(a => { if (map[a.id]) a.status = map[a.id]; });
+      /* 분할본은 ?v= 로 버전이 붙어 오므로 오버라이드 뒤에도 캐시를 허용한다.
+         전체본(관리·검수용)은 항상 최신이어야 하니 캐시하지 않는다. */
+      const cacheable = p !== '/articles.json';
+      return new Response(JSON.stringify(data), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': cacheable ? 'public, max-age=604800' : 'no-store',
+        },
+      });
+    } catch (e) { return env.ASSETS.fetch(req); }
+}
+
 export default {
   async scheduled(event, env, ctx) {
     /* 크론은 문자열로 가른다 — 모르는 크론이 전부 백업으로 도는 사고를 막는다(설계안 §7-5 #11).
@@ -554,27 +576,20 @@ export default {
     const url = new URL(req.url);
     const p = url.pathname;
 
+    if (p === '/mcp') return serveReadingMcp(req, env, {
+      app:'wb-reading', prefix:'rdr_', tool:'wb_reading_status', description:'현재 지문 건수',
+      async summary(bindings) {
+        const response = await readPublishedArticles(
+          new Request('https://wb-reading.whdudwns33.workers.dev/articles.json'), bindings);
+        if (!response.ok) return {status:'unavailable'};
+        const data = await response.json();
+        return Array.isArray(data.articles) ? {articles_count:data.articles.length} : {status:'unavailable'};
+      },
+    });
+
     /* 발행 오버라이드 — 전체본과 학년대별 분할본 모두에 같은 규칙을 적용한다.
        분할본만 빼먹으면 강사가 '초안으로 내리기'를 눌러도 학생 화면에서 안 사라진다. */
-    if (/^\/articles(-L[1-4])?\.json$/.test(p)) {
-      const res = await env.ASSETS.fetch(req);
-      try {
-        const map = await env.DB.get('pubmap', 'json');
-        if (!map || !Object.keys(map).length) return res;
-        const data = await res.json();
-        (data.articles || []).forEach(a => { if (map[a.id]) a.status = map[a.id]; });
-        /* 분할본은 ?v= 로 버전이 붙어 오므로 오버라이드 뒤에도 캐시를 허용한다.
-           전체본(관리·검수용)은 항상 최신이어야 하니 캐시하지 않는다. */
-        const cacheable = p !== '/articles.json';
-        return new Response(JSON.stringify(data), {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/json; charset=utf-8',
-            'Cache-Control': cacheable ? 'public, max-age=604800' : 'no-store',
-          },
-        });
-      } catch (e) { return env.ASSETS.fetch(req); }
-    }
+    if (/^\/articles(-L[1-4])?\.json$/.test(p)) return readPublishedArticles(req, env);
 
     /* 한자 카드도 같은 규칙을 받아야 한다. 이 파일은 빌드 때 미리 계산해 두는데,
        강사가 '초안으로 내리기'를 누른 뒤에도 그 지문의 낱말이 카드에 남아 있으면

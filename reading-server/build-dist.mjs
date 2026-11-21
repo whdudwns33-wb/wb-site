@@ -15,13 +15,22 @@ fs.mkdirSync(path.join(DIST, 'admin'), { recursive: true });
 
 /* textbook.json(코칭 원문)은 더 이상 싣지 않는다 — 공개 저장소·정적 자산에서 빼고
    KV(textbook-src)로 옮겼다. 관리 웹의 「교재 코칭 원문」 카드에서 업로드한다. */
-const APP_FILES = ['index.html', 'articles.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'review.html', 'parent.html',
+const APP_FILES = ['index.html', 'articles.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'offline.html',
+  'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png', 'review.html', 'parent.html',
   /* 학년대별 분할본 — 학생 앱은 자기 학년대 하나만 받는다 (node reading/build-split.mjs 산출물) */
   'articles-L1.json', 'articles-L2.json', 'articles-L3.json', 'articles-L4.json', 'hanja.json', 'version.json',
   /* 보안 헤더(CSP·X-Frame-Options·Referrer-Policy 등)와 캐시 규칙.
      지금까지 dist에 넣지 않아 배포본에는 이 헤더가 하나도 붙지 않았다. */
   '_headers'];
 for (const f of APP_FILES) fs.copyFileSync(path.join(APP, f), path.join(DIST, f));
+// The same source files also serve the GitHub Pages mirror under /reading/.
+const rootManifestPath = path.join(DIST, 'manifest.webmanifest');
+const rootManifest = JSON.parse(fs.readFileSync(rootManifestPath, 'utf8'));
+const rootPath = value => new URL(value, 'https://wb-reading.whdudwns33.workers.dev/').pathname;
+for (const field of ['id','start_url','scope']) rootManifest[field] = rootPath(rootManifest[field]);
+for (const icon of rootManifest.icons) icon.src = rootPath(icon.src);
+fs.writeFileSync(rootManifestPath, JSON.stringify(rootManifest, null, 2) + '\n');
+
 fs.copyFileSync(path.join(ROOT, 'public', 'admin.html'), path.join(DIST, 'admin', 'index.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'vocab-review.html'), path.join(DIST, 'admin', 'vocab-review.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'metrics.html'), path.join(DIST, 'admin', 'metrics.html'));
@@ -182,7 +191,7 @@ function stampSW(swPath, shellPaths, prefix) {
   return tag;
 }
 const rTag = stampSW(path.join(DIST, 'sw.js'),
-  ['index.html', 'voice.js', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, f)), 'wbr-shell');
+  ['index.html', 'voice.js', 'manifest.webmanifest', 'icon.svg', 'offline.html', 'icon-192.png'].map(f => path.join(DIST, f)), 'wbr-shell');
 const vTag = stampSW(path.join(DIST, 'vocab', 'sw.js'),
   ['index.html', 'voice.js', 'words.js', 'bridge.js', 'quiz.js', 'srs.js', 'trace.js', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'vocab', f)), 'wbv-shell');

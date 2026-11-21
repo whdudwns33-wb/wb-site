@@ -49,6 +49,13 @@
     footer{max-width:560px;margin:auto;padding:0 14px 40px;color:var(--muted);font-size:12px;text-align:center}
     .err{padding:40px 16px;text-align:center;color:var(--muted)}
   </style>
+<link rel="manifest" href="./manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<meta name="theme-color" content="#173957">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="진로독서">
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{})</script>
 </head>
 <body>
 <header><b>WB 진로독서 · 학부모 리포트</b><small>WEXLER BRAIN CENTER</small></header>
