@@ -73,6 +73,19 @@ tool_timeout_sec = 30
 읽기 1건 점검이다. D1 마이그레이션과 Pages 배포는 필요하지 않다. 기존
 `TASK_ADMIN_SECRET`, 관리자·직원 개인 링크 토큰을 이 연결에 재사용하지 않는다.
 
+### 앱 표준 읽기 키 (`/mcp`·`/task/mcp`, 반영 후보)
+
+- 키 모양은 `tsk_` + base64url 43자다. D1 `task_read_keys`에는 SHA-256만 두고,
+  범위는 `read`만, 기간은 1~365일(기본 90)이다. 이름마다 따로 폐기하며 대표 계정당 유효 키는 20개까지다.
+  만들기·폐기는 `task_read_key_activity`에 `token_create`/`token_revoke`(경로 `cli`)로 남는다.
+- 대표 계정(`task_director_account`)이 처음 암호를 바꾼 뒤에만 발급된다. 처음 암호 상태로 돌아가면
+  이미 낸 키도 막힌다. 키로 들어온 요청은 `last_used`만 고치고 본문은 기록하지 않는다.
+- 발급·폐기(저장소 루트, wrangler 로그인 뒤). 키는 표준출력 한 줄이므로 바로 파일로 넘긴다:
+  `node sync/task-read-key.mjs --remote add-key <대표 계정> <이름> [일수] > <키 파일>` ·
+  `node sync/task-read-key.mjs --remote revoke-key <대표 계정> <이름>`.
+- MCP는 접두어와 관계없이 `TASK_MCP_READ_SECRET`을 먼저 비교한다. 일치하지 않는 `tsk_` 키는 D1에서 확인한다. `/task-export`는 기존 공용 비밀값을 쓴다.
+- 반영 순서: 운영 D1 보호본 → `094_task_read_keys.sql` 한 번 → Worker 배포 → 발급 → `tools/list` 확인.
+
 ## 첫 결제 12회 선납
 
 `sessionInitialCycleSize:12`이면 첫 세 개의 4회 불변 원장을 결제 회차 하나(12회)로 투영한다.
