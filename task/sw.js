@@ -1,6 +1,6 @@
 importScripts('./request-sw.js');
 const PREFIX="wb-pwa:/task/:";
-const V=PREFIX+"20261202";const KEEP=["/task/offline.html","/task/icon-192.png"];
+const V=PREFIX+"20261202-2";const KEEP=["/task/offline/","/task/icon-192.png"];
 const SCOPE="/task/";
 self.addEventListener('install',e=>e.waitUntil(caches.open(V).then(c=>c.addAll(KEEP)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k.startsWith(PREFIX)&&k!==V).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));

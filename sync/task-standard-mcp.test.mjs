@@ -51,7 +51,7 @@ test('PWA routes serve manifest and install service worker retains notification 
   const events = {};
   const ctx = {
     self:{location:{pathname:'/task/sw.js'},addEventListener(name,fn){events[name]=fn;}},
-    URL, fetch:async()=>{throw Error('offline');}, caches:{match:async()=>'/task/offline.html'},
+    URL, fetch:async()=>{throw Error('offline');}, caches:{match:async path=>path},
     importScripts(){runInNewContext(readFileSync(new URL('../task/request-sw.js',import.meta.url),'utf8'),ctx);},
   };
   runInNewContext(sw,ctx);
@@ -64,7 +64,7 @@ test('PWA routes serve manifest and install service worker retains notification 
   };
   assert.equal(request('/task/mcp'),undefined);
   assert.equal(request('/api/tower'),undefined);
-  assert.equal(await request('/task/'),'/task/offline.html');
+  assert.equal(await request('/task/'),'/task/offline/');
 });
 
 if (process.env.WB_MCP_TEST_RELAY) test('task stdio relay completes all four messages', async () => {
