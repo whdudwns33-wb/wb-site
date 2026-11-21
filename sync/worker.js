@@ -7,6 +7,7 @@ import { handleScheduledTuitionAlerts } from './tuition-alert.js';
 import { applyTestStaffNextDayAttendance } from './test-staff-attendance.js';
 import { dispatchTaskPush } from './task-push.js';
 import { handleTaskDirector } from './task-director.js';
+import { taskStandardMcp } from './task-standard-mcp.mjs';
 import { handleTaskChecker } from './task-checker.js';
 
 const BOOK_ORDER_CRON = '0 11 * * *';
@@ -28,6 +29,8 @@ export function cleanupCurriculum(text) {
 
 export default {
   async fetch(request, env, ctx) {
+    const {pathname} = new URL(request.url);
+    if (pathname === '/task/mcp' || pathname === '/mcp') return taskStandardMcp(request, env);
     const checker = await handleTaskChecker(request, env);
     if (checker) return checker;
     const director = await handleTaskDirector(request, env, forwarded => curriculumWorker.fetch(forwarded, env, ctx));
@@ -37,7 +40,10 @@ export default {
       const asset = await env.ASSETS.fetch(request);
       const headers = new Headers(asset.headers);
       // 보호자 전용 CSP는 외부 JS를 막으므로 업무 화면에만 실행 자산·글꼴을 허용한다.
-      headers.set('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://wb-sync.whdudwns33.workers.dev; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+      headers.set('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://wb-sync.whdudwns33.workers.dev; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+      if (url.pathname === '/task/manifest.webmanifest' && asset.ok) {
+        headers.set('Content-Type', 'application/manifest+json');
+      }
       headers.set('Cache-Control','no-store');
       headers.set('X-Robots-Tag','noindex, nofollow, noarchive');
       return new Response(asset.body,{status:asset.status,headers});

@@ -1,7 +1,9 @@
 'use strict';
 // 캐시·토큰을 저장하지 않는 /task/ 전용 알림 워커.
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
+if (self.location.pathname.endsWith('/request-sw.js')) {
+  self.addEventListener('install', () => self.skipWaiting());
+  self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
+}
 self.addEventListener('push', event => {
   event.waitUntil(Promise.all([
     self.registration.showNotification('WB 업무지시서 · 새 실시간 요청', {

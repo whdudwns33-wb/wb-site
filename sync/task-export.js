@@ -165,6 +165,16 @@ export function buildTaskExport(taskRows, staffRows, options = {}) {
   };
 }
 
+export async function countWorkOrdersToday(env, now = Date.now()) {
+  const date = new Date(now + 9 * 3600000).toISOString().slice(0, 10);
+  const {results} = await env.DB.prepare('SELECT id,data FROM tasks WHERE app=?').bind('task').all();
+  return (results || []).reduce((total, row) => {
+    const data = parseStoredData(row.data);
+    const task = data && {...data, id: data.id || row.id};
+    return total + Number(isGeneralWorkOrder(task) && occursOn(task, date));
+  }, 0);
+}
+
 export async function handleTaskExport(request, env) {
   if (request.method !== 'POST') return response({ ok: false, error: 'POST만 허용' }, 405);
   if (request.headers.get('Origin')) {

@@ -10,7 +10,7 @@
     return auth && ['person','admin'].includes(auth.mode) ? JSON.stringify(auth) : '';
   }
   async function reg() {
-    if (!registration) registration = await navigator.serviceWorker.register('./request-sw.js',{scope:'./',updateViaCache:'none'});
+    if (!registration) registration = await navigator.serviceWorker.register('./sw.js',{scope:'./',updateViaCache:'none'});
     return navigator.serviceWorker.ready;
   }
   function keyBytes(value) {

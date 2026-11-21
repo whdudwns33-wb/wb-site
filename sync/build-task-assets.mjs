@@ -12,7 +12,7 @@ async function copy(source,target) {
     if (entry.name.startsWith('.') || /(?:\.test\.|README|AGENTS|CLAUDE|private-names)/i.test(entry.name)) continue;
     const from=path.join(source,entry.name), to=path.join(target,entry.name);
     if (entry.isDirectory()) { await copy(from,to); continue; }
-    if (/\.(?:html|css|js|json|png|svg|ico|webp|woff2?)$/.test(entry.name) || entry.name==='_headers') await copyFile(from,to);
+    if (/\.(?:html|css|js|json|png|svg|ico|webmanifest|webp|woff2?)$/.test(entry.name) || entry.name==='_headers') await copyFile(from,to);
   }
 }
 await copy(path.join(root,'parent'),out);
