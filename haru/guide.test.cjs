@@ -45,11 +45,11 @@ function serviceWorker(file = 'sw.js', offline = false) {
   });
   await t('코드 입력 전·샘플·보호자에서 토큰 없는 동일 안내 링크를 제공', () => {
     const link = student.slice(student.indexOf('function showLink('), student.indexOf('function showPending('));
-    assert.ok(link.indexOf('href="./guide.html"') >= 0);
-    assert.ok(link.indexOf('href="./guide.html"') < link.indexOf('<form'));
+    assert.ok(link.indexOf('href="./v2/"') >= 0);
+    assert.ok(link.indexOf('href="./v2/"') < link.indexOf('<form'));
     const preview = student.slice(student.indexOf('<aside class="preview"'), student.indexOf('<main'));
-    assert.match(preview, /href="\.\/guide\.html"/);
-    assert.match(parent.slice(0, parent.indexOf('<main')), /href="\.\/guide\.html"/);
+    assert.match(preview, /href="\.\/v2\/"/);
+    assert.match(parent.slice(0, parent.indexOf('<main')), /href="\.\/v2\/"/);
     assert.doesNotMatch(student + parent, /href="\.\/guide\.html\?/);
     const home = student.slice(student.indexOf('function showHome('), student.indexOf('function startRunner('));
     assert.doesNotMatch(home, /guide\.html/);

@@ -7,17 +7,17 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 const data = catalog.validate(JSON.parse(fs.readFileSync(path.join(dir, 'catalog.json'), 'utf8')));
 const esc = text => String(text).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 const base = '/haru/v2/';
-const navItems = [['samyook/', '호남삼육중 준비'], ['gwangju-gifted/', '광주 영재교육원 준비'], ['middle-schools/', '화산·영선·용정중 준비'], ['#other', '다른 학교·지역'], ['/haru/', '학습실 입장']];
+const navItems = [['gwangju-gifted/', '영재원 대비'], ['samyook/', '삼육중 컨설팅'], ['middle-schools/#hs', '화산중 컨설팅'], ['middle-schools/#ys', '영선중 컨설팅'], ['middle-schools/#yj', '용정중 컨설팅'], ['#other', '다른 학교·지역'], ['/haru/', '기존 삼육중 학습실']];
 const nav = current => navItems.map(([url,label]) => `<a href="${url.startsWith('/haru/') ? url : base + url}"${current === url ? ' aria-current="page"' : ''}>${label}</a>`).join('');
 function page(title, current, body) {
   const assets = current ? '../' : './';
   return `<!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title} — 삼육중 및 영재원 대비</title><meta name="description" content="광주 학부모를 위한 호남삼육중 준비와 광주 영재교육원 기관별 지원·준비 안내">
+<title>${title} — 영재원 대비 삼육중 화산중 영선중 용정중 컨설팅 앱웹</title><meta name="description" content="영재원 대비와 삼육중·화산중·영선중·용정중의 공식 정보·지원 절차·학년별 준비 컨설팅 안내">
 <meta name="robots" content="noindex, nofollow"><meta name="referrer" content="no-referrer">
 <link rel="icon" href="${assets}../icon.svg" type="image/svg+xml"><link rel="stylesheet" href="${assets}style.css">
 <script defer src="${assets}catalog.js"></script><script defer src="${assets}public.js"></script></head>
-<body><a class="skip" href="#main">본문으로 건너뛰기</a><header class="brand"><div class="brand-inner"><a class="brand-name" href="${base}">삼육중 및 영재원 대비</a><nav aria-label="주 메뉴">${nav(current)}</nav></div></header>
+<body><a class="skip" href="#main">본문으로 건너뛰기</a><header class="brand"><div class="brand-inner"><a class="brand-name" href="${base}">영재원 대비 삼육중 화산중 영선중 용정중 컨설팅 앱웹</a><nav aria-label="주 메뉴">${nav(current)}</nav></div></header>
 <main id="main">${body}</main><footer><p>WB 독해력학원의 사설 준비 안내입니다. 학교·영재교육기관과 제휴·후원 관계가 없습니다.</p><p>공식 정보와 WB 준비 제안을 구분합니다. 합격 가능성이나 영재 판정을 제공하지 않습니다. 지원·추천·등록은 가족과 학교가 공식 경로에서 확인합니다.</p><a href="/haru/guide.html">기존 전체 준비 안내</a> · <a href="/haru/parent.html?preview=1">보호자 화면 예시</a></footer></body></html>
 `;
 }
@@ -38,10 +38,10 @@ const contents = items => `<nav class="contents" aria-label="이 페이지 목�
 const intro = (title, lead) => `<h1>${title}</h1><p class="small">2026년 현재 학년 → 2027학년도 입학·교육</p><p class="lead">${lead}</p>`;
 const directory = data.directory.map(i => `<details id="directory-${esc(i.id)}"><summary>${esc(i.name)} · ${esc(i.region)}</summary><div><p class="small">${esc(i.kind)} · ${i.year}학년도</p><dl><dt>대상·자격</dt><dd>${esc(i.target)}</dd><dt>절차·일정</dt><dd>${esc(i.process)}</dd><dt>제한·확인</dt><dd>${esc(i.limits)}</dd></dl>${source(i.source)}${data.schoolGuides.some(s=>s.id===i.id) ? '<p><a href="/haru/v2/middle-schools/#'+esc(i.id)+'">학교별 준비 안내 보기</a></p>' : ''}${i.events.length ? schedule(i.events) : ''}</div></details>`).join('');
 
-const home = page('준비 안내', '', `<h1>아이의 목표에 맞게,<br>준비의 순서부터.</h1><p class="lead">광주 학부모를 위한 지원 정보와 준비 과정입니다. 학교 입학과 영재교육은 목적·자격·선발 방식이 달라 각각 안내합니다.</p>
-<div class="paths"><section class="path"><h2>호남삼육중 준비</h2><p>올해 전형 확인과 다음 학년도 준비. 교과 기초, 실전 연습, 지원 일정.</p><a class="action" href="${base}samyook/">삼육중 준비 보기</a></section><section class="path"><h2>광주 영재교육원 준비</h2><p>현재 학년과 관심 분야로 기관을 탐색하고, 기관별 추천·접수 절차를 확인합니다.</p><a class="action" href="${base}gwangju-gifted/">영재교육 준비 보기</a></section></div>
-<section class="path"><h2>화산·영선·용정중 준비</h2><p>추첨·면접·서류·체력평가의 차이와 학교별 자격·서류·일정을 확인하세요.</p><a class="action" href="${base}middle-schools/">세 학교 준비 비교</a></section>
-<aside class="note"><p><strong>이미 학습 중인가요?</strong> 기존 학생 코드와 강사 승인 방식으로 입장합니다. 두 목표를 준비해도 새 계정이나 중복 숙제를 만들지 않습니다.</p><a href="/haru/">학습실 입장</a> · <a href="/haru/?preview=1">저장하지 않는 학생 샘플 보기</a></aside>
+const home = page('진학 컨설팅 안내', '', `<h1>영재원·네 학교,<br>목표에 맞춘 진학 컨설팅.</h1><p class="lead">영재원 대비와 삼육중·화산중·영선중·용정중 진학을 위한 공식 정보와 준비 과정을 안내합니다. 관심 대상을 골라 자격·서류·평가·일정을 확인하고 상담으로 연결하세요.</p>
+<div class="paths"><section class="path" id="path-gifted"><h2>영재원 대비</h2><p>광주 기관별 현재 지원 학년·분야와 GED·자체 접수, 추천·평가 절차를 확인합니다.</p><a class="action" href="${base}gwangju-gifted/">영재원 대비 안내</a></section><section class="path" id="path-samyook"><h2>삼육중 컨설팅</h2><p>호남삼육중의 전형별 자격·교과 범위·제출서류와 올해·다음 모집의 준비 순서를 확인합니다.</p><a class="action" href="${base}samyook/">삼육중 준비 안내</a></section><section class="path" id="path-hs"><h2>화산중 컨설팅</h2><p>전형별 자격과 일반전형 추첨·면접, 서류·등록·예비소집 확인 사항을 안내합니다.</p><a class="action" href="${base}middle-schools/#hs">화산중 준비 안내</a></section><section class="path" id="path-ys"><h2>영선중 컨설팅</h2><p>지원 자격·면접·제출서류와 등록·후보·오리엔테이션 확인 사항을 안내합니다.</p><a class="action" href="${base}middle-schools/#ys">영선중 준비 안내</a></section><section class="path" id="path-yj"><h2>용정중 컨설팅</h2><p>서류·면접·체력평가와 등록·예비소집의 공식 안내와 미확인 사항을 구분합니다.</p><a class="action" href="${base}middle-schools/#yj">용정중 준비 안내</a></section></div>
+<p><a href="${base}middle-schools/">세 학교 준비 비교</a> · <a href="${base}gwangju-gifted/#consult">컨설팅 상담 방법</a></p>
+<aside class="note"><p><strong>이미 학습 중인가요?</strong> 기존 학생 코드와 강사 승인 방식으로 입장합니다. 여러 목표를 검토해도 새 계정이나 중복 숙제를 만들지 않습니다. 기존 학습실은 삼육중 학습용이며 다른 학교·영재원 안내와 구분합니다.</p><a href="/haru/">학습실 입장</a> · <a href="/haru/?preview=1">저장하지 않는 학생 샘플 보기</a></aside>
 <section id="other"><h2>다른 학교·지역</h2><p>학교와 기관을 펼쳐 공식 원문·확인 범위·다음 절차를 확인하세요. 2026 운영·2027 모집의 전수 확인은 미완료이며, 현재 안내하는 항목이 지역 전체의 모집기관을 뜻하지 않습니다.</p><p class="small">2026-10-12 GED의 2027학년도 전체 기관 유형 재조회: 전남 등록 공고 5건·전북 18건. 자체 공고와 연결 첨부도 함께 안내합니다. 미확인 기관의 요강·추천·증빙 전수 검수는 계속 진행 중입니다.</p><p class="small">대학·지원청 자체 공고도 함께 안내합니다. 자체 홈페이지에 공고가 있어도 접수는 GED를 쓰는 기관이 있습니다. 설립 공지·전년도 자료는 2027 모집 일정과 구분합니다.</p><p class="small">2025 GED 기관알리미 등록 명부 전남 26개·전북 30개를 전 페이지 대조해 누락 안내 24개를 보완했습니다. 등록정보가 현재 모집을 보장하지는 않습니다.</p><p class="small">2026 교육청 계획의 전남 24원·전북 27기관 표도 대조해 사이버영재교육원 2곳을 추가했습니다. 교육청 계획 표의 범위이며 대학부설 등 지역 전체 운영기관을 뜻하지 않습니다. 전년도 대상 학년을 2027 지원 학년으로 적용하지 않습니다.</p><p class="small">본문 확인과 첨부 요강 전문 검수는 구분합니다. 현재 초등 학년과 중학교·고등학교 입학 자격을 혼용하지 않습니다.</p>${directory}<a href="/haru/guide.html#gift">기존 광주·전남 안내와 확인 범위 보기</a></section>
 <section><h2>원문과 준비 제안의 경계</h2><p>모집 일정·지원 자격은 기관의 공식 요강이 기준입니다. WB의 독서·탐구·교과 활동은 준비 제안이며 공식 필수 과제가 아닙니다. 미확인 정보로 지원 가능 여부를 확정하지 않습니다.</p><p class="small">자료 기준 ${data.referenceDate}. 세 중학교 안내는 10/27 보완했으며 다른 기관까지 재검수했다는 뜻은 아닙니다. 마지막 원문 확인일은 각 기관에 별도로 표시합니다.</p></section>`);
 
