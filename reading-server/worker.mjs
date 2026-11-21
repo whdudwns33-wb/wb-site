@@ -587,6 +587,14 @@ export default {
       },
     });
 
+    if (p === '/naesin-tg/mcp') return serveReadingMcp(req, env, {
+      app:'naesin-tg', prefix:'tgr_', tool:'naesin_tg_status', description:'현재 문제지 건수',
+      async summary(bindings) {
+        const ids = await naesinTgStore(bindings).getSheetIds();
+        return {sheets_count: Array.isArray(ids) ? ids.length : 0};
+      },
+    });
+
     /* 발행 오버라이드 — 전체본과 학년대별 분할본 모두에 같은 규칙을 적용한다.
        분할본만 빼먹으면 강사가 '초안으로 내리기'를 눌러도 학생 화면에서 안 사라진다. */
     if (/^\/articles(-L[1-4])?\.json$/.test(p)) return readPublishedArticles(req, env);

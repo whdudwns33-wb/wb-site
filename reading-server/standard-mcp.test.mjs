@@ -53,3 +53,24 @@ test('reading accepts only owner read keys and returns the article total', async
   assert.ok(db.prepare("SELECT last_used FROM api_tokens").get().last_used);
   assert.ok((await (await rpc('wb-reading','tools/call',key,{name:'set_student'})).json()).error);
 });
+
+test('naesin uses its own key and a count-only tool', async()=>{
+  const {keyCommand}=await import('./mcp-key.mjs');
+  const issue={ownerId:'synthetic-owner',ownerReady:'1',execute:async sql=>db.prepare(sql).get()};
+  const temporary=await keyCommand({...issue,args:['add-key','naesin-tg','synthetic-owner','tg-fixture']});
+  assert.equal((await worker.fetch(new Request(origin+paths['naesin-tg']),env)).status,405);
+  assert.equal((await rpc('naesin-tg','tools/list',key)).status,401);
+  assert.equal((await rpc('wb-reading','tools/list',temporary)).status,401);
+  assert.equal((await rpc('naesin-tg','tools/list')).headers.get('WWW-Authenticate'),'Bearer realm="naesin-tg"');
+  const listed=(await (await rpc('naesin-tg','tools/list',temporary)).json()).result.tools;
+  assert.deepEqual(listed.map(t=>t.name),['naesin_tg_status']);
+  const result=(await (await rpc('naesin-tg','tools/call',temporary,{name:'naesin_tg_status'})).json()).result;
+  assert.deepEqual(JSON.parse(result.content[0].text),{sheets_count:1});
+  if (process.env.WB_MCP_TEST_RELAY) {
+    const {checkRelay}=await import('./test-relay.mjs');
+    await checkRelay({handle:request=>worker.fetch(request,env),url:origin+paths['naesin-tg'],
+      key:temporary,tool:'naesin_tg_status',expected:{sheets_count:1}});
+  }
+  await keyCommand({...issue,args:['revoke-key','naesin-tg','synthetic-owner','tg-fixture']});
+  assert.equal((await rpc('naesin-tg','tools/list',temporary)).status,401);
+});
