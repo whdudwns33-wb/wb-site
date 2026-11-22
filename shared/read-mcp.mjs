@@ -63,7 +63,7 @@ export function createMcp({ name, version = '1', origins = [], authenticate, too
   const listed = tools.map(({ name, title, description, inputSchema, annotations, scope, run }) => {
     if (typeof name !== 'string' || !name || byName.has(name) || !['read', 'write'].includes(scope) ||
         typeof run !== 'function' || inputSchema?.type !== 'object') throw new Error('bad_tool');
-    byName.set(name, { scope, run });
+    byName.set(name, { scope, run, inputSchema });
     return { name, title, description, inputSchema, annotations: { ...annotations, readOnlyHint: scope === 'read' } };
   });
   const allowed = new Set(origins);
@@ -149,6 +149,10 @@ export function createMcp({ name, version = '1', origins = [], authenticate, too
           if (!tool || !record(args)) return rpcError(200, -32602, 'invalid_params', id);
           if (tool.scope === 'write' && auth.scope !== 'write') {
             return rpcError(403, -32003, 'insufficient_scope', id);
+          }
+          const { additionalProperties, properties = {} } = tool.inputSchema;
+          if (additionalProperties === false && Object.keys(args).some(key => !Object.hasOwn(properties, key))) {
+            return rpcError(200, -32602, 'invalid_params', id);
           }
           if (expired()) return timeoutResponse();
           const data = await tool.run(args, { user: auth.user, scope: auth.scope, signal: controller.signal });

@@ -33,6 +33,7 @@ test('task exposes aggregate MCP only with the existing read secret',async () =>
   assert.deepEqual(tools.map(t=>t.name),['task_sheet_status']);
   assert.equal(tools[0].annotations.readOnlyHint,true);
   const out=await (await rpc('tools/call',key,{name:'task_sheet_status'})).json();
+  await rpc('tools/call', key, {name:'task_sheet_status',arguments:{undeclared:true}}).then(async r => { assert.deepEqual([r.status, (await r.json()).error?.code], [200, -32602]); });
   assert.deepEqual(JSON.parse(out.result.content[0].text),{work_orders_today:1});
   assert.ok((await (await rpc('tools/call', key, {name:'create_task'})).json()).error);
   const oversize=await worker.fetch(new Request(url,{method:'POST',body:' '.repeat(1024*1024+1)}),env);
