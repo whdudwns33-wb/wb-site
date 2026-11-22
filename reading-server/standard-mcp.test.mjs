@@ -74,3 +74,11 @@ test('naesin uses its own key and a count-only tool', async()=>{
   await keyCommand({...issue,args:['revoke-key','naesin-tg','synthetic-owner','tg-fixture']});
   assert.equal((await rpc('naesin-tg','tools/list',temporary)).status,401);
 });
+
+test('worker config binds the key D1 and the owner flag that the worker and CLI read', ()=>{
+  const toml=readFileSync(new URL('./wrangler.toml',import.meta.url),'utf8');
+  assert.match(toml,/\[\[d1_databases\]\]\s*binding = "MCP_KEYS"\s*database_name = "wb-reading-mcp-keys"\s*database_id = "__READING_MCP_D1_ID__"/);
+  assert.match(toml,/\[vars\]\s*READING_MCP_OWNER_READY = "1"/);
+  const deploy=readFileSync(new URL('../.github/workflows/deploy-reading.yml',import.meta.url),'utf8');
+  assert.match(deploy,/__READING_MCP_D1_ID__[\s\S]*d1 execute MCP_KEYS --remote --file=mcp-keys\.sql[\s\S]*\$WRANGLER deploy\n/);
+});

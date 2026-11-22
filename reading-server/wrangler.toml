@@ -17,6 +17,18 @@ run_worker_first = ["/", "/mcp", "/naesin-tg/mcp", "/articles.json", "/articles-
 binding = "DB"
 id = "7c7f971952b449fdadf616ef94ef73d1"
 
+# 읽기 MCP 키 전용 D1(앱 표준 §3) — 학생 기록 KV 와 따로 둔다. 배포가 이름으로 찾고 없으면 만든 뒤
+# __READING_MCP_D1_ID__ 를 실제 id 로 바꾸고 mcp-keys.sql(멱등)을 적용한다. 키 발급(mcp-key.mjs)도
+# id 를 넣은 사본을 READING_MCP_WRANGLER_CONFIG 로 가리킨다.
+[[d1_databases]]
+binding = "MCP_KEYS"
+database_name = "wb-reading-mcp-keys"
+database_id = "__READING_MCP_D1_ID__"
+
+# 키 주인(ADMIN_ID 계정)이 처음 암호를 바꿨다고 대표가 확인했다는 표지. "1" 이 아니면 MCP 인증과 키 발급이 닫힌다.
+[vars]
+READING_MCP_OWNER_READY = "1"
+
 # 크론 4개 — 18:00 UTC(03:00 KST): 일일 백업 스냅샷(backup:<날짜>, 10개 보관, vocab:·haru:·letter:·hanja: 키 포함 — 한자 단어장 본문은 제외)
 #           12:00 UTC(21:00 KST): 워드브레인 "자기 전 3분 물주기" Web Push
 #           18:10 UTC(03:10 KST): 하루브레인 주간 익명 집계(haru:agg:<주>, 백업 직후 · 셀 n<5 생략)
