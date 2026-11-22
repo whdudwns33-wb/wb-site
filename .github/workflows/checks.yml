@@ -67,7 +67,7 @@ jobs:
       - name: 세일즈데스크 워커 번들 점검 (dry-run)
         working-directory: crm
         run: |
-          node build.mjs
+          node build.mjs --worker-pwa
           npx --yes --prefer-offline $WRANGLER deploy --dry-run --outdir=/tmp/wb-crm-bundle
           if grep -l 'node:' /tmp/wb-crm-bundle/*.js; then
             echo "::error::워커 번들에 node: 내장 모듈이 남아 있습니다 — Cloudflare 에서 로드되지 않습니다"
