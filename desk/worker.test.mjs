@@ -409,7 +409,9 @@ test('worker.mjs: /api/* 는 handleApi, 나머지는 ASSETS 로', async () => {
   const page = await worker.fetch(new Request(BASE + '/'), env, {});
   assert.equal(await page.text(), 'asset');
   await worker.fetch(new Request(BASE + '/lib/runbook-ui.js'), env, {});
-  assert.deepEqual(served, ['/', '/lib/runbook-ui.js']);
+  const offline = await worker.fetch(new Request(BASE + '/offline.html'), env, {});
+  assert.equal(offline.status, 200);
+  assert.deepEqual(served, ['/', '/lib/runbook-ui.js', '/offline']);
 });
 
 /* ── 기획서 v1.1 — 배정 카드·템플릿·앱 목적지·매뉴얼 ── */
@@ -647,4 +649,140 @@ test('manuals: 숫자가 이어진 사진 id 는 PII 로 보지 않고, 사진 �
     assert.deepEqual([r.status, r.body.code], [400, 'INVALID'], id);
   }
   assert.equal(await docOf(env, adminToken, 'manuals', 'm-bad'), null, '거절된 문서는 저장되지 않는다');
+});
+
+function keyOp(env, token, body) {
+  return call(env, 'POST', '/api/mcp-keys', { token, body });
+}
+
+function mcp(env, method, message, { key, origin } = {}) {
+  const headers = {};
+  if (key) headers.authorization = 'Bearer ' + key;
+  if (origin) headers.origin = origin;
+  return worker.fetch(new Request(BASE + '/mcp', { method, headers,
+    body: message === undefined ? undefined : JSON.stringify(message) }), env, {});
+}
+
+const rpc = (method, params) => ({ jsonrpc: '2.0', id: 1, method, params });
+const listTools = rpc('tools/list');
+const statusTool = rpc('tools/call', { name: 'programdesk_status', arguments: {} });
+const keyDetails = { op: 'add-key', name: 'synthetic-relay', days: 1 };
+
+async function mcpAdmin(env) {
+  const token = await setupAdmin(env);
+  const changed = await call(env, 'POST', '/api/password', { token,
+    body: { password: PASSWORD, newPassword: 'synthetic-second-password' } });
+  assert.equal(changed.status, 200);
+  return token;
+}
+
+test('MCP는 POST만 받으며 기기 토큰과 read 키 권한은 서로 분리된다', async () => {
+  const env = envFor();
+  const token = await mcpAdmin(env);
+  for (const method of ['GET', 'HEAD', 'DELETE', 'OPTIONS']) {
+    const response = await mcp(env, method);
+    assert.equal(response.status, 405);
+    assert.equal(response.headers.get('allow'), 'POST');
+  }
+  for (const key of [undefined, token, 'pds_' + 'x'.repeat(43)]) {
+    const response = await mcp(env, 'POST', listTools, { key });
+    assert.equal(response.status, 401);
+    assert.equal(response.headers.get('www-authenticate'), 'Bearer realm="programdesk"');
+  }
+  const issued = await keyOp(env, token, keyDetails);
+  assert.equal(issued.status, 200);
+  const key = issued.body.key;
+  assert.match(key, /^pds_[A-Za-z0-9_-]{43}$/);
+  const deniedOrigin = await mcp(env, 'POST', listTools, { key, origin: 'https://other.test' });
+  assert.equal(deniedOrigin.status, 403);
+  const onOrigin = await mcp(env, 'POST', listTools,
+    { key, origin: 'https://wb-desk.whdudwns33.workers.dev' });
+  assert.equal(onOrigin.status, 200);
+  const tools = (await onOrigin.json()).result.tools;
+  assert.deepEqual(tools.map(tool => [tool.name, tool.annotations.readOnlyHint]), [['programdesk_status', true]]);
+  const write = await mcp(env, 'POST', rpc('tools/call', { name: 'programdesk_write' }), { key });
+  assert.equal(write.status, 403);
+  assert.equal((await call(env, 'GET', '/api/docs', { token: key })).status, 401);
+  assert.equal((await mcp(env, 'POST', 'x'.repeat(1024 * 1024), { key })).status, 413);
+});
+
+test('도구는 KST 오늘 카드의 건수만 반환한다', async () => {
+  const env = envFor();
+  const token = await mcpAdmin(env);
+  const midnight = Date.parse('2026-11-20T15:00:00Z');
+  const row = env.DB.database.prepare('INSERT INTO desk_documents VALUES (?,?,?,?,?,?)');
+  const card = { what: '합성 메모', target: { type: 'student', id: 'synthetic-student' } };
+  for (const [id, data, deleted] of [
+    ['due1', { due: '2026-11-21', status: 'todo' }, 0],
+    ['old1', { due: '2026-11-20', status: 'doing' }, 0],
+    ['done1', { due: '2026-11-20', status: 'done', doneAt: midnight }, 0],
+    ['done2', { due: '2026-11-21', status: 'done', doneAt: midnight - 1 }, 0],
+    ['done3', { status: 'done', doneAt: midnight + DAY }, 0],
+    ['gone1', { due: '2026-11-21', status: 'todo' }, 1],
+  ]) row.run('cards', id, JSON.stringify({ ...card, ...data }), midnight, 'admin', deleted);
+  row.run('students', 'synthetic-student', '{"name":"합성학생","guardian":{"phone":"010-0000-0000"}}', midnight, 'admin', 0);
+  await atNow(midnight + 1, async () => {
+    const { body: { key } } = await keyOp(env, token, keyDetails);
+    const response = await mcp(env, 'POST', statusTool, { key });
+    assert.equal(response.status, 200);
+    assert.deepEqual(JSON.parse((await response.json()).result.content[0].text),
+      { date: '2026-11-21', due_today: 2, overdue_open: 1, completed_today: 1 });
+    const invalid = await mcp(env, 'POST', rpc('tools/call',
+      { name: 'programdesk_status', arguments: { data: 'private' } }), { key });
+    assert.equal((await invalid.json()).error.message, 'invalid_params');
+  });
+});
+
+test('원장 첫 암호 변경·수명·폐기·감사를 강제하고 키 원문을 저장하지 않는다', async () => {
+  const env = envFor();
+  const token = await setupAdmin(env);
+  const staff = await makeStaff(env, token, '합성직원');
+  assert.equal((await keyOp(env, staff.token, keyDetails)).status, 403);
+  assert.equal((await keyOp(env, token, keyDetails)).status, 403);
+  await call(env, 'POST', '/api/password', { token, body: { password: PASSWORD, newPassword: PASSWORD } });
+  assert.equal((await keyOp(env, token, keyDetails)).status, 403);
+  await call(env, 'POST', '/api/password', { token,
+    body: { password: PASSWORD, newPassword: 'synthetic-second-password' } });
+  const now = Date.now();
+  const response = await atNow(now, () => keyOp(env, token, keyDetails));
+  assert.equal(response.status, 200);
+  const { id, key, expiresAt } = response.body;
+  assert.equal(expiresAt, now + DAY);
+  const db = env.DB.database;
+  const fetchKey = () => db.prepare('SELECT * FROM api_tokens WHERE id=?').get(id);
+  assert.match(fetchKey().token_hash, /^[a-f0-9]{64}$/);
+  assert.equal(JSON.stringify(fetchKey()).includes(key), false);
+  assert.equal(fetchKey().last_used, null);
+  await atNow(now + 1, async () => {
+    assert.equal((await mcp(env, 'POST', listTools, { key })).status, 200);
+    assert.equal(fetchKey().last_used, now + 1);
+    db.prepare("UPDATE api_tokens SET scope='write' WHERE id=?").run(id);
+    assert.equal((await mcp(env, 'POST', listTools, { key })).status, 401);
+    db.prepare("UPDATE api_tokens SET scope='read' WHERE id=?").run(id);
+  });
+  assert.equal((await atNow(now + DAY, () => mcp(env, 'POST', listTools, { key }))).status, 401);
+  assert.equal((await keyOp(env, token, { op: 'revoke-key', id })).status, 200);
+  assert.equal((await keyOp(env, token, { op: 'revoke-key', id })).status, 200);
+  assert.equal((await mcp(env, 'POST', listTools, { key })).status, 401);
+  const events = db.prepare('SELECT kind,name,scope,via FROM desk_token_events WHERE token_id=? ORDER BY rowid').all(id);
+  assert.deepEqual(events.map(event => Object.values(event)),
+    [['token_create', keyDetails.name, 'read', 'cli'], ['token_revoke', keyDetails.name, 'read', 'cli']]);
+});
+
+test('발급 경쟁의 20개 한도와 공유 D1의 분당 120회 한도를 지킨다', async () => {
+  const env = envFor();
+  const token = await mcpAdmin(env);
+  assert.equal((await keyOp(env, token, { ...keyDetails, days: 366 })).status, 400);
+  const issued = await Promise.all(Array.from({ length: 21 }, () => keyOp(env, token, keyDetails)));
+  assert.equal(issued.filter(result => result.status === 200).length, 20);
+  assert.equal(issued.filter(result => result.status === 409).length, 1);
+  const key = issued.find(result => result.status === 200).body.key;
+  const now = Date.now();
+  await atNow(now, async () => {
+    for (let i = 0; i < 120; i++) assert.equal((await mcp(env, 'POST', listTools, { key })).status, 200);
+    const limited = await mcp(env, 'POST', listTools, { key });
+    assert.equal(limited.status, 429);
+    assert.match(limited.headers.get('retry-after'), /^\d+$/);
+  });
+  assert.equal((await atNow(now + 60_000, () => mcp(env, 'POST', listTools, { key }))).status, 200);
 });

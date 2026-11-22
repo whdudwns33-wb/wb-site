@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
+import { handleMcp } from './desk-mcp.mjs';
 import { handleApi } from './desk-api.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -70,7 +71,9 @@ const DIST = path.join(here, 'dist');
 const APP = path.join(here, 'app');
 const LIB = path.join(here, 'lib');
 const SHARED = path.join(here, '..', 'shared');
-const APP_FILES = new Set(['app.js', 'desk-core.js', 'desk.css', 'manifest.webmanifest', 'icon.svg', 'index.html']);
+const APP_FILES = new Set(['app.js', 'desk-core.js', 'desk.css', 'index.html', 'ext.html', 'ext.js',
+  'manifest.webmanifest', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png',
+  'icon-maskable-512.png', 'sw.js', 'offline.html']);
 
 function inside(base, file) {
   const rel = path.relative(base, file);
@@ -126,15 +129,19 @@ function readBody(req) {
   });
 }
 
-async function proxyApi(req, res, env) {
+async function proxy(req, res, env, handler) {
   const method = String(req.method || 'GET').toUpperCase();
-  const body = method === 'GET' || method === 'HEAD' ? undefined : await readBody(req);
-  const headers = new Headers();
-  for (const key of ['authorization', 'content-type', 'accept']) {
-    if (req.headers[key]) headers.set(key, String(req.headers[key]));
+  const headers = new Headers(req.headers);
+  const init = { method, headers };
+  if (handler === handleMcp && method === 'POST') {
+    // 본문 중단 시 응답을 보내기 전에 Node가 소켓을 닫지 않게 한다.
+    init.body = ReadableStream.from(req.iterator({ destroyOnReturn: false }));
+    init.duplex = 'half';
+  } else if (handler === handleApi && method !== 'GET' && method !== 'HEAD') {
+    init.body = await readBody(req);
   }
-  const request = new Request('http://127.0.0.1:' + PORT + req.url, { method, headers, body });
-  const response = await handleApi(request, env, {});
+  const request = new Request('http://127.0.0.1:' + PORT + req.url, init);
+  const response = await handler(request, env, {});
   const out = {};
   response.headers.forEach((value, key) => { out[key] = value; });
   const bytes = Buffer.from(await response.arrayBuffer());
@@ -146,9 +153,10 @@ async function proxyApi(req, res, env) {
 const env = { DB: new LocalD1(openDatabase()) };
 const server = http.createServer((req, res) => {
   const pathname = String(req.url || '/').split('?')[0];
-  const handler = pathname === '/api' || pathname.startsWith('/api/')
-    ? proxyApi(req, res, env)
-    : Promise.resolve(serveStatic(pathname, res));
+  const route = pathname === '/mcp' ? handleMcp
+    : pathname === '/api' || pathname.startsWith('/api/') ? handleApi
+    : null;
+  const handler = route ? proxy(req, res, env, route) : Promise.resolve(serveStatic(pathname, res));
   handler.catch(error => {
     res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify({ ok: false, code: 'SERVER', error: String(error && error.message || error) }));

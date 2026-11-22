@@ -7,8 +7,8 @@ compatibility_date = "2026-08-01"
 [assets]
 directory = "./dist"
 binding = "ASSETS"
-# 정적 파일은 워커를 거치지 않고 바로 나간다. /api/* 만 워커가 받는다(worker.mjs → desk-api.mjs).
-run_worker_first = ["/api/*"]
+# /offline.html은 서비스 워커가 쓰는 고정 주소라 HTML 자동 리다이렉트를 피한다.
+run_worker_first = ["/api/*", "/mcp", "/offline.html"]
 
 # D1 — 배포 워크플로우가 `wrangler d1 create wb-desk` 로 얻은 실제 id 로 __DESK_D1_ID__ 를 치환한 뒤
 # `wrangler d1 migrations apply` 대신 migrations/*.sql 을 순서대로 `wrangler d1 execute --file` 로 전부 적용한다(멱등).

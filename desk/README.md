@@ -97,6 +97,21 @@
 
 인증은 `Authorization: Bearer <token>`. 토큰은 서버에 해시로만 저장되고, 원장 30일·직원 180일(마지막 사용 기준)이다.
 
+### 읽기 MCP 및 키 관리
+
+- `POST /mcp`에 전용 Bearer read 키를 보낸다. 도구 `programdesk_status`는 입력 없이 한국 시간 날짜와 오늘 기한·지연 미완료·오늘 완료 카드 건수를 반환한다. 저장된 카드만 집계한다.
+- 화면의 기기 토큰과 MCP 키는 분리된다. 원장의 첫 암호 변경 여부를 기록하기 시작한 판이므로, 이전 설치도 다른 암호로 한 번 바꾼 뒤 발급할 수 있다.
+- CLI에는 기존 원장 로그인 계정 `admin`을 지정한다. 암호는 승인된 보관소에서 표준입력으로 전달한다. `WB_DESK_URL`의 기본값은 루프백 개발 주소이며 운영 반영 뒤에는 배포 주소를 명시한다.
+
+```sh
+# 원장 암호를 받는 명령에서 파이프로 연결하고, 출력 파일은 신규 0600 파일로 준비한다.
+node desk/mcp-key-cli.mjs add-key admin 연결이름 90
+node desk/mcp-key-cli.mjs revoke-key admin 키ID
+```
+
+일수는 1~365일(기본 90)이다. 발급 원문은 stdout 한 줄, 폐기에 쓰는 키 ID는 stderr로 전달한다.
+D1에는 발급·폐기 감사와 키 해시·범위·만료·마지막 사용을 기록한다. 계정의 유효 키 20개와 키별 최근 60초 120회 제한을 D1에서 적용한다.
+
 ## 5. 배포 — 원장은 머지만
 
 `.github/workflows/deploy-desk.yml`이 main에 `desk/` 변경이 올라오면 자동으로 돈다: 테스트 → `node desk/build.mjs`(dist 조립) →
@@ -116,10 +131,10 @@ node desk/build.mjs                                                   # dist 조
 
 ```
 desk/
-├─ worker.mjs          워커 진입 — /api/* → desk-api, 그 외 정적 자산
+├─ worker.mjs          워커 진입 — /api/* → desk-api, /mcp → desk-mcp, 그 외 정적 자산
 ├─ desk-api.mjs        인증·직원·문서·내보내기 라우트 (+ worker.test.mjs)
 ├─ requests.mjs        운영 요청 원장 (+ requests.test.mjs)
-├─ migrations/         D1 스키마 (멱등) — 001 기본 표, 002 문서 저장소 desk_documents(컬렉션 CHECK 없음, 허용 목록은 desk-api.mjs), 003 파일(desk_files, 매뉴얼 사진 BLOB), 004 표 캡처(desk_captures)
+├─ migrations/         D1 스키마 (멱등) — 001 기본 표, 002 문서 저장소 desk_documents(컬렉션 CHECK 없음, 허용 목록은 desk-api.mjs), 003 파일(desk_files, 매뉴얼 사진 BLOB), 004 표 캡처, 005 MCP 키·감사
 ├─ ../desk-ext/        크롬 확장(MV3) — manifest · popup(연결·프로그램·표 고르기) · content(표 추출·점선·토스트) · background(데스크로 전송). build 가 dist/ext/ 로 복사, app/ext.html 이 zip 으로 묶어 준다
 ├─ dev-server.mjs      로컬 실행 (node:sqlite)
 ├─ build.mjs           app/ + lib/ + shared/external-links.js → dist/
