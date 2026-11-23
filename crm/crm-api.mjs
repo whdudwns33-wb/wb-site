@@ -10,6 +10,8 @@ import CORE from './crm-core.js';
 import { createClient, contactProperties, contactPatchProperties, leadFromContact, applyDealsToLead, dealName, noteBody, HubSpotError } from './hubspot.mjs';
 import { SYSTEM_ID, SETTINGS_ID, DOC_ID, PII_ALLOWED_PATHS, json, fail, hasPii, isPlainObject, absent, parseJson, byteLength, changesOf, kstToday, readJson,
   safeEqual, hex, hexBytes, sha256Hex, passwordHash, randomOpaqueValue, randomSlug, loadDoc, loadCollection, loadSettings, writeDocRaw, patchDocFields, enqueueFor, same, findPii, LINK_CODE, CODE_TTL_MS } from './crm-shared.mjs';
+import { manageMcpKey } from './mcp-keys.mjs';
+import { MCP_OWNER, MCP_PREFIX } from './salesdesk-mcp.mjs';
 import { handlePartnerApi, partnerOp } from './partner-api.mjs';
 import { handlePortalApi, portalLinked, portalOwnsContact, portalOwnsDeal, claimHubspot, releaseHubspot, canWriteHubspot, PORTAL_HOLD } from './portal-api.mjs';
 
@@ -1081,6 +1083,15 @@ export async function handleApi(request, env, ctx) {
 
     const auth = await resolveAuth(request, env);
     if (!auth) return fail('AUTH', '로그인이 필요합니다', 401);
+
+    if (path === '/api/mcp-keys') {
+      if (method !== 'POST') return methodNotAllowed();
+      const denied = adminOnly(auth);
+      if (denied) return denied;
+      // CRM 최초 설정에는 기본 암호가 없고, 관리자 암호를 직접 정해야 한다.
+      if (!(await adminRow(env))) return fail('AUTH', '로그인이 필요합니다', 401);
+      return manageMcpKey(env.DB, await readJson(request), MCP_OWNER, MCP_PREFIX);
+    }
 
     if (path.startsWith('/api/portal/')) return handlePortalApi(request, env, auth);
 

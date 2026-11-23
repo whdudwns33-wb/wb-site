@@ -6,9 +6,9 @@
   <title>WB 탐구브레인 — 사회·과학 시험대비</title>
   <meta name="description" content="사회·과학 내신 문제지를 지면 그대로 풀고 채점·오답까지 — WB 원내 전용">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#2A3B2E">
-  <link rel="manifest" href="./manifest.webmanifest">
-  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+
+
+
   <style>
     /* 국어브레인과 같은 색·글자·부품(형제 앱). 지면이 주인공이라 풀이 화면은 왼쪽 지면 + 오른쪽 답안 칸이다. */
     :root {
@@ -86,6 +86,13 @@
       .answers { width: auto; flex: 1; border-left: 0; border-top: 1px solid var(--line); }
     }
   </style>
+<link rel="manifest" href="/naesin-tg/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" href="/naesin-tg/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/naesin-tg/apple-touch-icon.png">
+<meta name="theme-color" content="#2a3b2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="탐구브레인">
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/naesin-tg/sw.js').catch(()=>{})</script>
 </head>
 <body>
 <header>
@@ -340,7 +347,6 @@
 
   boot();
 })();
-  if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function () {});
 </script>
 </body>
 </html>

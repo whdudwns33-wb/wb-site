@@ -121,6 +121,13 @@ HubSpot에 **새 연락처를 생성**하려면 [이름 또는 이메일이 필�
 
 동기화 실행 결과를 정상적으로 반환하면 일부 보류가 있어도 `ok:true`이며 실제 처리 상태는 `automation.error`와 `lastResult`로 판단한다. 보류·실패가 있으면 이전 `lastSuccessAt`을 유지한다. 인증·입력·활성화 조건 거절은 별도 오류 응답이다.
 
+### 읽기 MCP
+
+Worker의 `/mcp`에서 `salesdesk_status`를 호출하면 삭제하지 않은 고객 건수를 받습니다.
+키 관리는 `node crm/mcp-key-cli.mjs add-key admin <연결이름> [일수]`와
+`node crm/mcp-key-cli.mjs revoke-key admin <키ID>`를 사용하고 관리자 비밀번호는 표준입력으로 전달합니다.
+공개 Worker용 자산을 조립할 때는 `node crm/build.mjs --worker-pwa`를 사용합니다.
+
 ## 7. 배포 — 원장은 머지만
 
 `.github/workflows/deploy-crm.yml` 이 main 에 `crm/` 변경이 올라오면 돈다: 테스트 → `node crm/build.mjs` → D1 `wb-crm` 을 이름으로 찾고 없으면 생성 → `migrations/*.sql` 전부 순서대로(**전부 `IF NOT EXISTS`**) → 번들 dry-run(node: 모듈 금지) → 배포 → `HUBSPOT_ACCESS_TOKEN` 저장소 시크릿이 있으면 워커 시크릿으로 복사 → `/api/health`.

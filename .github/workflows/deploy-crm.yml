@@ -37,7 +37,7 @@ jobs:
           node ../scripts/check.mjs --only crm
 
       - name: 정적 파일 조립 (dist/)
-        run: node build.mjs
+        run: node build.mjs --worker-pwa
 
       - name: wrangler 캐시
         uses: actions/cache@v4

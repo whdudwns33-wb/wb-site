@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>업무지시서 · WB 웩슬러브레인센터</title>
-<meta name="theme-color" content="#1B3A5C">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
@@ -1364,6 +1363,13 @@
 <link rel="stylesheet" href="readability.css?v=2026-10-22.1">
 <script src="roster-search-core.js?v=2026-10-22.1"></script>
 <script src="tab-scroll.js" defer></script>
+<link rel="manifest" href="/task/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" href="/task/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/task/apple-touch-icon.png">
+<meta name="theme-color" content="#1f5fa8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="업무지시">
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/task/sw.js').catch(()=>{})</script>
 </head>
 <body>
 
@@ -1429,6 +1435,7 @@
 </div>
 
 <script src="./lesson-form-core.js?v=2026-10-22.1"></script>
+<script src="./lesson-progress-core.js?v=2026-10-22.1"></script>
 <script src="./task-push-client.js?v=2026-10-22.1"></script>
 <script src="./schedule-board-core.js?v=2026-10-22.1"></script>
 <script src="./week-timetable.js?v=2026-10-22.1&patch=weekend-20261028"></script>
@@ -1690,14 +1697,11 @@ function tasksFor(staffId, date) {
 
 const ckey = (taskId, date) => taskId + '|' + date;
 const getCheck = (taskId, date) => state.checks[ckey(taskId, date)] || null;
+const { LESSON_OPERATIONAL_STEP_LABELS, usesStandardLessonDisplay, taskSteps, lessonReferenceSteps, lessonCheckIsDone } = window.WBLessonProgressCore;
 function isDone(taskId, date) {
   const c = getCheck(taskId, date);
   const task = typeof taskById === 'function' ? taskById(taskId) : state.tasks.find(row => row.id === taskId);
-  const steps = taskSteps(task, c);
-  if (usesStandardLessonDisplay(task) && steps.length === LESSON_OPERATIONAL_STEP_LABELS.length) {
-    return steps.every(step => c && c.steps && c.steps[step.id]);
-  }
-  return !!(c && c.done);
+  return lessonCheckIsDone(task, c);
 }
 
 function setCheck(taskId, date, patch) {
@@ -1748,42 +1752,6 @@ function setAsset(id, patch) {
   save();
   queueSync();
   return next;
-}
-
-/** 수업 화면은 생성 시기와 무관하게 같은 운영 5단계를 쓴다.
- *  예전 단계에 이미 체크한 날짜는 그날 기록을 그대로 보여 주고, 새 날짜부터 표준으로 전환한다. */
-const LESSON_OPERATIONAL_STEP_LABELS = [
-  '지난 숙제·온라인 수행 확인',
-  '교재와 오늘 진도 진행',
-  '이해도·오답·학생 반응 확인',
-  '다음 숙제 안내',
-  '실제 진도와 특이사항 기록'
-];
-
-function usesStandardLessonDisplay(t) {
-  return !!(t && (t.taskKind === 'lesson_instruction' || /^\[수업\]/.test(t.title || '')));
-}
-
-function storedTaskSteps(t) { return t && Array.isArray(t.steps) ? t.steps : []; }
-
-function hasStandardLessonSteps(t) {
-  const steps = storedTaskSteps(t);
-  return steps.length === LESSON_OPERATIONAL_STEP_LABELS.length &&
-    steps.every((step, index) => String(step.label || '') === LESSON_OPERATIONAL_STEP_LABELS[index]);
-}
-
-function taskSteps(t, c) {
-  const stored = storedTaskSteps(t);
-  if (!usesStandardLessonDisplay(t) || hasStandardLessonSteps(t)) return stored;
-  const legacyProgress = c && c.steps && stored.some(step => c.steps[step.id]);
-  if (legacyProgress) return stored;
-  return LESSON_OPERATIONAL_STEP_LABELS.map((label, index) => ({
-    id: String(t.id || 'lesson') + '-standard-step-' + (index + 1), label: label
-  }));
-}
-
-function lessonReferenceSteps(t) {
-  return usesStandardLessonDisplay(t) && !hasStandardLessonSteps(t) ? storedTaskSteps(t) : [];
 }
 
 function lessonScheduleMetaHtml(task, date) {
@@ -4331,6 +4299,46 @@ function replaceView(root, html) {
   return true;
 }
 
+let pendingStepScrollRestore = null;
+function renderKeepingStepPosition(button) {
+  if (pendingStepScrollRestore) pendingStepScrollRestore();
+  const root = $('#view');
+  if (!root || !button) { render(); return; }
+  const key = { id: button.dataset.id, date: button.dataset.date, step: button.dataset.step };
+  const top = button.getBoundingClientRect().top;
+  const originalRoute = route;
+  const focused = document.activeElement === button;
+  const anchor = root.style.overflowAnchor;
+  // details 복원 중 브라우저의 자동 앵커 이동과 명시적 위치 복원이 겹치지 않게 한다.
+  root.style.overflowAnchor = 'none';
+  let frame = null;
+  const cleanup = () => {
+    if (frame !== null) cancelAnimationFrame(frame);
+    root.style.overflowAnchor = anchor;
+    if (pendingStepScrollRestore === cleanup) pendingStepScrollRestore = null;
+  };
+  pendingStepScrollRestore = cleanup;
+  const find = () => Array.from(root.querySelectorAll('[data-act="step"]')).find(el =>
+    el.dataset.id === key.id && el.dataset.date === key.date && el.dataset.step === key.step);
+  const restore = () => {
+    const next = find();
+    if (!next || route !== originalRoute) return;
+    const delta = next.getBoundingClientRect().top - top;
+    if (Math.abs(delta) > 0.5) window.scrollBy({ top: delta, left: 0, behavior: 'instant' });
+    if (focused) next.focus({ preventScroll: true });
+  };
+  try {
+    render();
+    restore();
+    const restoredY = window.scrollY;
+    frame = requestAnimationFrame(() => {
+      // 다음 수업 안내 등의 배치가 끝난 뒤 보정하되 사용자가 직접 스크롤하면 따라가지 않는다.
+      if (Math.abs(window.scrollY - restoredY) < 2) restore();
+      cleanup();
+    });
+  } catch (error) { cleanup(); throw error; }
+}
+
 function renderMarkupFingerprint(value) {
   // 전체 HTML을 다시 파싱하지 않고 같은 화면인지 빠르게 판별한다.
   let hash = 2166136261;
@@ -6360,6 +6368,10 @@ function viewToday() {
     '<div class="today-date-picker-body"><label class="field"><span class="fl">확인할 날짜</span>' +
     '<input class="in" type="date" data-today-date value="' + esc(cursor) + '"></label></div></details>';
 
+  if (session.isStaffLink && !session.isAdmin && me.id === session.staffId) {
+    h += '<div class="mb8"><a class="btn btn-ghost" style="min-height:44px" href="https://tower.wbcowork.com/my-apps">내 앱 보기</a></div>';
+  }
+
   const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
   h += quickAttendanceHtml(me.id, cursor);
   list.forEach(t => counts[teacherTaskCardStatus(t, cursor)]++);
@@ -7339,7 +7351,7 @@ function taskPanel(t, date, c, editable) {
   }
 
   if (steps.length) {
-    h += (lesson ? '<details class="lesson-progress-section lesson-progress-details"><summary>수업 5단계 진행</summary><div class="lesson-progress-details-body">' : '<div style="margin-top:10px">') + steps.map((s, i) => {
+    h += (lesson ? '<details class="lesson-progress-section lesson-progress-details" data-persist-key="lesson-steps|' + esc(t.id) + '|' + esc(date) + '"><summary>수업 5단계 진행</summary><div class="lesson-progress-details-body">' : '<div style="margin-top:10px">') + steps.map((s, i) => {
       const on = !!(c && c.steps && c.steps[s.id]);
       return '<div class="step ' + (on ? 'on' : '') + '">' +
         '<button class="sbox" ' + (editable ? 'data-act="step" data-id="' + t.id + '" data-date="' + date + '" data-step="' + s.id + '"' : 'disabled') + '>✓</button>' +
@@ -24730,7 +24742,7 @@ document.addEventListener('click', async ev => {
       cur[k] = !cur[k];
       setCheck(id, date, { steps: cur, blocked: false });
       syncAuto(t, date);
-      render();
+      renderKeepingStepPosition(el);
       if (isScheduledMakeupTask(t) && isDone(id, date)) completeMakeupAfterLesson(t, date);
       break;
     }

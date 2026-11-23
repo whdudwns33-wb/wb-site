@@ -6,6 +6,13 @@
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex,nofollow">
   <title>WB 진로독서 · 관리</title>
+  <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <meta name="theme-color" content="#173957">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="진로독서">
+  <script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/sw.js').catch(()=>{})</script>
   <style>
     /* 원내 내신 서버에서는 진로독서 전용 항목을 숨긴다 — 같은 명부 화면을 두 앱이 함께 쓰기 때문 */
     body.ns .rd-only{display:none!important}

@@ -9,12 +9,25 @@ binding = "ASSETS"
 #  · articles.json — 발행 오버라이드(pubmap)를 얹어야 한다.
 #  · textbook.json — 코칭 원문은 이제 자산에 없다(KV textbook-src로 이전, 2026-09).
 #    목록에 남겨 두는 것은 과거 캐시·직접 요청이 와도 워커의 404 응답을 타게 하기 위해서다.
-run_worker_first = ["/articles.json", "/articles-L1.json", "/articles-L2.json", "/articles-L3.json", "/articles-L4.json", "/hanja.json", "/version.json", "/textbook.json", "/letter/fonts/*"]
+#  · / — 탐구브레인 학생 코드 화면의 설치 정보를 고른다.
+run_worker_first = ["/", "/mcp", "/naesin-tg/mcp", "/articles.json", "/articles-L1.json", "/articles-L2.json", "/articles-L3.json", "/articles-L4.json", "/hanja.json", "/version.json", "/textbook.json", "/letter/fonts/*"]
 
 # KV 네임스페이스 — 배포 시 `wrangler kv namespace create DB`로 생성된 id로 교체
 [[kv_namespaces]]
 binding = "DB"
 id = "7c7f971952b449fdadf616ef94ef73d1"
+
+# 읽기 MCP 키 전용 D1(앱 표준 §3) — 학생 기록 KV 와 따로 둔다. 배포가 이름으로 찾고 없으면 만든 뒤
+# __READING_MCP_D1_ID__ 를 실제 id 로 바꾸고 mcp-keys.sql(멱등)을 적용한다. 키 발급(mcp-key.mjs)도
+# id 를 넣은 사본을 READING_MCP_WRANGLER_CONFIG 로 가리킨다.
+[[d1_databases]]
+binding = "MCP_KEYS"
+database_name = "wb-reading-mcp-keys"
+database_id = "__READING_MCP_D1_ID__"
+
+# 키 주인(ADMIN_ID 계정)이 처음 암호를 바꿨다고 대표가 확인했다는 표지. "1" 이 아니면 MCP 인증과 키 발급이 닫힌다.
+[vars]
+READING_MCP_OWNER_READY = "1"
 
 # 크론 4개 — 18:00 UTC(03:00 KST): 일일 백업 스냅샷(backup:<날짜>, 10개 보관, vocab:·haru:·letter:·hanja: 키 포함 — 한자 단어장 본문은 제외)
 #           12:00 UTC(21:00 KST): 워드브레인 "자기 전 3분 물주기" Web Push

@@ -3,6 +3,8 @@
 // 인증: 원장 비밀번호(PBKDF2) → Bearer 토큰, 직원은 1회용 링크 코드 → Bearer 토큰. 토큰은 sha256 만 저장한다.
 // 문서(desk_documents)는 컬렉션별 규칙 함수가 검사하고, 전화번호는 students.guardian.phone 에만 허용한다.
 import { handleRequests, exportRequests, hasPii } from './requests.mjs';
+import { manageMcpKey } from './mcp-keys.mjs';
+import deskCore from './app/desk-core.js';
 
 const APP_NAME = 'wb-desk';
 const ADMIN_ID = 'admin';
@@ -294,13 +296,21 @@ async function changePassword(env, auth, body) {
   if (!safeEqual(hash, row.password_hash)) return fail('LOGIN_FAILED', '현재 비밀번호가 맞지 않습니다', 401);
   const salt = randomOpaqueValue();
   const next = await passwordHash(body.newPassword, salt, PASSWORD_ITERATIONS);
-  await env.DB.batch([
-    env.DB.prepare('UPDATE desk_admin SET password_salt=?,password_hash=?,password_iterations=?,failed_attempts=0,locked_until=0 WHERE id=1')
-      .bind(salt, next, PASSWORD_ITERATIONS),
-    // 비밀번호를 바꾸면 다른 원장 기기는 내려보낸다 — 지금 기기만 남긴다.
-    env.DB.prepare('UPDATE desk_tokens SET revoked=1 WHERE staff_id=? AND role=? AND token_hash<>? AND revoked=0')
-      .bind(ADMIN_ID, 'admin', auth.tokenHash)
-  ]);
+  const updates = [
+    env.DB.prepare('UPDATE desk_admin SET password_salt=?,password_hash=?,password_iterations=?,failed_attempts=0,locked_until=0 ' +
+      'WHERE id=1 AND password_hash=? AND password_salt=?')
+      .bind(salt, next, PASSWORD_ITERATIONS, row.password_hash, row.password_salt),
+    // 새 암호가 적용된 경우에만 지금 기기를 빼고 다른 원장 기기를 내려보낸다.
+    env.DB.prepare('UPDATE desk_tokens SET revoked=1 WHERE staff_id=? AND role=? AND token_hash<>? AND revoked=0 ' +
+      'AND EXISTS (SELECT 1 FROM desk_admin WHERE id=1 AND password_salt=?)')
+      .bind(ADMIN_ID, 'admin', auth.tokenHash, salt)
+  ];
+  if (body.newPassword !== current) {
+    updates.push(env.DB.prepare('INSERT OR IGNORE INTO desk_admin_mcp_ready (id) ' +
+      'SELECT id FROM desk_admin WHERE id=1 AND password_salt=?').bind(salt));
+  }
+  const [updated] = await env.DB.batch(updates);
+  if (changesOf(updated) === 0) return fail('PASSWORD_CHANGED', '비밀번호가 변경되었습니다. 다시 시도해 주세요', 409);
   return json({ ok: true });
 }
 
@@ -833,20 +843,41 @@ function staffDoc(row) {
   };
 }
 
+async function readDocumentRows(env, where, bindings) {
+  const rows = await env.DB.prepare(
+    'SELECT collection,id,data,updated_at,updated_by,deleted FROM desk_documents' + where + ' ORDER BY updated_at, collection, id'
+  ).bind(...bindings).all();
+  return rows.results || [];
+}
+
+export async function programdeskStatus(env, auth) {
+  if (auth.role !== 'admin' || auth.staffId !== ADMIN_ID) throw new Error('forbidden');
+  const kst = 9 * 60 * 60 * 1000;
+  const day = 24 * 60 * 60 * 1000;
+  const date = new Date(Date.now() + kst).toISOString().slice(0, 10);
+  const start = Date.parse(date + 'T00:00:00+09:00');
+  const summary = { date, due_today: 0, overdue_open: 0, completed_today: 0 };
+  for (const row of await readDocumentRows(env, ' WHERE collection=? AND deleted=0', ['cards'])) {
+    const { data: card } = docView(row);
+    if (card.due === date) summary.due_today++;
+    if (deskCore.cardLate(card, date)) summary.overdue_open++;
+    if (card.status === 'done' && card.doneAt >= start && card.doneAt < start + day) summary.completed_today++;
+  }
+  return summary;
+}
+
 async function readDocs(env, url) {
   const sinceRaw = url.searchParams.get('since');
   const since = sinceRaw === null || sinceRaw === '' ? null : Number(sinceRaw);
   if (since !== null && !Number.isFinite(since)) return fail('INVALID', 'since 는 ms 숫자여야 합니다');
   const where = since === null ? '' : ' WHERE updated_at>?';
   const bindings = since === null ? [] : [since];
-  const rows = await env.DB.prepare(
-    'SELECT collection,id,data,updated_at,updated_by,deleted FROM desk_documents' + where + ' ORDER BY updated_at, collection, id'
-  ).bind(...bindings).all();
+  const rows = await readDocumentRows(env, where, bindings);
   // 직원 명단은 desk_staff 가 정본이지만 클라이언트는 문서 하나로 받는 편이 단순하다 — staff 문서로 함께 내려준다.
   const staffRows = await env.DB.prepare(
     'SELECT id,name,role,active,updated_at FROM desk_staff' + where + ' ORDER BY updated_at, id'
   ).bind(...bindings).all();
-  const docs = (rows.results || []).map(docView).concat((staffRows.results || []).map(staffDoc));
+  const docs = rows.map(docView).concat((staffRows.results || []).map(staffDoc));
   return json({ ok: true, now: Date.now(), docs });
 }
 
@@ -1133,6 +1164,14 @@ async function handleApiInner(request, env, ctx) {
       if (method === 'GET') return readDocs(env, url);
       if (method === 'POST') return writeDocs(env, auth, await readJson(request));
       return methodNotAllowed();
+    }
+    if (path === '/api/mcp-keys') {
+      if (method !== 'POST') return methodNotAllowed();
+      if (auth.role !== 'admin' || request.headers.has('origin')) return fail('FORBIDDEN', '원장 CLI 전용입니다', 403);
+      const { body, error } = await readLimitedJson(request, 4096);
+      if (error) return error;
+      try { return await manageMcpKey(env.DB, body); }
+      catch { return fail('SERVER', '키 명령을 처리하지 못했습니다', 500); }
     }
     if (path === '/api/captures') {
       if (method === 'GET') return listCaptures(env, url);

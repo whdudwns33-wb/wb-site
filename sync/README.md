@@ -4,6 +4,40 @@
 [`TASK_DIRECTOR_RUNBOOK.md`](TASK_DIRECTOR_RUNBOOK.md)를 따른다.
 배포 전 `node sync/build-task-assets.mjs`로 기존 parent 자산과 task 자산을 조립한다.
 
+## 컨트롤타워 숫자 요약 (개발, 운영 반영 전)
+
+- `GET /api/tower/summary`: 서버 간 전용. `Authorization: Bearer …`에 새 종류
+  `wbt_ct_` + base64url 43자(무작위 32바이트)의 `TASK_TOWER_READ_SECRET`을 사용한다.
+  기존 `TASK_MCP_READ_SECRET`과 같은 Worker secret 저장 방식이며 기존 키를 재사용하지 않는다.
+  키 미설정·누락·오류는 401, GET 이외는 405, Origin이 있는 요청은 403, 조회 조건은 400이다.
+- 고정 응답: `{version:1, source:"wb-task", timezone:"Asia/Seoul", generatedAt, asOf,
+  counts:{center_unread, makeup_pending, blocked}}`. 세 건수는 0 이상의 정수 또는 null이다.
+  성공·실패 모두 `Cache-Control: no-store, private`. 이름·제목·학생 정보·자유 글은 반환하지 않는다.
+- `center_unread`: 대표(`director`)의 읽음 이후 타인 메시지(전체 기간)와 오늘 KST 등원 알림.
+  센터 소통의 기존 unread 집계를 재사용하고 읽음 기록을 갱신하지 않는다. 개인대화는 제외한다.
+- `makeup_pending`: 전체 보강 화면의 **보강 필요** KPI. 검토 대기·검토완료·보호자 대기와
+  확정 보강 중 해당 일정 출결이 결석인 건. 기존 목록의 학생/원수업 확인·회차제/클리닉
+  제외·확정 출결 검증을 재사용한다. 완료·취소·정상 예정은 제외하며 목록의 500건 제한은 적용하지 않는다.
+- `blocked`: KST 오늘 현황판의 활성 직원(대표 포함) 업무 중 `check.blocked`인 건.
+  유효 기간·요일·유효 시간표·비정기 예약/실제 방문을 따르며 주문 업무와 삭제된 업무는 제외한다.
+  막힘은 완료보다 우선하고 이월이나 지난 날짜의 막힘은 더하지 않는다.
+- 실제 빈 자료는 0, 원생 명단 부재/손상·테이블 미설치·DB 조회 실패 등 계산 불가는 해당 값만 null.
+  `asOf`는 요청에서 조회를 시작한 시각, `generatedAt`은 응답 생성 시각(+09:00 ISO)이다.
+  세 집계는 요청 안에서 각각 읽으며 하나의 DB 트랜잭션 스냅샷을 보장하지 않는다.
+  오래된 업무라도 현재 원장에 남은 미처리 상태는 센다. 마지막 수정 시각을 자료 관측 시각으로 쓰지 않는다.
+  CT는 수집 중단으로 오래된 `asOf`를 정상 최신 숫자로 표시하지 않아야 한다.
+- 배포는 기존 `wb-sync` 수동 Worker 반영 절차를 따른다. 새 DB 마이그레이션·키 발급 화면은 없다.
+  전용 키 설치·CT의 `CT_TASK_KEY_FILE` 설정·실제 수신 검증은 대표의 별도 운영 승인 뒤 총괄이 수행한다.
+
+## 컨트롤타워 직원 사용 집계 (개발)
+
+- `GET /api/tower/usage`는 summary와 같은 읽기 키·인증·캐시 정책을 쓴다. 2판의 출처는
+  `wb-task`다. `login`은 활성 업무지시서 직원의 `staff.id`이며 CT 별칭으로 연결한다.
+- `lesson_done`은 서울 오늘의 유효한 수업에서 공용 수업 완료 판정을 통과한 건의 `checks.data.at`를 센다.
+  인계받은 수업은 인계 원장의 완료 시각으로 센다. `report_written`은 `feedback_requests`에 남은 취소되지 않은 수업 피드백의 첫 저장 시각을 센다.
+- `report_today`는 담당자별로 완료 수업과 같은 수업 ID·기록일·담당 ID의 피드백이 있는 수를 비교한다.
+  같은 담당 보강은 기존 피드백 저장과 같은 정규 수업 ID를 사용한다. 완료 수업이 0건이면 `null`이다. 응답에는 제목·직원 이름·학생·보호자·피드백 내용이 없다.
+
 ## 업무지시서 읽기 전용 API·MCP
 
 - `POST /task-export`는 서버 간 연결 전용이다. `Origin`이 없는 요청에서만 동작하며,
@@ -38,6 +72,19 @@ tool_timeout_sec = 30
 운영 순서는 새 secret 등록 → Worker 배포 → 로컬 환경변수·MCP 등록 → `tools/list`와
 읽기 1건 점검이다. D1 마이그레이션과 Pages 배포는 필요하지 않다. 기존
 `TASK_ADMIN_SECRET`, 관리자·직원 개인 링크 토큰을 이 연결에 재사용하지 않는다.
+
+### 앱 표준 읽기 키 (`/mcp`·`/task/mcp`, 반영 후보)
+
+- 키 모양은 `tsk_` + base64url 43자다. D1 `task_read_keys`에는 SHA-256만 두고,
+  범위는 `read`만, 기간은 1~365일(기본 90)이다. 이름마다 따로 폐기하며 대표 계정당 유효 키는 20개까지다.
+  만들기·폐기는 `task_read_key_activity`에 `token_create`/`token_revoke`(경로 `cli`)로 남는다.
+- 대표 계정(`task_director_account`)이 처음 암호를 바꾼 뒤에만 발급된다. 처음 암호 상태로 돌아가면
+  이미 낸 키도 막힌다. 키로 들어온 요청은 `last_used`만 고치고 본문은 기록하지 않는다.
+- 발급·폐기(저장소 루트, wrangler 로그인 뒤). 키는 표준출력 한 줄이므로 바로 파일로 넘긴다:
+  `node sync/task-read-key.mjs --remote add-key <대표 계정> <이름> [일수] > <키 파일>` ·
+  `node sync/task-read-key.mjs --remote revoke-key <대표 계정> <이름>`.
+- MCP는 접두어와 관계없이 `TASK_MCP_READ_SECRET`을 먼저 비교한다. 일치하지 않는 `tsk_` 키는 D1에서 확인한다. `/task-export`는 기존 공용 비밀값을 쓴다.
+- 반영 순서: 운영 D1 보호본 → `094_task_read_keys.sql` 한 번 → Worker 배포 → 발급 → `tools/list` 확인.
 
 ## 첫 결제 12회 선납
 

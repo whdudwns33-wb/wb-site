@@ -63,6 +63,13 @@
     #toast.show{transform:translateX(-50%) translateY(0)}
     @media(max-width:560px){.stats{grid-template-columns:repeat(2,1fr)}}
   </style>
+<link rel="manifest" href="./manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<meta name="theme-color" content="#173957">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="진로독서">
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{})</script>
 </head>
 <body>
 <header>

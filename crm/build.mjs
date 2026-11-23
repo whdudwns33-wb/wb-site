@@ -1,6 +1,6 @@
 /* WB 세일즈데스크 — dist 조립
  *
- *   node crm/build.mjs
+ *   node crm/build.mjs [--worker-pwa]
  *
  * 하는 일: crm/app/* → crm/dist/ · crm/crm-core.js → crm/dist/crm-core.js · crm/partner/* → crm/dist/partner/(파트너 포털).
  * index.html(둘 다)의 `?v=dev` 자산 참조를
@@ -58,6 +58,23 @@ async function main() {
   }
   await stampHtml('index.html', 3);
   await stampHtml('partner/index.html', 2);
+  if (process.argv.includes('--worker-pwa')) {
+    const pwa = path.join(here, 'pwa');
+    for (const name of await fs.readdir(pwa)) {
+      await fs.copyFile(path.join(pwa, name), path.join(DIST, name));
+      copied.push(name);
+    }
+    const html = path.join(DIST, 'index.html');
+    const original = await fs.readFile(html, 'utf8');
+    const install = original
+      .replace('content="#1B2A4A"', 'content="#1b2a4a"')
+      .replace('content="세일즈데스크"', 'content="세일즈"')
+      .replace('href="./manifest.webmanifest"', 'href="/manifest.webmanifest" crossorigin="use-credentials"')
+      .replace('href="./icon.svg"', 'href="/icon.svg"')
+      .replace('rel="apple-touch-icon" href="./icon.svg"', 'rel="apple-touch-icon" href="/apple-touch-icon.png"')
+      .replace('</head>', '<script src="/pwa-register.js" defer></script>\n</head>');
+    await fs.writeFile(html, install);
+  }
   console.log('dist 조립 완료 — ' + copied.length + '개 파일, 스탬프 ' + stamped.length + '개');
   stamped.forEach(s => console.log('  ' + s));
 }

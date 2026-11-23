@@ -29,7 +29,7 @@ const first = new Set(m ? [...m[1].matchAll(/"([^"]+)"/g)].map(x => x[1]) : []);
 /* 워커가 /api/ 앞에서 가로채는 정적 경로를 코드에서 뽑는다 */
 const head = worker.split("if (!p.startsWith('/api/'))")[0];
 const paths = new Set();
-for (const x of head.matchAll(/p === '(\/[^']+)'/g)) paths.add(x[1]);
+for (const x of head.matchAll(/p === '(\/[^']*)'/g)) paths.add(x[1]);
 /* 접두어로 가로채는 것(p.startsWith('/letter/fonts/')) — run_worker_first 에는 글꼴(/letter/fonts/*)로 적는다 */
 for (const x of head.matchAll(/p\.startsWith\('(\/[^']+)'\)/g)) paths.add(x[1] + '*');
 /* 정규식으로 가로채는 것 — articles(-L1..L4).json */

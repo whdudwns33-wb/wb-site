@@ -12,16 +12,26 @@ const DIST = path.join(ROOT, 'dist');
 
 fs.rmSync(DIST, { recursive: true, force: true });
 fs.mkdirSync(path.join(DIST, 'admin'), { recursive: true });
+fs.mkdirSync(path.join(DIST, 'offline'), { recursive: true });
 
 /* textbook.json(코칭 원문)은 더 이상 싣지 않는다 — 공개 저장소·정적 자산에서 빼고
    KV(textbook-src)로 옮겼다. 관리 웹의 「교재 코칭 원문」 카드에서 업로드한다. */
-const APP_FILES = ['index.html', 'articles.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'review.html', 'parent.html',
+const APP_FILES = ['index.html', 'articles.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'offline/index.html',
+  'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png', 'review.html', 'parent.html',
   /* 학년대별 분할본 — 학생 앱은 자기 학년대 하나만 받는다 (node reading/build-split.mjs 산출물) */
   'articles-L1.json', 'articles-L2.json', 'articles-L3.json', 'articles-L4.json', 'hanja.json', 'version.json',
   /* 보안 헤더(CSP·X-Frame-Options·Referrer-Policy 등)와 캐시 규칙.
      지금까지 dist에 넣지 않아 배포본에는 이 헤더가 하나도 붙지 않았다. */
   '_headers'];
 for (const f of APP_FILES) fs.copyFileSync(path.join(APP, f), path.join(DIST, f));
+// The same source files also serve the GitHub Pages mirror under /reading/.
+const rootManifestPath = path.join(DIST, 'manifest.webmanifest');
+const rootManifest = JSON.parse(fs.readFileSync(rootManifestPath, 'utf8'));
+const rootPath = value => new URL(value, 'https://wb-reading.whdudwns33.workers.dev/').pathname;
+for (const field of ['id','start_url','scope']) rootManifest[field] = rootPath(rootManifest[field]);
+for (const icon of rootManifest.icons) icon.src = rootPath(icon.src);
+fs.writeFileSync(rootManifestPath, JSON.stringify(rootManifest, null, 2) + '\n');
+
 fs.copyFileSync(path.join(ROOT, 'public', 'admin.html'), path.join(DIST, 'admin', 'index.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'vocab-review.html'), path.join(DIST, 'admin', 'vocab-review.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'metrics.html'), path.join(DIST, 'admin', 'metrics.html'));
@@ -81,8 +91,9 @@ for (const f of NAESINKO_FILES) fs.copyFileSync(path.join(NAESINKO, f), path.joi
 fs.copyFileSync(SHARED, path.join(DIST, 'naesin-ko', 'voice.js'));
 /* 탐구브레인 (naesin-tg/) — 화면 껍데기뿐이다. 문제지·쪽 그림·정답은 KV 에만 있고 서버가 채점한다.
    서비스 워커는 앱 설치용으로 셸만 캐시하고 /api/ 는 건드리지 않는다 — 지면을 기기에 쌓지 않는다. */
-fs.mkdirSync(path.join(DIST, 'naesin-tg'), { recursive: true });
-for (const f of ['index.html', 'sw.js', 'manifest.webmanifest', 'icon.svg']) fs.copyFileSync(path.join(ROOT, '..', 'naesin-tg', f), path.join(DIST, 'naesin-tg', f));
+fs.mkdirSync(path.join(DIST, 'naesin-tg', 'offline'), { recursive: true });
+for (const f of ['index.html', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'offline/index.html',
+  'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png']) fs.copyFileSync(path.join(ROOT, '..', 'naesin-tg', f), path.join(DIST, 'naesin-tg', f));
 /* 하루브레인 (haru/) — 같은 오리진 /haru/ 에서 서빙해야 학생 코드·API가 공유된다.
    앱 껍데기·순수 로직·atoms.json·공개 준비 안내와 검토용 자체 샘플(preview.js)만 싣는다. 운영 팩·대응표·플랜·시험지는 dist 에 없다(설계안 §5-0). */
 const HARU = path.join(ROOT, '..', 'haru');
@@ -182,7 +193,7 @@ function stampSW(swPath, shellPaths, prefix) {
   return tag;
 }
 const rTag = stampSW(path.join(DIST, 'sw.js'),
-  ['index.html', 'voice.js', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, f)), 'wbr-shell');
+  ['index.html', 'voice.js', 'manifest.webmanifest', 'icon.svg', 'offline/index.html', 'icon-192.png'].map(f => path.join(DIST, f)), 'wbr-shell');
 const vTag = stampSW(path.join(DIST, 'vocab', 'sw.js'),
   ['index.html', 'voice.js', 'words.js', 'bridge.js', 'quiz.js', 'srs.js', 'trace.js', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'vocab', f)), 'wbv-shell');
@@ -195,7 +206,7 @@ const kTag = stampSW(path.join(DIST, 'naesin-ko', 'sw.js'),
     .map(f => path.join(DIST, 'naesin-ko', f)), 'wbk-shell');
 
 const tTag = stampSW(path.join(DIST, 'naesin-tg', 'sw.js'),
-  ['index.html', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, 'naesin-tg', f)), 'wbt-shell');
+  ['index.html', 'manifest.webmanifest', 'icon.svg', 'offline/index.html', 'icon-192.png'].map(f => path.join(DIST, 'naesin-tg', f)), 'wbt-shell');
 
 const cTag = stampSW(path.join(DIST, 'chunk', 'sw.js'),
   ['index.html', 'print.html', 'voice.js', 'rules.js', 'sched.js', 'lessons.js', 'passages.js', 'manifest.webmanifest', 'icon.svg']

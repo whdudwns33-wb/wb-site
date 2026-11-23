@@ -293,12 +293,18 @@ test('연결하지 않은 다른 리드도 확인된 센터앱 연락처·예약
   }
 });
 
-test('마이그레이션은 멱등이고 표·인덱스를 만든다 · 워커는 /api 만 코드로 받는다', async () => {
+test('마이그레이션은 멱등이고 표·인덱스를 만든다 · 워커는 API 및 정확한 /mcp를 코드로 받는다', async () => {
   const db = new TestD1();
   const names = db.database.prepare("SELECT name FROM sqlite_master WHERE name LIKE 'crm_%' OR name LIKE 'idx_crm%' ORDER BY name").all().map(r => r.name);
   for (const n of ['crm_admin', 'crm_staff', 'crm_codes', 'crm_tokens', 'crm_documents', 'crm_hs_links', 'crm_sync_queue', 'crm_kv', 'idx_crm_sync_queue_status']) assert.ok(names.includes(n), n);
   const env = { DB: db, ASSETS: { fetch: async () => new Response('asset', { status: 200 }) } };
   assert.equal(await (await worker.fetch(new Request(BASE + '/index.html'), env, {})).text(), 'asset');
+  const mcp = await worker.fetch(new Request(BASE + '/mcp'), env, {});
+  assert.equal(mcp.status, 405);
+  const noKey = await worker.fetch(new Request(BASE + '/mcp', {method:'POST', body:'{}'}), env, {});
+  assert.equal(noKey.status, 401);
+  assert.match(noKey.headers.get('www-authenticate'), /^Bearer /);
+  assert.equal(await (await worker.fetch(new Request(BASE + '/mcp/help'), env, {})).text(), 'asset');
   const api = await worker.fetch(new Request(BASE + '/api/health'), env, {});
   assert.equal((await api.json()).app, 'wb-crm');
   // 토큰이 없으면 크론은 아무것도 하지 않는다

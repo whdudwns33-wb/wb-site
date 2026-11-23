@@ -35,6 +35,13 @@
     .muted{color:var(--muted);font-size:13px}
     #loginCard{max-width:380px;margin:60px auto}
   </style>
+<link rel="manifest" href="/naesin-tg/manifest.webmanifest" crossorigin="use-credentials">
+<link rel="icon" href="/naesin-tg/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/naesin-tg/apple-touch-icon.png">
+<meta name="theme-color" content="#2a3b2e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="탐구브레인">
+<script>if('serviceWorker' in navigator)navigator.serviceWorker.register('/naesin-tg/sw.js').catch(()=>{})</script>
 </head>
 <body>
 <header><b>WB 탐구브레인 · 관리</b><small>사회·과학 내신 — 원내 전용</small><span class="sp"></span><button class="hbtn" id="btnLogout">로그아웃</button></header>
