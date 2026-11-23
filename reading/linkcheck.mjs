@@ -5,13 +5,12 @@
    유튜브는 oembed로 실제 시청 가능 여부까지 확인.
    종료 코드: 죽은 링크(bad)가 있으면 1, 없으면 0. curl 사용(프록시 환경 호환). */
 import fs from 'node:fs';
-import { execFile } from 'node:child_process';
+import { curlGet, get } from './net-get.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DB = JSON.parse(fs.readFileSync(path.join(HERE, 'articles.json'), 'utf8'));
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36';
 
 const items = [];
 for (const a of DB.articles) {
@@ -24,12 +23,8 @@ for (const a of DB.articles) {
   });
 }
 
-function curlCode(url, secs) {
-  return new Promise(resolve => {
-    execFile('curl', ['-sS', '-o', '/dev/null', '-w', '%{http_code}', '-L', '-m', String(secs), '-A', UA, url],
-      { timeout: (secs + 3) * 1000 }, (err, stdout) => resolve((stdout || '000').trim()));
-  });
-}
+/* 1차는 지금까지처럼 curl 로 빠르게 훑는다 — 프록시를 지나는 길이다. */
+const curlCode = (url, secs) => curlGet(url, secs, false).then(r => r.code);
 
 const target = (it) => it.yt
   ? 'https://www.youtube.com/oembed?format=json&url=' + encodeURIComponent(it.url)
@@ -66,13 +61,16 @@ const retry = results.filter(r => r.verdict !== 'ok' && r.verdict !== 'bad');
 if (retry.length) {
   process.stderr.write(`재확인 ${retry.length}건 (순차)\n`);
   for (const r of retry) {
-    for (let k = 0; k < 2 && r.verdict !== 'ok'; k++) {
-      const code = await curlCode(target(r), 25);
-      const v = verdictOf(code);
-      if (v === 'ok' || k === 1) { r.code = code; r.verdict = v; }
-      if (v === 'ok') break;
-    }
+    /* 2차는 net-get 에 맡긴다 — curl 이 000(프록시가 터널을 닫음)일 때만
+       프록시를 지나지 않는 길로 한 번 더 묻는다. 2026-11-23 에 .go.kr 여러 곳이
+       curl 000 · fetch 200 이어서 ⚠ 가 20에서 84로 부풀었다. */
+    const got = await get(target(r), { secs: 25, tries: 2, body: false });
+    r.code = got.code; r.verdict = verdictOf(got.code); r.via = got.via;
   }
+}
+const rescued = results.filter(r => r.via === 'fetch');
+if (rescued.length) {
+  process.stderr.write(`curl 이 막혀 다른 길로 확인한 것 ${rescued.length}건 — 링크는 살아 있다\n`);
 }
 
 const bad = results.filter(r => r.verdict === 'bad');
