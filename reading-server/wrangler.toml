@@ -18,7 +18,7 @@ binding = "DB"
 id = "7c7f971952b449fdadf616ef94ef73d1"
 
 # 읽기 MCP 키 전용 D1(앱 표준 §3) — 학생 기록 KV 와 따로 둔다. 배포가 이름으로 찾고 없으면 만든 뒤
-# __READING_MCP_D1_ID__ 를 실제 id 로 바꾸고 mcp-keys.sql(멱등)을 적용한다. 키 발급(mcp-key.mjs)도
+# 아래 database_id 의 자리표를 실제 id 로 바꾸고 mcp-keys.sql(멱등)을 적용한다. 키 발급(mcp-key.mjs)도
 # id 를 넣은 사본을 READING_MCP_WRANGLER_CONFIG 로 가리킨다.
 [[d1_databases]]
 binding = "MCP_KEYS"
