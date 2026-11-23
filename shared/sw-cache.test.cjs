@@ -15,8 +15,12 @@ const apps = { reading: 'wbr', vocab: 'wbv', naesin: 'wbn', 'naesin-ko': 'wbk', 
       'wbl-meta', 'wbl-fonts', 'wbc-meta', 'unrelated-cache'];
     const hooks = {}, deleted = [];
     let claimed = false, done;
+    // 워커에 따라 자기 경로로 ROOT 를 계산한다(new URL('./', self.location.href)).
+    // 샌드박스에 location 과 URL 이 없으면 캐시 규칙이 아니라 준비물 때문에 터진다.
     vm.runInNewContext(src, {
-      self: { addEventListener: (name, fn) => { hooks[name] = fn; }, clients: { claim: () => { claimed = true; } } },
+      URL,
+      self: { location: { href: 'https://wb-reading.example/' + (app === 'reading' ? '' : app + '/') + 'sw.js' },
+        addEventListener: (name, fn) => { hooks[name] = fn; }, clients: { claim: () => { claimed = true; } } },
       caches: { keys: async () => [old, ...keep], delete: async (key) => { deleted.push(key); return true; } }
     });
     hooks.activate({ waitUntil: (p) => { done = p; } });

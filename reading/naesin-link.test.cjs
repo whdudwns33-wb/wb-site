@@ -5,7 +5,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-const inline = html.split('<script>')[1].split('</script>')[0];
+// index.html 의 <head> 에도 인라인 <script> 가 하나 있다(서비스워커 등록).
+// 그래서 첫 블록을 집지 않고 본체(boot)가 든 블록을 찾는다 — head 에 한 줄이 더 늘어도 안 깨지게.
+const inline = html.split('<script>').map(s => s.split('</script>')[0])
+  .find(s => s.includes('(async function boot(){'));
 const account = { code: 'OWN-A', name: '자체 학생 A', token: 'own-token-a' };
 const other = { code: 'OWN-B', name: '자체 학생 B', token: 'own-token-b' };
 const record = JSON.stringify({ v: 1, profile: { grade: '초5', level: 'L2', interests: [] }, readings: { own: { sec: 90 } } });

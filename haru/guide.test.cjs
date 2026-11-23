@@ -14,7 +14,9 @@ async function t(name, fn) { await fn(); count++; console.log('통과:', name); 
 function serviceWorker(file = 'sw.js', offline = false) {
   const handlers = {}, calls = { fetch: [], match: [], put: [] };
   const context = vm.createContext({ URL, location: { origin: 'https://example.test' },
-    self: { addEventListener: (name, fn) => { handlers[name] = fn; } },
+    // reading/sw.js 는 자기 경로로 ROOT 를 잡는다 — location 이 없으면 평가 자체가 안 된다.
+    self: { location: { href: 'https://example.test/sw.js' },
+      addEventListener: (name, fn) => { handlers[name] = fn; } },
     fetch: async request => {
       calls.fetch.push(request.url);
       if (offline) throw new Error('오프라인');
@@ -59,8 +61,13 @@ function serviceWorker(file = 'sw.js', offline = false) {
     assert.match(build, /'haru\/guide\.html'/);
     for (const file of workers) {
       const { context } = serviceWorker(file);
-      assert.equal(vm.runInContext('VERSION', context), file === 'sw.js' ? 'wbh-shell-dev' : 'wbr-shell-v6');
-      assert.equal(vm.runInContext('SHELL.some(file => file.includes("guide"))', context), false);
+      // VERSION 은 build-dist.mjs 가 내용 해시로 스탬프한다 — 값을 통째로 적어 두면 배포마다 깨진다.
+      // 어느 앱의 워커를 평가했는지만 접두사로 확인한다.
+      const prefix = file === 'sw.js' ? 'wbh-shell-' : 'wbr-shell-';
+      assert.ok(String(vm.runInContext('VERSION', context)).startsWith(prefix), file + ' 를 평가하지 못했다');
+      // 캐시 목록의 이름이 앱마다 다르다(haru: SHELL · reading: KEEP). 있는 쪽을 집어 guide 가 없음을 본다.
+      const shell = vm.runInContext('typeof SHELL !== "undefined" ? SHELL : KEEP', context);
+      assert.equal(shell.some(name => String(name).includes('guide')), false, file + ' 오프라인 셸에 guide 가 들어갔다');
     }
   });
   await t('2027학년도 주요 일정은 facts.json 정본과 같음', () => {
@@ -107,25 +114,45 @@ function serviceWorker(file = 'sw.js', offline = false) {
       assert.deepEqual(calls, { fetch: [], match: [], put: [] });
     }
   });
-  await t('비슷한 다른 경로·학생 홈의 네트워크와 오프라인 처리 계약은 유지', async () => {
-    for (const file of workers) {
-      const home = file === 'sw.js' ? '/haru/' : '/';
-      const online = serviceWorker(file);
-      for (const route of [home, '/haru/parent.html', '/haru/guidebook', '/haru/guide.js', '/haru/guide/extra', '/haru/guide.html/extra']) {
-        assert.equal((await online.request(route)).from, 'network');
-      }
-      assert.equal(online.calls.fetch.length, 6);
-      assert.deepEqual(online.calls.put, Array.from({ length: 6 }, () => ['./index.html', 'network']));
-      const offline = serviceWorker(file, true);
-      assert.equal((await offline.request(home)).from, 'cache');
-      assert.deepEqual(offline.calls.match, ['./index.html']);
-      for (const [route, options] of [['/api/haru/today', {}],
-        [home, { method: 'POST' }], ['https://school.test/haru/', {}]]) {
-        assert.equal(online.request(route, options), undefined);
-      }
-      if (file === 'sw.js') assert.equal(online.request('/haru/atoms.json'), undefined);
-      assert.equal(online.calls.fetch.length, 6);
+  await t('하루브레인 워커: 탐색은 망으로, 끊기면 캐시한 셸로 답한다', async () => {
+    const file = 'sw.js', home = '/haru/';
+    const online = serviceWorker(file);
+    for (const route of [home, '/haru/parent.html', '/haru/guidebook', '/haru/guide.js', '/haru/guide/extra', '/haru/guide.html/extra']) {
+      assert.equal((await online.request(route)).from, 'network');
     }
+    assert.equal(online.calls.fetch.length, 6);
+    assert.deepEqual(online.calls.put, Array.from({ length: 6 }, () => ['./index.html', 'network']));
+    const offline = serviceWorker(file, true);
+    assert.equal((await offline.request(home)).from, 'cache');
+    assert.deepEqual(offline.calls.match, ['./index.html']);
+    for (const [route, options] of [['/api/haru/today', {}],
+      [home, { method: 'POST' }], ['https://school.test/haru/', {}]]) {
+      assert.equal(online.request(route, options), undefined);
+    }
+    assert.equal(online.request('/haru/atoms.json'), undefined);
+    assert.equal(online.calls.fetch.length, 6);
+  });
+  /* 진로독서 워커의 계약은 2026-11-21 설치 앱 전환으로 달라졌다 — 탐색 응답을 캐시에
+     넣지 않고, 자기 뿌리의 지정된 화면만 가로채 망이 끊기면 오프라인 화면으로 답한다.
+     하루브레인과 한 틀에 묶어 두면 형제 앱이 바뀔 때마다 이 파일이 깨지므로 따로 적는다.
+     여기서 지키려는 것은 하나다 — guide 와 API·POST·외부 주소는 워커가 건드리지 않는다. */
+  await t('진로독서 워커: 자기 뿌리의 화면만 가로채고 guide·API·외부 주소는 지나보낸다', async () => {
+    const file = '../reading/sw.js';
+    const online = serviceWorker(file);
+    assert.equal((await online.request('/')).from, 'network');
+    for (const route of ['/haru/parent.html', '/haru/guidebook', '/haru/guide.js', '/haru/guide/extra', '/haru/guide.html/extra']) {
+      assert.equal(online.request(route), undefined, file + ': ' + route);
+    }
+    assert.equal(online.calls.fetch.length, 1);
+    assert.deepEqual(online.calls.put, []);
+    const offline = serviceWorker(file, true);
+    assert.equal((await offline.request('/')).from, 'cache');
+    assert.deepEqual(offline.calls.match, ['/offline/']);
+    for (const [route, options] of [['/api/haru/today', {}],
+      ['/', { method: 'POST' }], ['https://school.test/haru/', {}]]) {
+      assert.equal(online.request(route, options), undefined);
+    }
+    assert.equal(online.calls.fetch.length, 1);
   });
   console.log('준비 안내 회귀:', count, '개 통과');
 })().catch(error => { console.error(error); process.exitCode = 1; });
