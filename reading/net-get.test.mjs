@@ -79,3 +79,45 @@ await t('막힌 길의 표시는 000 하나뿐이다', () => {
 });
 
 console.log('OK — net-get ' + n + '/7');
+
+/* ── 글자 인코딩 ─────────────────────────────────────────────────────────
+   EUC-KR 로 보내는 연구기관 누리집이 있어(2026-11-23 www.kribb.re.kr) UTF-8 로
+   읽으면 한글이 깨지고, 그러면 srccheck 가 멀쩡한 지면을 본문 미확인으로 떨어뜨린다. */
+import { decode } from './net-get.mjs';
+
+let m = 0;
+const t2 = (name, fn) => { fn(); m++; console.log('  ✓ ' + name); };
+
+/* EUC-KR 바이트를 직접 만든다 — 「한글」 = C7D1 B1DB */
+const body = Buffer.from([0xC7, 0xD1, 0xB1, 0xDB]);
+const euc = Buffer.concat([
+  Buffer.from('<html><head><meta http-equiv="Content-Type" content="text/html; charset=euc-kr"></head><body>', 'latin1'),
+  body,
+  Buffer.from('</body></html>', 'latin1'),
+]);
+
+t2('지면이 EUC-KR 이라 적어 두면 그 인코딩으로 푼다', () => {
+  assert.ok(decode(euc).includes('한글'), 'EUC-KR 한글이 깨졌다');
+  /* UTF-8 로 읽으면 같은 바이트가 다른 글자가 된다 — 그래서 고를 줄 알아야 뜻이 있다 */
+  assert.notEqual(euc.toString('utf8'), decode(euc));
+  assert.ok(!euc.toString('utf8').includes('한글'));
+});
+
+t2('charset 을 적지 않으면 UTF-8 로 읽는다', () => {
+  const utf8 = Buffer.from('<html><body>나노플라스틱</body></html>', 'utf8');
+  assert.ok(decode(utf8).includes('나노플라스틱'));
+});
+
+t2('모르는 charset 이면 UTF-8 로 떨어뜨리고 터지지 않는다', () => {
+  const odd = Buffer.concat([
+    Buffer.from('<meta charset="x-made-up-9999">', 'latin1'),
+    Buffer.from('나노', 'utf8'),
+  ]);
+  assert.ok(decode(odd).includes('나노'));
+});
+
+t2('이미 문자열이면 그대로 돌려준다', () => {
+  assert.equal(decode('나노'), '나노');
+});
+
+console.log('OK — 글자 인코딩 ' + m + '/4');

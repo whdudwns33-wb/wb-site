@@ -17,10 +17,25 @@
  *
  * TLS 검증을 끄거나 HTTPS_PROXY 를 지우지 않는다. 프록시를 지나지 않는 길이 하나 더
  * 있을 뿐이고, 그 길은 이 저장소가 이미 쓰던 길이다.
+ *
+ * 글자 인코딩도 여기서 푼다. 연구기관 누리집 가운데 EUC-KR 로 보내는 곳이 있어
+ * (2026-11-23: www.kribb.re.kr) UTF-8 로 읽으면 한글이 깨진다. 그러면 srccheck 의
+ * 「제목 낱말 대조」가 멀쩡한 지면을 본문 미확인으로 떨어뜨린다 — 링크가 아니라
+ * 읽는 방법이 틀린 것이다. 그래서 바이트로 받아 지면이 적어 둔 charset 으로 푼다.
  */
 import { execFile } from 'node:child_process';
 
 export const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36';
+
+/* 지면이 적어 둔 charset 으로 바이트를 푼다. 못 알아보면 UTF-8 로 둔다. */
+export function decode(buf) {
+  if (typeof buf === 'string') return buf;
+  const head = buf.slice(0, 4096).toString('latin1');
+  const m = head.match(/charset\s*=\s*["']?\s*([\w-]+)/i);
+  const name = (m ? m[1] : 'utf-8').toLowerCase();
+  if (/^(utf-?8|us-ascii)$/.test(name)) return buf.toString('utf8');
+  try { return new TextDecoder(name).decode(buf); } catch { return buf.toString('utf8'); }
+}
 
 /* curl 은 프록시를 지난다. body 가 false 면 본문을 버려 가볍게 묻는다. */
 export function curlGet(url, secs, body) {
@@ -28,10 +43,13 @@ export function curlGet(url, secs, body) {
     ? ['-sSL', '-m', String(secs), '-A', UA, '-w', '\n@@@%{http_code}', url]
     : ['-sS', '-o', '/dev/null', '-w', '%{http_code}', '-L', '-m', String(secs), '-A', UA, url];
   return new Promise(resolve => {
-    execFile('curl', args, { timeout: (secs + 5) * 1000, maxBuffer: 32 * 1024 * 1024 },
+    /* encoding:'buffer' 로 받아야 EUC-KR 지면을 되살릴 수 있다 — 문자열로 받으면
+       이미 UTF-8 로 잘못 풀린 뒤라 되돌릴 수 없다. */
+    execFile('curl', args, { timeout: (secs + 5) * 1000, maxBuffer: 32 * 1024 * 1024, encoding: 'buffer' },
       (err, stdout) => {
-        const s = stdout || '';
-        if (!body) return resolve({ code: s.trim() || '000', html: '' });
+        const raw = stdout || Buffer.alloc(0);
+        if (!body) return resolve({ code: raw.toString('latin1').trim() || '000', html: '' });
+        const s = decode(raw);
         const at = s.lastIndexOf('\n@@@');
         if (at < 0) return resolve({ code: '000', html: '' });
         resolve({ code: s.slice(at + 4).trim() || '000', html: s.slice(0, at) });
@@ -46,7 +64,8 @@ export async function fetchGet(url, secs, body) {
       headers: { 'user-agent': UA, 'accept-language': 'ko-KR,ko;q=0.9' },
       signal: AbortSignal.timeout(secs * 1000)
     });
-    const html = body ? await r.text() : '';
+    /* r.text() 는 헤더의 charset 만 본다 — 한국 누리집은 meta 에만 적는 곳이 많다. */
+    const html = body ? decode(Buffer.from(await r.arrayBuffer())) : '';
     return { code: String(r.status), html };
   } catch {
     return { code: '000', html: '' };
