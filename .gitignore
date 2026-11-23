@@ -31,3 +31,7 @@ task/private-names.json
 # 세일즈데스크(crm/) — dist는 배포 워크플로우가 조립, .local은 로컬 실행용 SQLite(가정 정보 포함 가능, 커밋 금지)
 crm/dist/
 crm/.local/
+
+# 파이썬 바이트코드 — 저장소 전체 검사가 추출기 모듈을 들여올 때마다 다시 생긴다. 커밋 대상 아님.
+__pycache__/
+*.pyc

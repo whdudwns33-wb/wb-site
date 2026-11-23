@@ -24,13 +24,12 @@
  * 종료 코드: 확실한 결함(bad)이 있으면 1, 없으면 0.
  */
 import fs from 'node:fs';
-import { execFile } from 'node:child_process';
+import { get } from './net-get.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DB = JSON.parse(fs.readFileSync(path.join(HERE, 'articles.json'), 'utf8'));
-const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36';
 
 const argv = process.argv.slice(2);
 let jsonOut = null;
@@ -139,27 +138,12 @@ if (selftest) {
   process.exit(fail || caught.length ? 1 : 0);
 }
 
-function curl(url, secs) {
-  return new Promise(resolve => {
-    execFile('curl', ['-sSL', '-m', String(secs), '-A', UA, '-w', '\n@@@%{http_code}', url],
-      { timeout: (secs + 5) * 1000, maxBuffer: 32 * 1024 * 1024 },
-      (err, stdout) => {
-        const s = stdout || '';
-        const at = s.lastIndexOf('\n@@@');
-        if (at < 0) return resolve({ code: '000', html: '', failed: true });
-        resolve({ code: s.slice(at + 4).trim() || '000', html: s.slice(0, at), failed: false });
-      });
-  });
-}
-
-/* 끊긴 연결은 재시도한다 — 프록시가 이따금 터널을 닫는다 */
+/* 끊긴 연결은 재시도하고, 그래도 000 이면 프록시를 지나지 않는 길로 한 번 더 묻는다.
+   프록시가 터널을 닫으면(ws_closed_mid_exchange) curl 은 000 을 돌려주는데
+   같은 주소를 Node fetch 로는 받아 온다 — 그때 ⚠ 는 링크가 아니라 길의 문제다. */
 async function fetchWithRetry(url, tries = 3) {
-  for (let i = 0; i < tries; i++) {
-    const r = await curl(url, 50);
-    if (!r.failed && r.code !== '000') return r;
-    await new Promise(z => setTimeout(z, 2500 * (i + 1)));
-  }
-  return { code: '000', html: '', failed: true };
+  const r = await get(url, { secs: 50, body: true, tries, gap: 2500 });
+  return { code: r.code, html: r.html, failed: r.code === '000', via: r.via };
 }
 
 const strip = s => s.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, '');
