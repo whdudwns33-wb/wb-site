@@ -25,6 +25,7 @@
  */
 import fs from 'node:fs';
 import { get } from './net-get.mjs';
+import { shellGroups, shellReport } from './shell-detect.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -247,5 +248,13 @@ for (const it of items) {
 console.log(`\n${'─'.repeat(56)}`);
 console.log(`출처 ${items.length}개 · 정상 ${items.length - bad - warn} · 결함 ${bad} · 확인 필요 ${warn}`);
 if (warn) console.log('⚠ 는 봇 차단이나 순간 오류일 수 있습니다 — 브라우저로 한 번 열어 보고 판단하세요.');
+
+/* 같은 껍데기를 돌려주는 호스트 — 「본문 확인」으로 통과한 자리가 섞여 있어 따로 적는다.
+   제목 낱말이 누리집 메뉴 목록에 우연히 들어 있으면 통과해 버리기 때문이다. */
+const shells = shellGroups(rows);
+if (shells.length) {
+  console.log(`\n같은 껍데기로 보이는 자리 ${shells.length}곳 — 자바스크립트로 그리는 지면일 수 있습니다`);
+  for (const line of shellReport(shells)) console.log('  ' + line);
+}
 if (jsonOut) { fs.writeFileSync(jsonOut, JSON.stringify(rows, null, 2)); console.log(`결과 저장: ${jsonOut}`); }
 process.exit(bad ? 1 : 0);
