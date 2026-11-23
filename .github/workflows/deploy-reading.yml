@@ -250,7 +250,11 @@ jobs:
           id=$(find_d1)
           if [ -z "$id" ]; then npx --yes --prefer-offline $WRANGLER d1 create wb-reading-mcp-keys >/dev/null; id=$(find_d1); fi
           if [ -z "$id" ]; then echo "::error::읽기 MCP 키 D1 id 를 얻지 못했습니다"; exit 1; fi
-          D1_ID="$id" node -e 'const fs=require("fs");const f="wrangler.toml";fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace("__READING_MCP_D1_ID__",process.env.D1_ID))'
-          grep -q "$id" wrangler.toml
+          # replace 는 첫 한 자리만 바꾼다 — 자리표가 주석에도 적혀 있어 2026-11-21~23 배포가
+          # 주석만 바꾸고 database_id 는 자리표째 남긴 채 d1 execute 로 갔다(Invalid uuid 7400).
+          # 그래서 replaceAll 로 바꾸고, 「id 가 어딘가 있다」가 아니라 「자리표가 없다」로 막는다.
+          D1_ID="$id" node -e 'const fs=require("fs");const f="wrangler.toml";fs.writeFileSync(f,fs.readFileSync(f,"utf8").replaceAll("__READING_MCP_D1_ID__",process.env.D1_ID))'
+          if grep -q "__READING_MCP_D1_ID__" wrangler.toml; then echo "::error::wrangler.toml 에 __READING_MCP_D1_ID__ 자리표가 남았습니다"; exit 1; fi
+          grep -q "database_id = \"$id\"" wrangler.toml
           npx --yes --prefer-offline $WRANGLER d1 execute MCP_KEYS --remote --file=mcp-keys.sql -y
           npx --yes --prefer-offline $WRANGLER deploy
