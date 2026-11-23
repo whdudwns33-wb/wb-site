@@ -9,6 +9,8 @@ const html = fs.readFileSync(__dirname + '/index.html','utf8');
 test('push always displays generic notification without payload or tokens and wakes foreground refresh',async()=>{
   const handlers={}, notifications=[], messages=[];
   const self={
+    // request-sw.js 는 self.location.pathname 으로 설치 워커인지 가른다.
+    location:{pathname:'/task/request-sw.js'},
     addEventListener:(type,f)=>handlers[type]=f,
     registration:{scope:'https://example.test/task/',showNotification:async(title,options)=>notifications.push({title,options})},
     clients:{matchAll:async()=>[
@@ -28,6 +30,8 @@ test('push always displays generic notification without payload or tokens and wa
 test('notification click focuses task window without acknowledging request or navigating foreign URL',async()=>{
   const handlers={};let focused=0,refreshed=0,closed=0;
   const self={
+    // request-sw.js 는 self.location.pathname 으로 설치 워커인지 가른다.
+    location:{pathname:'/task/request-sw.js'},
     addEventListener:(type,f)=>handlers[type]=f,
     registration:{scope:'https://example.test/task/'},
     clients:{matchAll:async()=>[{url:'https://example.test/task/?u=example',

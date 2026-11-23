@@ -21,11 +21,19 @@ test('personal links use a phone layout below 721px and a tablet-native layout a
   assert.match(html, /html\.person-mobile \.btn,[\s\S]{0,120}min-height: 44px;/);
 });
 
-test('personal home shortcut keeps its staff scope and is intentionally not a PWA', () => {
+/* 2026-11-21 커밋 48e4f0b 가 /task/ 를 설치할 수 있게 바꿨다(직원 태블릿 홈 화면).
+   그래서 「PWA 가 아니다」라는 옛 전제는 여기서 접는다. 대신 바뀌면 안 되는 쪽을 못 박는다 —
+   설치 범위가 /task/ 를 넘지 않고, 개인 링크의 ?u= 는 주소에서 지워지지 않아야 한다.
+   설치 자체를 되돌리려면 고칠 자리는 이 검사가 아니라 task/index.html 의 매니페스트·등록 두 줄이다. */
+test('personal home shortcut keeps its staff scope and installs only within /task/', () => {
   const head = html.slice(0, html.indexOf('</head>'));
   const scrub = html.slice(html.indexOf('function scrubBootstrapCodeFromAddress'), html.indexOf('function classifyPersonLinkError'));
-  assert.doesNotMatch(head, /rel=["']manifest["']/i);
-  assert.doesNotMatch(html, /serviceWorker\.register/);
+  assert.match(head, /<link rel="manifest" href="\/task\/manifest\.webmanifest"/);
+  assert.match(head, /serviceWorker\.register\('\/task\/sw\.js'\)/);
+  assert.equal((html.match(/serviceWorker\.register\(/g) || []).length, 1, '워커 등록은 /task/ 하나뿐이어야 한다');
+  const manifest = JSON.parse(fs.readFileSync(__dirname + '/manifest.webmanifest', 'utf8'));
+  assert.equal(manifest.scope, '/task/');
+  assert.equal(manifest.start_url, '/task/');
   assert.match(html, /return location\.origin \+ location\.pathname \+ '\?u=' \+ encodeURIComponent\(id\) \+ '#c='/);
   assert.match(scrub, /new URLSearchParams\(location\.search\)/);
   assert.doesNotMatch(scrub, /\.delete\(["']u["']\)/);
