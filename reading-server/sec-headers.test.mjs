@@ -59,7 +59,7 @@ try {
     if (p.startsWith('/haru/v2/')) {
       ok(r.status === 200, p + ' 새 안내 경로가 열리지 않는다');
       const body = await r.text();
-      ok(body.includes('id="main"') && body.includes('삼육중 및 영재원 대비'), p + ' 읽기 안내 대신 다른 화면을 받았다');
+      ok(body.includes('id="main"') && body.includes('영재원 대비 삼육중 화산중 영선중 용정중 컨설팅 앱웹'), p + ' 읽기 안내 대신 다른 화면을 받았다');
     }
     for (const k of Object.keys(WANT)) {
       ok(r.headers.get(k) === WANT[k],

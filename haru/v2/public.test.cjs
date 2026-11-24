@@ -44,7 +44,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     const { outputs } = await import(pathToFileURL(path.join(__dirname,'build.mjs')).href);
     for (const [file, expected] of Object.entries(outputs)) {
       const html = read(file); assert.equal(html, expected, '생성물을 다시 빌드하세요: ' + file);
-      assert.match(html, /lang="ko"/); assert.match(html, /삼육중 및 영재원 대비/);
+      assert.match(html, /lang="ko"/); assert.match(html, /영재원 대비 삼육중 화산중 영선중 용정중 컨설팅 앱웹/);
       for (const route of ['/haru/v2/samyook/', '/haru/v2/gwangju-gifted/', '/haru/', '/haru/v2/#other']) assert.ok(html.includes('href="' + route + '"'));
       assert.doesNotMatch(html, /<(?:form|iframe|object)\b|\bon\w+=|\/api\/|localStorage|sessionStorage|indexedDB|serviceWorker|fetch\s*\(/);
       for (const match of html.matchAll(/(?:href|src)="([^"]+)"/g)) {
@@ -378,6 +378,17 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     assert.match(html,/건강기록·동의서를 수집하지 않습니다/);
     assert.match(html,/수업 시간·횟수·수강료·담당자·개설일은 모두 미정/);
     assert.doesNotMatch(html,/약도 이미지·안전관리 첨부 전문은 미검수/);
+  });
+  await test('컨설팅 앱 이름과 다섯 대상의 독립 진입점을 모든 화면에 표시', () => {
+    const name='영재원 대비 삼육중 화산중 영선중 용정중 컨설팅 앱웹';
+    for(const file of ['index.html','samyook/index.html','gwangju-gifted/index.html','middle-schools/index.html']){
+      const html=read(file);assert.ok(html.includes(name));assert.doesNotMatch(html,/삼육중 및 영재원 대비/);
+      for(const route of ['gwangju-gifted/','samyook/','middle-schools/#hs','middle-schools/#ys','middle-schools/#yj'])assert.ok(html.includes('href="/haru/v2/'+route+'"'));
+    }
+    const home=read('index.html');for(const id of ['gifted','samyook','hs','ys','yj'])assert.ok(home.includes('id="path-'+id+'"'));
+    assert.match(home,/기존 학습실은 삼육중 학습용/);assert.match(home,/수업|준비 과정/);
+    for(const file of ['../index.html','../parent.html','../guide.html','../../reading-server/haru-staff.html','../../reading-server/public/haru-admin.html'])assert.ok(read(file).includes(name));
+    const manifest=JSON.parse(read('../manifest.webmanifest'));assert.equal(manifest.name,name);assert.equal(manifest.short_name,name);assert.equal(manifest.start_url,'./');assert.equal(manifest.scope,'./');
   });
   console.log('새 공개 안내:', count, '개 통과');
 })().catch(error => { console.error(error); process.exitCode = 1; });
