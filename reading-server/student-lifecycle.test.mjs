@@ -32,7 +32,13 @@ const errors = [];
 const E = (m) => errors.push(m);
 const ok = (cond, m) => { if (!cond) E(m); };
 
-const srv = spawn(process.execPath, [path.join(DIR, 'server.mjs')], {
+// 하루 시험 자료의 학습 기간 안에서 실행해 실제 날짜에 따라 이용 기간이 끝나지 않게 한다.
+const TEST_NOW = Date.parse('2026-10-01T10:00:00+09:00');
+const clockSetup = `import { mock } from 'node:test';
+mock.timers.enable({ apis: ['Date'], now: ${TEST_NOW} });`;
+const srv = spawn(process.execPath, [
+  '--import', 'data:text/javascript,' + encodeURIComponent(clockSetup), path.join(DIR, 'server.mjs'),
+], {
   env: { ...process.env, PORT: String(PORT), DATA_DIR: DATA, ADMIN_PIN: PIN },
   stdio: 'ignore',
 });
@@ -129,7 +135,7 @@ try {
     body: { state: { marker: 'naesin-life', summary: { packId: PACK_ID, word: { total: 1, reached: 1 } } } } })).body.ok, '⑥-2 내신 기록 저장 실패');
   ok((await req('/api/naesin/state', { token: stuTok })).body.state?.marker === 'naesin-life', '⑥-2 내신 기록을 다시 못 읽는다');
   const beforeQuestions=(await req('/api/naesin/state',{token:stuTok})).body.state;
-  ok((await req('/api/naesin/state',{method:'PUT',token:stuTok,body:{state:{...beforeQuestions,owner:CODE,packs:{...beforeQuestions.packs,[questionPack.packId]:{savedAt:Date.now(),wrong:{'i:id:own-question':{cleared:false}}}},savedAt:Date.now()}}})).body.ok,'문제 전용 학습 기록 저장 실패');
+  ok((await req('/api/naesin/state',{method:'PUT',token:stuTok,body:{state:{...beforeQuestions,owner:CODE,packs:{...beforeQuestions.packs,[questionPack.packId]:{savedAt:TEST_NOW,wrong:{'i:id:own-question':{cleared:false}}}},savedAt:TEST_NOW}}})).body.ok,'문제 전용 학습 기록 저장 실패');
   const questionState=(await req('/api/naesin/state',{token:stuTok})).body.state;
   ok(questionState?.packs?.[questionPack.packId]?.wrong?.['i:id:own-question']?.cleared===false,'문제 전용 오답 기록 왕복 실패');
   const exams = (await req('/api/naesin/admin/exams', { token: admin })).body.exams || [];
