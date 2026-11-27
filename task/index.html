@@ -1543,6 +1543,7 @@ function load() {
 
 function save() {
   invalidateTaskQueryIndex();
+  previousTaskMemos.checkIndex = null;
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
   catch (e) { toast('저장 공간이 부족합니다'); }
 }
@@ -1712,6 +1713,17 @@ function setCheck(taskId, date, patch) {
   save();
   queueSync();
   return next;
+}
+
+function setAttendanceBatch(rows) {
+  // 한 번의 확인으로 저장하는 출석 묶음은 전체 캐시를 학생 수만큼 쓰지 않는다.
+  // 비동기 대기 전에 모두 저장하므로 창을 닫아도 기존과 같이 기기 기록이 남는다.
+  rows.forEach(row => {
+    const taskId = row.task.id, date = row.recordDate, key = ckey(taskId, date);
+    const cur = state.checks[key] || { taskId, date, done: false, note: '', steps: {}, count: 0, blocked: false };
+    state.checks[key] = Object.assign({}, cur, { att: 'P', absenceType: '', updatedAt: now() });
+  });
+  if (rows.length) { save(); queueSync(); }
 }
 
 /* ══════════════════════════════════════════════════════
@@ -4250,7 +4262,7 @@ function currentStaff() {
  * 화면 전체가 다시 그려져도 사용자가 직접 펼친 details는 유지한다.
  * 숫자·날짜처럼 계속 바뀌는 summary 부분은 키에서 정규화하고, 같은 제목은 DOM 순서로 구분한다.
  */
-function persistentDetailsKey(details, root) {
+function persistentDetailsKey(details, root, positions) {
   if (!details || !root) return '';
   const explicit = String(details.dataset.persistKey || '');
   if (explicit) return (root.dataset.renderedRoute || route) + '|explicit|' + explicit;
@@ -4260,6 +4272,11 @@ function persistentDetailsKey(details, root) {
   const task = details.closest('[data-task]');
   const classes = Array.from(details.classList).sort().join('.');
   const base = [root.dataset.renderedRoute || route, task ? task.dataset.task : '', classes, summaryKey].join('|');
+  if (positions) {
+    const position = positions.get(base) || 0;
+    positions.set(base, position + 1);
+    return base + '|' + position;
+  }
   const peers = Array.from(root.querySelectorAll('details')).filter(item => {
     const itemSummary = item.querySelector(':scope > summary');
     const itemSummaryKey = String(itemSummary && itemSummary.textContent || '')
@@ -4273,8 +4290,9 @@ function persistentDetailsKey(details, root) {
 
 function capturePersistentDetails(root) {
   if (!root) return;
+  const positions = new Map();
   root.querySelectorAll('details').forEach(details => {
-    const key = persistentDetailsKey(details, root);
+    const key = persistentDetailsKey(details, root, positions);
     if (!key) return;
     persistentDetailsState.set(key, details.open);
   });
@@ -4282,17 +4300,63 @@ function capturePersistentDetails(root) {
 
 function restorePersistentDetails(root) {
   if (!root) return;
+  const positions = new Map();
   root.querySelectorAll('details').forEach(details => {
-    const key = persistentDetailsKey(details, root);
+    const key = persistentDetailsKey(details, root, positions);
     if (key && persistentDetailsState.has(key)) details.open = persistentDetailsState.get(key);
   });
+}
+
+function todayCardMarkupMatches(previous, next, live) {
+  if (previous.outerHTML === next.outerHTML) return true;
+  // 미저장 메모가 렌더링 초안에도 들어오면, 같은 입력을 이미 가진 카드는 유지한다.
+  const fields = '[data-lesson-memo-field]';
+  const beforeFields = previous.querySelectorAll(fields);
+  const afterFields = next.querySelectorAll(fields);
+  const liveFields = live.querySelectorAll(fields);
+  if (!beforeFields.length || beforeFields.length !== afterFields.length || beforeFields.length !== liveFields.length) return false;
+  const withDraft = previous.cloneNode(true);
+  withDraft.querySelectorAll(fields).forEach((field, index) => {
+    if (afterFields[index].defaultValue === liveFields[index].value) field.defaultValue = liveFields[index].value;
+  });
+  return withDraft.outerHTML === next.outerHTML;
+}
+
+function patchTodayView(root, next) {
+  const previous = root.todayTemplate;
+  if (!previous || root.children.length !== previous.children.length ||
+      next.children.length !== previous.children.length) return false;
+  const oldNodes = Array.from(previous.children), nextNodes = Array.from(next.children);
+  if (oldNodes.some((node, i) => node.tagName !== nextNodes[i].tagName)) return false;
+  oldNodes.forEach((node, i) => {
+    const replacement = nextNodes[i], live = root.children[i];
+    if (node.outerHTML === replacement.outerHTML) return;
+    // 다른 학생의 펼친 카드와 입력란은 그대로 두고 바뀐 수업만 교체한다.
+    const beforeRows = Array.from(node.children), afterRows = Array.from(replacement.children);
+    const sameTasks = node.classList.contains('today-task-grid') && replacement.classList.contains('today-task-grid') &&
+      beforeRows.length === afterRows.length && live.children.length === beforeRows.length &&
+      beforeRows.every((row, j) => row.dataset.task && row.dataset.task === afterRows[j].dataset.task &&
+        live.children[j].dataset.task === row.dataset.task);
+    if (sameTasks) beforeRows.forEach((row, j) => {
+      if (!todayCardMarkupMatches(row, afterRows[j], live.children[j])) live.children[j].replaceWith(afterRows[j].cloneNode(true));
+    });
+    else live.replaceWith(replacement.cloneNode(true));
+  });
+  return true;
 }
 
 function replaceView(root, html) {
   const fingerprint = renderMarkupFingerprint(html);
   if (root.dataset.renderedRoute === route && root.dataset.renderFingerprint === fingerprint) return false;
   capturePersistentDetails(root);
-  root.innerHTML = html;
+  let next = null;
+  if (route === 'today') {
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    next = template.content;
+  }
+  if (!(next && root.dataset.renderedRoute === route && patchTodayView(root, next))) root.innerHTML = html;
+  root.todayTemplate = next;
   root.dataset.renderedRoute = route;
   root.dataset.renderFingerprint = fingerprint;
   restorePersistentDetails(root);
@@ -4378,6 +4442,8 @@ async function loadOperationsSnapshot() {
   }
 }
 function render() {
+  // 외부 조회가 출결 객체를 직접 갱신한 경우에도 이번 화면은 최신 기록으로 만든다.
+  previousTaskMemos.checkIndex = null;
   if (window.WBTaskPush) window.WBTaskPush.refresh();
   if (sync.recovering && !shouldGateStaffWork()) { renderSyncRecoveryNotice(); return; }
   syncRenderPending = false;
@@ -6314,7 +6380,8 @@ async function saveQuickAttendanceBatch() {
   if (!rows.length) return toast('미입력 수업을 선택해 주세요');
   if (!confirm(rows.map(row => row.task.studentName || studentOf(row.task)).join(', ') + '\n' + rows.length + '수업을 출석 처리할까요?')) return;
   quickAttendance.busy = true;
-  rows.forEach(row => { quickAttendance.errors.delete(row.task.id); setCheck(row.task.id, row.recordDate, { att: 'P', absenceType: '' }); });
+  rows.forEach(row => quickAttendance.errors.delete(row.task.id));
+  setAttendanceBatch(rows);
   quickAttendance.selected.clear(); render();
   try { await settleSync(); toast(rows.length + '수업 출석 저장 완료'); }
   catch (error) { rows.forEach(row => quickAttendance.errors.set(row.task.id, '기기 저장됨 · 서버 반영 확인 필요: ' + String(sync.err || error.message))); }
@@ -6586,6 +6653,18 @@ function taskMemoEditorHtml(t, date, c, editable) {
 }
 
 function previousTaskMemos(taskId, beforeDate) {
+  // 저장 때 비우고, 서버 동기화·로그인 전환으로 객체가 바뀌어도 새로 만든다.
+  // 카드마다 모든 학생의 출결을 훑지 않고 해당 수업 기록만 읽는다.
+  let index = previousTaskMemos.checkIndex;
+  if (!index || index.source !== state.checks) {
+    const byTask = new Map();
+    Object.values(state.checks || {}).forEach(row => {
+      if (!row) return;
+      if (!byTask.has(row.taskId)) byTask.set(row.taskId, []);
+      byTask.get(row.taskId).push(row);
+    });
+    index = previousTaskMemos.checkIndex = { source: state.checks, byTask };
+  }
   const task = (state.tasks || []).find(row => row.id === taskId);
   const inherited = task && task.inheritedLessonMemos;
   // 서버에서 확인해 연결한 같은 학생·원수업의 메모만 읽기 전용으로 보여준다.
@@ -6593,7 +6672,7 @@ function previousTaskMemos(taskId, beforeDate) {
     inherited.sourceTaskId === task.predecessorTaskId && Array.isArray(inherited.records)
     ? inherited.records.filter(row => row && (row.taskId === inherited.sourceTaskId ||
         (Array.isArray(inherited.sourceTaskIds) && inherited.sourceTaskIds.includes(row.taskId))) && row.date < task.start) : [];
-  const rows = Object.values(state.checks || {}).filter(row => row && row.taskId === taskId).concat(archived).map(row => {
+  const rows = (index.byTask.get(taskId) || []).concat(archived).map(row => {
     let note = String(row.note || '').trim();
     const memo = row.lessonMemo || {};
     if (!note) note = [['contentProgress','수업내용 · 진도'],['homework','과제'],['guardianNotice','안내사항'],['otherNotes','기타 · 특이사항']]
@@ -7137,6 +7216,7 @@ async function saveGuardianPublication(container, button) {
   guardianPublicationDrafts.set(key, { publicHomework: homework, publicReadiness: readiness, studentVisible: published && studentVisible });
   guardianPublicationErrors.delete(key);
   guardianPublicationSaving.add(key);
+  const saveLabel = button && button.textContent;
   if (button) { button.disabled = true; button.textContent = '숙제 · 준비물 저장 중…'; }
   try {
     const result = await sync.post('/parent-portal', {
@@ -7166,6 +7246,7 @@ async function saveGuardianPublication(container, button) {
     }
   } finally {
     guardianPublicationSaving.delete(key);
+    if (button) { button.disabled = false; button.textContent = saveLabel; }
     if (route === 'today') renderAfterSync();
   }
 }
@@ -26780,6 +26861,16 @@ window.WBPrivateChat.init({
   allowed: () => centerChatCanRequest(), post: (path, body) => sync.post(path, body),
   esc, bodyHtml: centerChatBodyHtml
 });
+// 예전 요청함이 비어 있을 때만 조회 간격을 늘린다. 새 요청 수신은 최대 60초,
+// 미확인 요청이 있으면 15초이며 직접 열기·푸시·화면 복귀는 기존 즉시 조회다.
+const quietRequestPoll = new Map();
+function requestPollDue(key, active, timestamp) {
+  const previous = quietRequestPoll.get(key);
+  // 타이머가 원래 박자로 돌아오며 수 ms 짧아져도 한 회차를 더 건너뛰지 않는다.
+  if (previous !== undefined && timestamp >= previous && timestamp - previous < (active ? 15000 : 60000) - 2000) return false;
+  quietRequestPoll.set(key, timestamp);
+  return true;
+}
 startSyncSession();
 setInterval(() => {
   if (document.visibilityState === 'visible' && centerChatCanRequest()) loadCenterChat(false);
@@ -26811,10 +26902,15 @@ setInterval(() => {
   if (document.visibilityState === 'visible' && liveRoute && auth && (session.isAdmin || session.isStaffLink)) {
     if (typeof refreshVisibleWeekendVisitScopes === 'function') refreshVisibleWeekendVisitScopes(true);
     if (typeof refreshVisibleLessonHandoffs === 'function') refreshVisibleLessonHandoffs(true, true);
-    loadAdminDirectives(true, true);
+    const pollScope = String(session.staffId || '') + ':' + String(session.isAdmin);
+    const pollAt = Date.now();
+    const activeDirectives = !adminDirectiveManageLoaded && !adminDirectiveOwnLoaded ||
+      adminDirectiveManageRows.concat(adminDirectiveOwnRows).some(row => row.isCurrent && row.directiveStatus === 'active');
+    if (requestPollDue(pollScope + ':directives', activeDirectives, pollAt)) loadAdminDirectives(true, true);
     loadStudentChanges(true);
     if (session.isAdmin) {
-      loadTeacherLiveRequests(true, true);
+      const activeRequests = !teacherLiveRequestLoaded || teacherLiveRequestRows.some(row => !row.acknowledgedAt);
+      if (requestPollDue(pollScope + ':teacher', activeRequests, pollAt)) loadTeacherLiveRequests(true, true);
       loadTuitionAlerts(true, true);
     }
   }

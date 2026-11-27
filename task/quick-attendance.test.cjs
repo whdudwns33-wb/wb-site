@@ -25,6 +25,7 @@ function setup() {
     currentStaff:()=>({id:'teacher'}),cursor:'2026-10-17',session:{isStaffLink:true},shouldGateStaffWork:()=>false,shouldGatePersonAccess:()=>false,
     confirm:()=>true,toast:()=>{},render:()=>{},setCheck:(id,date,patch)=>{writes.push({id,date,patch});checks[id]=patch;},settleSync:async()=>{},sync:{}
   };
+  ctx.setAttendanceBatch = rows => rows.forEach(row => ctx.setCheck(row.task.id, row.recordDate, { att:'P', absenceType:'' }));
   vm.createContext(ctx); vm.runInContext(source+'\nthis.qa=quickAttendance;',ctx); return ctx;
 }
 test('own lessons sorted; same student makeup separate; actual date and cutoff respected',()=>{

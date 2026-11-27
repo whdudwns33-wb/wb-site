@@ -117,12 +117,15 @@ test('보이는 관리자와 개인 링크는 모두 15초마다 학생 변경�
     const calls = { directives: 0, changes: 0, teacherRequests: 0, tuition: 0 };
     const execute = new Function(
       'setInterval', 'sync', 'document', 'session', 'loadAdminDirectives', 'loadStudentChanges',
-      'loadTeacherLiveRequests', 'loadTuitionAlerts', 'shouldGateStaffWork', pollSource
+      'loadTeacherLiveRequests', 'loadTuitionAlerts', 'shouldGateStaffWork',
+      'requestPollDue', 'adminDirectiveManageLoaded', 'adminDirectiveOwnLoaded',
+      'adminDirectiveManageRows', 'adminDirectiveOwnRows', 'teacherLiveRequestLoaded', 'teacherLiveRequestRows', pollSource
     );
     execute((fn, delay) => { assert.equal(delay, 15000); callback = fn; },
       { auth: () => ({ mode: session.isAdmin ? 'admin' : 'person' }) }, { visibilityState: 'visible' }, session,
       () => { calls.directives += 1; }, () => { calls.changes += 1; },
-      () => { calls.teacherRequests += 1; }, () => { calls.tuition += 1; }, () => false);
+      () => { calls.teacherRequests += 1; }, () => { calls.tuition += 1; }, () => false,
+      () => true, false, false, [], [], false, []);
     assert.equal(typeof callback, 'function');
     callback();
     return calls;
