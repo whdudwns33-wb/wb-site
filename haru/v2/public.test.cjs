@@ -84,7 +84,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     for (const entry of data.directory) assert.ok(home.includes('id="directory-' + entry.id + '"'));
     assert.match(home, /2026 운영·2027 모집의 전수 확인은 미완료/);
     for (const id of ['art','kiwoom','kaist-gwangju','jnu']) assert.ok(gifted.includes('id="' + id + '"'));
-    assert.equal(data.courses.filter(c => ['kiwoom','kaist-gwangju','jnu'].includes(c.institution)).length, 0);
+    assert.equal(data.courses.filter(c => ['kiwoom','kaist-gwangju'].includes(c.institution)).length, 0);
     assert.equal(data.events.filter(e => ['kiwoom','kaist-gwangju'].includes(e.institution)).length, 0);
     assert.match(data.admissions.find(a => a.institution === 'kaist-gwangju').restrictions, /상충/);
     const jb = data.directory.find(i => i.id === 'jb-ai');
@@ -146,7 +146,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     assert.equal(jeonju.events[0].end, '2026-11-17T17:00');
     assert.match(data.directory.find(i => i.id === 'jn-25908').limits, /예술의 인접지역/);
     assert.match(data.directory.find(i => i.id === 'jn-ged').limits, /모든 운영기관 명부는 아님/);
-    assert.equal(data.courses.length, 21);
+    assert.equal(data.courses.length, 25);
     for (const id of ['jn-cyber', 'jb-cyber']) {
       const entry = data.directory.find(e => e.id === id);
       assert.deepEqual(entry.events, []);
@@ -199,7 +199,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
       assert.equal(source.status, '전년도 참고');
     }
     assert.equal(data.directory.length, 69);
-    assert.equal(data.courses.length, 21);
+    assert.equal(data.courses.length, 25);
     for (const id of ['jn-cyber', 'jb-cyber']) {
       const entry = data.directory.find(e => e.id === id);
       assert.deepEqual(entry.events, []);
@@ -378,6 +378,38 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     assert.match(html,/건강기록·동의서를 수집하지 않습니다/);
     assert.match(html,/수업 시간·횟수·수강료·담당자·개설일은 모두 미정/);
     assert.doesNotMatch(html,/약도 이미지·안전관리 첨부 전문은 미검수/);
+  });
+  await test('전남대 5개 전형은 학년·검사·추천 면제·서류와 등록을 구분', () => {
+    const a=data.admissions.find(a=>a.institution==='jnu'), html=read('gwangju-gifted/index.html');
+    assert.equal(a.tracks.length,5);
+    assert.deepEqual(data.courses.filter(c=>c.institution==='jnu').map(c=>c.grades),[[5],[6],[6],[6]]);
+    assert.match(a.tracks[0].documents,/자기소개서.*일반 심화 공통 필수로 요구하지/);
+    assert.match(a.tracks[1].target,/2026 영재교육기관 수료/);
+    for(const t of [a.tracks[1],a.tracks[3]]) assert.match(t.documents,/추천서는 자체 대체.*동시 접수|동시 접수.*추천서는 자체 대체/);
+    assert.match(a.tracks[2].target,/전체 합계 15명/); assert.match(a.tracks[3].target,/전체 합계 3명/);
+    assert.match(a.tracks[4].target,/기회균등.*6개월/);
+    assert.match(a.tracks[4].documents,/기관이 직접 추천서.*온라인 추천 표기/);
+    assert.match(a.restrictions,/§2.*§8.*기관 확인/);
+    const events=data.events.filter(e=>e.institution==='jnu');
+    assert.equal(events.find(e=>e.kind==='원서').end,'2026-11-23T18:00');
+    assert.equal(events.find(e=>e.kind==='교사추천').end,'2026-11-24T18:00');
+    const exam=events.find(e=>e.kind==='시험');assert.equal(exam.start,'2026-11-28T14:00');assert.match(exam.note,/사사Ⅰ·특별전형.*구분/);
+    assert.equal(events.find(e=>e.kind==='면접').end,'2026-12-12');
+    assert.equal(events.find(e=>e.kind==='등록').end,'2026-12-22T17:00');
+    for(const t of a.tracks){const src=data.sources.find(s=>s.id===t.source);assert.equal(src.checkedAt,'2026-10-27');assert.equal(src.status,'공식 확인');assert.ok(html.includes(src.url));}
+    assert.doesNotMatch(html,/세부 과정·지원 학년·지역·추천·증빙·평가·접수·등록은 10\/15 공지 예정/);
+    const bad=structuredClone(data);bad.admissions.find(a=>a.institution==='jnu').tracks[0].source='없음';assert.throws(()=>catalog.validate(bad));
+  });
+  await test('광주 추가 공지의 수집 실패·전년도·상충과 운영 미정을 보존', () => {
+    for(const id of ['kiwoom','kaist-gwangju','gice','ai','art','gnue']){
+      const source=data.sources.find(s=>s.id===id.replace('kaist-gwangju','kaist')+'-followup-1027');
+      assert.ok(source);assert.equal(source.checkedAt,'2026-10-27');assert.notEqual(source.status,'공식 확인');
+    }
+    const ai=data.sources.find(s=>s.id==='ai-followup-1027');assert.equal(ai.retrieval,'수집 실패');
+    assert.match(ai.note,/TLS.*수집/);
+    assert.match(data.sources.find(s=>s.id==='kaist-followup-1027').note,/IP영재기업인.*다른 과정/);
+    assert.match(read('gwangju-gifted/index.html'),/WB 수업 시간·횟수·수강료·담당·개설일은 모두 미정/);
+    assert.equal(data.events.filter(e=>['kiwoom','kaist-gwangju'].includes(e.institution)).length,0);
   });
   console.log('새 공개 안내:', count, '개 통과');
 })().catch(error => { console.error(error); process.exitCode = 1; });
